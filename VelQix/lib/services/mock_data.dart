@@ -1,0 +1,327 @@
+import '../models/models.dart';
+
+class MockDataService {
+  static final UserModel currentUser = UserModel(
+    id: 'u1',
+    nom: 'Kofi',
+    prenom: 'Ama',
+    email: 'ama.kofi@example.com',
+    telephone: '+228 90 12 34 56',
+    isVerified: false,
+    rating: 4.8,
+    totalAvis: 23,
+    createdAt: DateTime(2023, 6, 15),
+    role: 'proprietaire',
+    isPremium: false,
+  );
+
+  // ✅ Compte admin par défaut
+  static final UserModel adminUser = UserModel(
+    id: 'admin_1',
+    nom: 'Admin',
+    prenom: 'VelQix',
+    email: 'admin@innorent.tg',
+    telephone: '+228 90 00 00 00',
+    isVerified: true,
+    rating: 5.0,
+    totalAvis: 0,
+    createdAt: DateTime(2023, 1, 1),
+    role: 'admin',
+    isPremium: true,
+  );
+
+  static final List<UserModel> users = [
+    currentUser,
+    UserModel(
+      id: 'u2', nom: 'Mensah', prenom: 'Kwame',
+      email: 'kwame@example.com', telephone: '+228 91 23 45 67',
+      isVerified: true, rating: 4.5, totalAvis: 18,
+      createdAt: DateTime(2023, 8, 10), role: 'proprietaire',
+    ),
+    UserModel(
+      id: 'u3', nom: 'Attiogbe', prenom: 'Sena',
+      email: 'sena@example.com', telephone: '+228 92 34 56 78',
+      isVerified: false, rating: 4.2, totalAvis: 7,
+      createdAt: DateTime(2024, 1, 20), role: 'client',
+    ),
+    UserModel(
+      id: 'u4', nom: 'Afélete', prenom: 'Mawuli',
+      email: 'mawuli@example.com', telephone: '+228 93 45 67 89',
+      isVerified: true, rating: 4.9, totalAvis: 45,
+      createdAt: DateTime(2023, 3, 5), role: 'proprietaire', isPremium: true,
+    ),
+  ];
+
+  static List<PropertyModel> get properties => [
+    PropertyModel(
+      id: 'p1',
+      titre: 'Villa moderne avec piscine',
+      description: 'Magnifique villa de 4 chambres avec piscine privée, jardin tropical et vue sur la mer. Idéale pour familles ou expatriés. Cuisine équipée, double salon, sécurité 24h. Connexion fibre optique disponible.',
+      type: PropertyType.immobilier,
+      listingType: ListingType.location,
+      categorie: PropertyCategory.maison,
+      prix: 450000,
+      prixParJour: '15 000 FCFA/mois',
+      images: [
+        'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800',
+        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800',
+      ],
+      adresse: AddressModel(rue: 'Boulevard du 13 Janvier', ville: 'Lomé', pays: 'Togo', latitude: 6.1375, longitude: 1.2123),
+      proprietaire: users[1],
+      caracteristiques: ['4 chambres', '3 salles de bain', 'Piscine', 'Jardin', 'Parking', 'Sécurité', 'Wifi'],
+      rating: 4.8, totalAvis: 12, isFeatured: true, vues: 342,
+      surface: '320 m²', nombrePieces: 7,
+      createdAt: DateTime(2024, 2, 10),
+ 
+      titreTranslations: {'en': 'Modern villa with pool', 'es': 'Villa moderna con piscina', 'pt': 'Villa moderna com piscina', 'de': 'Moderne Villa mit Pool', 'ar': 'فيلا حديثة مع مسبح'},
+      descriptionTranslations: {'en': 'Magnificent 4-bedroom villa with private pool, tropical garden and sea view. Ideal for families or expats. Fully equipped kitchen, double lounge, 24h security. Fiber optic internet available.', 'es': 'Magnífica villa de 4 habitaciones con piscina privada, jardín tropical y vista al mar. Ideal para familias o expatriados. Cocina equipada, doble salón, seguridad 24h. Conexión de fibra óptica disponible.', 'pt': 'Magnífica villa de 4 quartos com piscina privada, jardim tropical e vista para o mar. Ideal para famílias ou expatriados. Cozinha equipada, dupla sala, segurança 24h. Fibra ótica disponível.', 'de': 'Herrliche 4-Zimmer-Villa mit privatem Pool, tropischem Garten und Meerblick. Ideal für Familien oder Expats. Voll ausgestattete Küche, Doppelwohnzimmer, 24h-Sicherheit. Glasfaser-Internet verfügbar.', 'ar': 'فيلا رائعة من 4 غرف مع مسبح خاص وحديقة استوائية وإطلالة على البحر. مثالية للعائلات أو المغتربين. مطبخ مجهز، صالتان، حراسة 24 ساعة. إنترنت فائق السرعة متاح.'},
+      caracteristiquesTranslations: {
+        'en': ['4 bedrooms', '3 bathrooms', 'Pool', 'Garden', 'Parking', 'Security', 'Wifi'],
+        'es': ['4 habitaciones', '3 baños', 'Piscina', 'Jardín', 'Parking', 'Seguridad', 'Wifi'],
+        'pt': ['4 quartos', '3 casas de banho', 'Piscina', 'Jardim', 'Estacionamento', 'Segurança', 'Wifi'],
+        'de': ['4 Schlafzimmer', '3 Badezimmer', 'Pool', 'Garten', 'Parkplatz', 'Sicherheit', 'Wifi'],
+        'ar': ['4 غرف نوم', '3 حمامات', 'مسبح', 'حديقة', 'موقف سيارات', 'أمن', 'واي فاي'],
+      },
+    ),
+    PropertyModel(
+      id: 'p2',
+      titre: 'Toyota Corolla 2022 – État neuf',
+      description: 'Toyota Corolla 2022, automatique, climatisée, faible kilométrage (28 000 km). Entretien régulier chez concessionnaire. Carnet d\'entretien complet. Idéale pour usage quotidien ou voyage d\'affaires.',
+      type: PropertyType.mobilier,
+      listingType: ListingType.les_deux,
+      categorie: PropertyCategory.voiture,
+      prix: 12500000,
+      prixParJour: '35 000 FCFA/jour',
+      images: [
+        'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800',
+        'https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=800',
+      ],
+      adresse: AddressModel(rue: 'Quartier Bè', ville: 'Lomé', pays: 'Togo', latitude: 6.1450, longitude: 1.2312),
+      proprietaire: users[3],
+      caracteristiques: ['Automatique', 'Climatisée', 'GPS', '5 places', '28 000 km', 'Essence'],
+      rating: 4.9, totalAvis: 8, isFeatured: true, vues: 218, annee: 2022,
+      createdAt: DateTime(2024, 3, 5),
+ 
+      titreTranslations: {'en': 'Toyota Corolla 2022 – Like new', 'es': 'Toyota Corolla 2022 – Como nuevo', 'pt': 'Toyota Corolla 2022 – Como novo', 'de': 'Toyota Corolla 2022 – Wie neu', 'ar': 'تويوتا كورولا 2022 – كالجديدة'},
+      descriptionTranslations: {'en': 'Toyota Corolla 2022, automatic, air-conditioned, low mileage (28,000 km). Regular dealer maintenance. Full service history. Ideal for daily use or business travel.', 'es': 'Toyota Corolla 2022, automático, climatizado, bajo kilometraje (28 000 km). Mantenimiento regular en concesionario. Historial de servicio completo. Ideal para uso diario o viajes de negocios.', 'pt': 'Toyota Corolla 2022, automático, com ar condicionado, baixa quilometragem (28 000 km). Manutenção regular no concessionário. Histórico de serviço completo. Ideal para uso diário ou viagens de negócios.', 'de': 'Toyota Corolla 2022, Automatik, klimatisiert, niedrige Laufleistung (28.000 km). Regelmäßige Händlerwartung. Vollständiges Serviceheft. Ideal für den täglichen Gebrauch oder Geschäftsreisen.', 'ar': 'تويوتا كورولا 2022، أوتوماتيك، مكيفة، قليلة الكيلومترات (28,000 كم). صيانة منتظمة لدى الوكيل. سجل صيانة كامل. مثالية للاستخدام اليومي أو السفر للأعمال.'},
+      caracteristiquesTranslations: {
+        'en': ['Automatic', 'Air conditioning', 'GPS', '5 seats', '28,000 km', 'Petrol'],
+        'es': ['Automático', 'Climatizado', 'GPS', '5 plazas', '28 000 km', 'Gasolina'],
+        'pt': ['Automático', 'Ar condicionado', 'GPS', '5 lugares', '28 000 km', 'Gasolina'],
+        'de': ['Automatik', 'Klimaanlage', 'GPS', '5 Sitze', '28.000 km', 'Benzin'],
+        'ar': ['أوتوماتيك', 'مكيف', 'GPS', '5 مقاعد', '28,000 كم', 'بنزين'],
+      },
+    ),
+    PropertyModel(
+      id: 'p3',
+      titre: 'Appartement meublé centre-ville',
+      description: 'Bel appartement F3 entièrement meublé au cœur de Lomé. Salon moderne, 2 chambres climatisées, cuisine équipée, connexion internet incluse. Idéal pour professionnels ou courts séjours.',
+      type: PropertyType.immobilier,
+      listingType: ListingType.location,
+      categorie: PropertyCategory.appartement,
+      prix: 280000,
+      prixParJour: '280 000 FCFA/mois',
+      images: [
+        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
+        'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
+      ],
+      adresse: AddressModel(rue: 'Avenue Nicolas Grunitzky', ville: 'Lomé', pays: 'Togo', latitude: 6.1420, longitude: 1.2200),
+      proprietaire: users[0],
+      caracteristiques: ['2 chambres', 'Meublé', 'Climatisé', 'Internet', 'Gardiennage', '2ème étage'],
+      rating: 4.5, totalAvis: 15, vues: 189,
+      surface: '85 m²', nombrePieces: 4,
+      createdAt: DateTime(2024, 1, 20),
+ 
+      titreTranslations: {'en': 'Furnished apartment city centre', 'es': 'Apartamento amueblado centro ciudad', 'pt': 'Apartamento mobilado centro da cidade', 'de': 'Möblierte Wohnung Stadtzentrum', 'ar': 'شقة مفروشة وسط المدينة'},
+      descriptionTranslations: {'en': 'Beautiful fully furnished F3 apartment in the heart of Lomé. Modern living room, 2 air-conditioned bedrooms, equipped kitchen, internet included. Ideal for professionals or short stays.', 'es': 'Hermoso apartamento F3 completamente amueblado en el corazón de Lomé. Salón moderno, 2 habitaciones climatizadas, cocina equipada, conexión a internet incluida. Ideal para profesionales o estancias cortas.', 'pt': 'Belo apartamento F3 totalmente mobilado no coração de Lomé. Sala moderna, 2 quartos com ar condicionado, cozinha equipada, internet incluída. Ideal para profissionais ou estadias curtas.', 'de': 'Schöne, voll möblierte F3-Wohnung im Herzen von Lomé. Modernes Wohnzimmer, 2 klimatisierte Schlafzimmer, ausgestattete Küche, Internet inklusive. Ideal für Berufstätige oder Kurzaufenthalte.', 'ar': 'شقة F3 مفروشة بالكامل في قلب لومي. غرفة معيشة حديثة، غرفتا نوم مكيفتان، مطبخ مجهز، إنترنت مشمول. مثالية للمهنيين أو الإقامات القصيرة.'},
+      caracteristiquesTranslations: {
+        'en': ['2 bedrooms', 'Furnished', 'Air conditioning', 'Internet', 'Security guard', '2nd floor'],
+        'es': ['2 habitaciones', 'Amueblado', 'Climatizado', 'Internet', 'Vigilancia', '2ª planta'],
+        'pt': ['2 quartos', 'Mobilado', 'Ar condicionado', 'Internet', 'Segurança', '2º andar'],
+        'de': ['2 Schlafzimmer', 'Möbliert', 'Klimaanlage', 'Internet', 'Wachschutz', '2. Etage'],
+        'ar': ['غرفتان', 'مفروش', 'مكيف', 'إنترنت', 'حراسة', 'الطابق الثاني'],
+      },
+    ),
+    PropertyModel(
+      id: 'p4',
+      titre: 'Terrain constructible Agoè',
+      description: 'Grand terrain de 600 m² à Agoè-Nyivé, zone résidentielle en plein développement. Titre foncier en règle, bornage effectué. Accès asphalté, eau et électricité disponibles.',
+      type: PropertyType.immobilier,
+      listingType: ListingType.vente,
+      categorie: PropertyCategory.terrain,
+      prix: 8500000,
+      images: [
+        'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800',
+      ],
+      adresse: AddressModel(rue: 'Rue de l\'Industrie', ville: 'Agoè', pays: 'Togo', latitude: 6.2100, longitude: 1.1900),
+      proprietaire: users[1],
+      caracteristiques: ['600 m²', 'Titre foncier', 'Borné', 'Eau', 'Électricité', 'Route asphaltée'],
+      rating: 4.3, totalAvis: 5, vues: 97, surface: '600 m²',
+      createdAt: DateTime(2024, 2, 28),
+ 
+      titreTranslations: {'en': 'Buildable land Agoè', 'es': 'Terreno edificable Agoè', 'pt': 'Terreno para construção Agoè', 'de': 'Baugrundstück Agoè', 'ar': 'أرض صالحة للبناء أغوي'},
+      descriptionTranslations: {'en': 'Large 600 m² plot in Agoè-Nyivé, a rapidly developing residential area. Clear land title, surveyed. Paved access, water and electricity available.', 'es': 'Gran terreno de 600 m² en Agoè-Nyivé, zona residencial en pleno desarrollo. Título de propiedad en regla, deslindado. Acceso asfaltado, agua y electricidad disponibles.', 'pt': 'Grande terreno de 600 m² em Agoè-Nyivé, zona residencial em pleno desenvolvimento. Título de propriedade em ordem, demarcado. Acesso asfaltado, água e eletricidade disponíveis.', 'de': 'Großes Grundstück von 600 m² in Agoè-Nyivé, einem schnell wachsenden Wohngebiet. Klarer Grundstückstitel, vermessen. Gepflasterter Zugang, Wasser und Strom vorhanden.', 'ar': 'قطعة أرض كبيرة مساحتها 600 م² في أغوي-نييفي، منطقة سكنية في طور التطوير. صك ملكية سليم، مرسومة الحدود. طريق معبد، ماء وكهرباء متاحان.'},
+      caracteristiquesTranslations: {
+        'en': ['600 m²', 'Land title', 'Surveyed', 'Water', 'Electricity', 'Paved road'],
+        'es': ['600 m²', 'Título de propiedad', 'Deslindado', 'Agua', 'Electricidad', 'Carretera asfaltada'],
+        'pt': ['600 m²', 'Título de propriedade', 'Demarcado', 'Água', 'Eletricidade', 'Estrada asfaltada'],
+        'de': ['600 m²', 'Grundstückstitel', 'Vermessen', 'Wasser', 'Strom', 'Asphaltstraße'],
+        'ar': ['600 م²', 'صك ملكية', 'مرسومة', 'ماء', 'كهرباء', 'طريق معبد'],
+      },
+    ),
+    PropertyModel(
+      id: 'p5',
+      titre: 'Groupe électrogène 20 KVA',
+      description: 'Groupe électrogène 20 KVA en parfait état de fonctionnement. Idéal pour entreprises, événements ou zones sans électricité stable. Livraison possible. Entretien régulier effectué.',
+      type: PropertyType.mobilier,
+      listingType: ListingType.location,
+      categorie: PropertyCategory.equipement,
+      prix: 45000,
+      prixParJour: '45 000 FCFA/jour',
+      images: [
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+      ],
+      adresse: AddressModel(rue: 'Zone Industrielle', ville: 'Lomé', pays: 'Togo', latitude: 6.1550, longitude: 1.2400),
+      proprietaire: users[3],
+      caracteristiques: ['20 KVA', 'Diesel', 'Silencieux', 'Livraison', 'Opérateur inclus'],
+      rating: 4.7, totalAvis: 22, vues: 145,
+      createdAt: DateTime(2024, 1, 15),
+ 
+      titreTranslations: {'en': '20 KVA generator set', 'es': 'Grupo electrógeno 20 KVA', 'pt': 'Gerador 20 KVA', 'de': 'Stromgenerator 20 KVA', 'ar': 'مولد كهربائي 20 KVA'},
+      descriptionTranslations: {'en': '20 KVA generator in perfect working condition. Ideal for businesses, events or areas without stable electricity. Delivery possible. Regular maintenance carried out.', 'es': 'Grupo electrógeno de 20 KVA en perfecto estado de funcionamiento. Ideal para empresas, eventos o zonas sin electricidad estable. Entrega posible. Mantenimiento regular realizado.', 'pt': 'Gerador de 20 KVA em perfeitas condições de funcionamento. Ideal para empresas, eventos ou zonas sem eletricidade estável. Entrega possível. Manutenção regular efetuada.', 'de': 'Stromgenerator 20 KVA in einwandfreiem Betriebszustand. Ideal für Unternehmen, Veranstaltungen oder Gebiete ohne stabilen Strom. Lieferung möglich. Regelmäßige Wartung durchgeführt.', 'ar': 'مولد كهربائي 20 KVA في حالة عمل مثالية. مثالي للمؤسسات والفعاليات أو المناطق بدون كهرباء ثابتة. التوصيل متاح. صيانة دورية منتظمة.'},
+      caracteristiquesTranslations: {
+        'en': ['20 KVA', 'Diesel', 'Silent', 'Delivery', 'Operator included'],
+        'es': ['20 KVA', 'Diésel', 'Silencioso', 'Entrega', 'Operador incluido'],
+        'pt': ['20 KVA', 'Diesel', 'Silencioso', 'Entrega', 'Operador incluído'],
+        'de': ['20 KVA', 'Diesel', 'Geräuschlos', 'Lieferung', 'Bediener inklusive'],
+        'ar': ['20 KVA', 'ديزل', 'صامت', 'توصيل', 'مشغل مشمول'],
+      },
+    ),
+    PropertyModel(
+      id: 'p6',
+      titre: 'Bureau commercial – Quartier Adewui',
+      description: 'Espace bureau de 60 m² au 1er étage, quartier Adewui. Climatisé, parkings, salle de réunion partagée. Ideal pour PME, cabinets ou représentations commerciales.',
+      type: PropertyType.immobilier,
+      listingType: ListingType.les_deux,
+      categorie: PropertyCategory.bureau,
+      prix: 350000,
+      images: [
+        'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800',
+        'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=800',
+      ],
+      adresse: AddressModel(rue: 'Rue de la Kozah', ville: 'Lomé', pays: 'Togo', latitude: 6.1380, longitude: 1.2050),
+      proprietaire: users[0],
+      caracteristiques: ['60 m²', 'Climatisé', 'Parking', 'Salle de réunion', 'Wifi', 'Sécurité'],
+      rating: 4.6, totalAvis: 9, vues: 134,
+      surface: '60 m²',
+      createdAt: DateTime(2024, 3, 1),
+ 
+      titreTranslations: {'en': 'Commercial office – Adewui district', 'es': 'Oficina comercial – Barrio Adewui', 'pt': 'Escritório comercial – Bairro Adewui', 'de': 'Gewerbebüro – Stadtviertel Adewui', 'ar': 'مكتب تجاري – حي أديووي'},
+      descriptionTranslations: {'en': '60 m² office space on the 1st floor, Adewui district. Air-conditioned, parking, shared meeting room. Ideal for SMEs, professional offices or commercial representatives.', 'es': 'Espacio de oficina de 60 m² en el 1er piso, barrio Adewui. Climatizado, aparcamientos, sala de reuniones compartida. Ideal para PYMES, despachos o representaciones comerciales.', 'pt': 'Espaço de escritório de 60 m² no 1º andar, bairro Adewui. Climatizado, estacionamentos, sala de reuniões partilhada. Ideal para PMEs, gabinetes ou representações comerciais.', 'de': '60 m² Bürofläche im 1. Obergeschoss, Stadtviertel Adewui. Klimatisiert, Parkplätze, gemeinsamer Besprechungsraum. Ideal für KMU, Kanzleien oder Handelsvertretungen.', 'ar': 'مساحة مكتبية 60 م² في الطابق الأول، حي أديووي. مكيفة، مواقف سيارات، قاعة اجتماعات مشتركة. مثالية للشركات الصغيرة والمتوسطة أو المكاتب التجارية.'},
+      caracteristiquesTranslations: {
+        'en': ['60 m²', 'Air conditioning', 'Parking', 'Meeting room', 'Wifi', 'Security'],
+        'es': ['60 m²', 'Climatizado', 'Aparcamiento', 'Sala de reuniones', 'Wifi', 'Seguridad'],
+        'pt': ['60 m²', 'Ar condicionado', 'Estacionamento', 'Sala de reuniões', 'Wifi', 'Segurança'],
+        'de': ['60 m²', 'Klimaanlage', 'Parkplatz', 'Besprechungsraum', 'Wifi', 'Sicherheit'],
+        'ar': ['60 م²', 'مكيف', 'موقف سيارات', 'قاعة اجتماعات', 'واي فاي', 'أمن'],
+      },
+    ),
+    PropertyModel(
+      id: 'p7',
+      titre: 'Mercedes-Benz Vito 2020 – 9 places',
+      description: 'Mercedes Vito 2020, 9 places, diesel, parfait pour transferts aéroport, excursions ou transport d\'équipe. Climatisé, confortable, avec chauffeur disponible en option.',
+      type: PropertyType.mobilier,
+      listingType: ListingType.location,
+      categorie: PropertyCategory.camion,
+      prix: 75000,
+      prixParJour: '75 000 FCFA/jour',
+      images: [
+        'https://images.unsplash.com/photo-1464219789935-c2d9d9aba644?w=800',
+      ],
+      adresse: AddressModel(rue: 'Aéroport de Lomé', ville: 'Lomé', pays: 'Togo', latitude: 6.1657, longitude: 1.2545),
+      proprietaire: users[3],
+      caracteristiques: ['9 places', 'Diesel', 'Climatisé', 'Chauffeur optionnel', 'GPS'],
+      rating: 4.8, totalAvis: 31, vues: 267, annee: 2020,
+      createdAt: DateTime(2024, 1, 5),
+ 
+      titreTranslations: {'en': 'Mercedes-Benz Vito 2020 – 9 seats', 'es': 'Mercedes-Benz Vito 2020 – 9 plazas', 'pt': 'Mercedes-Benz Vito 2020 – 9 lugares', 'de': 'Mercedes-Benz Vito 2020 – 9 Sitze', 'ar': 'مرسيدس-بنز فيتو 2020 – 9 مقاعد'},
+      descriptionTranslations: {'en': 'Mercedes Vito 2020, 9-seater, diesel, perfect for airport transfers, excursions or team transport. Air-conditioned, comfortable, driver available as an option.', 'es': 'Mercedes Vito 2020, 9 plazas, diésel, perfecto para traslados al aeropuerto, excursiones o transporte de equipo. Climatizado, confortable, con conductor disponible como opción.', 'pt': 'Mercedes Vito 2020, 9 lugares, diesel, perfeito para transferes de aeroporto, excursões ou transporte de equipa. Climatizado, confortável, condutor disponível como opção.', 'de': 'Mercedes Vito 2020, 9-Sitzer, Diesel, perfekt für Flughafentransfers, Ausflüge oder Teamtransporte. Klimatisiert, komfortabel, Fahrer optional verfügbar.', 'ar': 'مرسيدس فيتو 2020، 9 مقاعد، ديزل، مثالية لنقل المطار والرحلات أو تنقل الفريق. مكيفة، مريحة، سائق متاح كخيار.'},
+      caracteristiquesTranslations: {
+        'en': ['9 seats', 'Diesel', 'Air conditioning', 'Optional driver', 'GPS'],
+        'es': ['9 plazas', 'Diésel', 'Climatizado', 'Conductor opcional', 'GPS'],
+        'pt': ['9 lugares', 'Diesel', 'Ar condicionado', 'Condutor opcional', 'GPS'],
+        'de': ['9 Sitze', 'Diesel', 'Klimaanlage', 'Fahrer optional', 'GPS'],
+        'ar': ['9 مقاعد', 'ديزل', 'مكيف', 'سائق اختياري', 'GPS'],
+      },
+    ),
+    PropertyModel(
+      id: 'p8',
+      titre: 'Maison 3 chambres à vendre – Tokoin',
+      description: 'Maison bien entretenue de 3 chambres à Tokoin Habitat. Deux salles de bain, salon, cuisine, cour clôturée. Titre foncier disponible. Quartier calme et sécurisé.',
+      type: PropertyType.immobilier,
+      listingType: ListingType.vente,
+      categorie: PropertyCategory.maison,
+      prix: 35000000,
+      images: [
+        'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800',
+        'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800',
+      ],
+      adresse: AddressModel(rue: 'Tokoin Habitat', ville: 'Lomé', pays: 'Togo', latitude: 6.1600, longitude: 1.2180),
+      proprietaire: users[1],
+      caracteristiques: ['3 chambres', '2 salles de bain', 'Cour clôturée', 'Titre foncier', 'Eau', 'Électricité'],
+      rating: 4.4, totalAvis: 6, vues: 312,
+      surface: '180 m²', nombrePieces: 6,
+      createdAt: DateTime(2024, 2, 14),
+ 
+      titreTranslations: {'en': '3-bedroom house for sale – Tokoin', 'es': 'Casa de 3 habitaciones en venta – Tokoin', 'pt': 'Casa de 3 quartos à venda – Tokoin', 'de': '3-Zimmer-Haus zu verkaufen – Tokoin', 'ar': 'منزل 3 غرف للبيع – توكوين'},
+      descriptionTranslations: {'en': 'Well-maintained 3-bedroom house in Tokoin Habitat. Two bathrooms, living room, kitchen, enclosed courtyard. Land title available. Quiet and secure neighbourhood.', 'es': 'Casa bien conservada de 3 habitaciones en Tokoin Habitat. Dos baños, salón, cocina, patio cercado. Título de propiedad disponible. Barrio tranquilo y seguro.', 'pt': 'Casa bem conservada de 3 quartos em Tokoin Habitat. Duas casas de banho, sala, cozinha, pátio vedado. Título de propriedade disponível. Bairro tranquilo e seguro.', 'de': 'Gut gepflegtes 3-Zimmer-Haus in Tokoin Habitat. Zwei Badezimmer, Wohnzimmer, Küche, eingezäunter Hof. Grundstückstitel verfügbar. Ruhige und sichere Nachbarschaft.', 'ar': 'منزل محافظ عليه من 3 غرف في توكوين هابيتات. حمامان، صالة، مطبخ، فناء مسور. صك ملكية متاح. حي هادئ وآمن.'},
+      caracteristiquesTranslations: {
+        'en': ['3 bedrooms', '2 bathrooms', 'Enclosed courtyard', 'Land title', 'Water', 'Electricity'],
+        'es': ['3 habitaciones', '2 baños', 'Patio cercado', 'Título de propiedad', 'Agua', 'Electricidad'],
+        'pt': ['3 quartos', '2 casas de banho', 'Pátio vedado', 'Título de propriedade', 'Água', 'Eletricidade'],
+        'de': ['3 Schlafzimmer', '2 Badezimmer', 'Eingezäunter Hof', 'Grundstückstitel', 'Wasser', 'Strom'],
+        'ar': ['3 غرف نوم', '2 حمام', 'فناء مسور', 'صك ملكية', 'ماء', 'كهرباء'],
+      },
+    ),
+  ];
+
+  static List<TransactionModel> get myTransactions => [
+    TransactionModel(
+      id: 't1', property: properties[0], client: users[2],
+      type: 'location', montant: 450000, statut: 'confirme',
+      dateDebut: DateTime(2024, 4, 1), dateFin: DateTime(2024, 4, 30),
+      methode: 'mobile_money', createdAt: DateTime(2024, 3, 25),
+    ),
+    TransactionModel(
+      id: 't2', property: properties[2], client: users[2],
+      type: 'location', montant: 280000, statut: 'termine',
+      dateDebut: DateTime(2024, 2, 1), dateFin: DateTime(2024, 2, 28),
+      methode: 'mobile_money', createdAt: DateTime(2024, 1, 28),
+    ),
+    TransactionModel(
+      id: 't3', property: properties[1], client: currentUser,
+      type: 'location', montant: 35000, statut: 'en_attente',
+      dateDebut: DateTime(2024, 4, 15), dateFin: DateTime(2024, 4, 16),
+      methode: 'carte', createdAt: DateTime(2024, 4, 10),
+    ),
+  ];
+
+  static List<AvisModel> get avis => [
+    AvisModel(id: 'a1', auteur: users[2], cible: 'p1', note: 5.0,
+        commentaire: 'Magnifique villa, exactement comme sur les photos. Très propre et bien équipée.', createdAt: DateTime(2024, 3, 20)),
+    AvisModel(id: 'a2', auteur: users[1], cible: 'p1', note: 4.5,
+        commentaire: 'Très bon séjour. Piscine excellente. Propriétaire réactif.', createdAt: DateTime(2024, 2, 15)),
+    AvisModel(id: 'a3', auteur: users[2], cible: 'p2', note: 5.0,
+        commentaire: 'Voiture impeccable, comme du neuf. Je recommande vivement !', createdAt: DateTime(2024, 3, 28)),
+  ];
+
+  // Notifications mock
+  static final List<Map<String, dynamic>> notifications = [
+    {'id': 'n1', 'titre': 'Réservation confirmée', 'message': 'Votre réservation pour "Villa moderne" a été confirmée.', 'type': 'success', 'lu': false, 'date': DateTime.now().subtract(const Duration(hours: 2))},
+    {'id': 'n2', 'titre': 'Nouveau message', 'message': 'Kwame Mensah vous a envoyé un message concernant votre annonce.', 'type': 'message', 'lu': false, 'date': DateTime.now().subtract(const Duration(hours: 5))},
+    {'id': 'n3', 'titre': 'Paiement reçu', 'message': 'Vous avez reçu 280 000 FCFA pour "Appartement meublé".', 'type': 'payment', 'lu': true, 'date': DateTime.now().subtract(const Duration(days: 1))},
+    {'id': 'n4', 'titre': 'Nouvel avis', 'message': 'Sena Attiogbe a laissé un avis 5 étoiles sur votre bien.', 'type': 'review', 'lu': true, 'date': DateTime.now().subtract(const Duration(days: 2))},
+    {'id': 'n5', 'titre': 'Annonce validée', 'message': 'Votre annonce "Bureau commercial" a été validée par l\'administrateur.', 'type': 'info', 'lu': true, 'date': DateTime.now().subtract(const Duration(days: 3))},
+  ];
+}

@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../models/models.dart';
+import '../services/mock_data.dart';
+import '../theme/app_theme.dart';
+import '../widgets/widgets.dart';
+import 'property_detail_screen.dart';
+
+class FavoritesScreen extends StatefulWidget {
+  const FavoritesScreen({super.key});
+  @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  // Simuler quelques favoris
+  late List<PropertyModel> _favorites;
+
+  @override
+  void initState() {
+    super.initState();
+    _favorites = MockDataService.properties.take(4).toList();
+  }
+
+  void _removeFav(PropertyModel p) {
+    setState(() => _favorites.remove(p));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Retiré des favoris', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+      backgroundColor: AppTheme.textSecondary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      action: SnackBarAction(
+        label: 'Annuler',
+        textColor: Colors.white,
+        onPressed: () => setState(() => _favorites.add(p)),
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(margin: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)]),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary)),
+        ),
+        title: Text('Mes favoris', style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+        centerTitle: true,
+      ),
+      body: _favorites.isEmpty
+          ? EmptyState(
+              icon: Icons.favorite_border_rounded,
+              title: 'Aucun favori',
+              subtitle: 'Ajoutez des biens à vos favoris pour les retrouver facilement.',
+            )
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Row(children: [
+                    Text('${_favorites.length} bien${_favorites.length > 1 ? 's' : ''} sauvegardé${_favorites.length > 1 ? 's' : ''}',
+                        style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+                  ]),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _favorites.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) => _FavoriteCard(
+                      property: _favorites[i],
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: _favorites[i]))),
+                      onRemove: () => _removeFav(_favorites[i]),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _FavoriteCard extends StatelessWidget {
+  final PropertyModel property;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
+  const _FavoriteCard({required this.property, required this.onTap, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = property;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface, borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
+              child: Image.network(p.firstImage, width: 110, height: 110, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(width: 110, height: 110, color: AppTheme.divider)),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(child: Text(p.titre, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      GestureDetector(
+                        onTap: onRemove,
+                        child: const Icon(Icons.favorite_rounded, color: AppTheme.error, size: 20),
+                      ),
+                    ]),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textHint),
+                      const SizedBox(width: 3),
+                      Text(p.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      const Icon(Icons.star_rounded, size: 13, color: AppTheme.accentLight),
+                      const SizedBox(width: 3),
+                      Text('${p.rating} (${p.totalAvis})', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(child: Text(formatFcfa(p.prix), style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: p.listingType == ListingType.vente ? AppTheme.success.withOpacity(0.1) : AppTheme.info.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(p.listingLabel, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600,
+                            color: p.listingType == ListingType.vente ? AppTheme.success : AppTheme.info)),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

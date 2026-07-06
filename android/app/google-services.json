@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "465274402627",
+    "project_id": "smart-innovators-8524f",
+    "storage_bucket": "smart-innovators-8524f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:465274402627:android:44031058e5718f4e6f21f6",
+        "android_client_info": {
+          "package_name": "com.example.innorent"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "465274402627-7qtn4rava253u4qh0gbr6bv74pu9ieqm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbdhc4XOp2Kn7nr7nla_f0rE_RmPBtCzs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "465274402627-7qtn4rava253u4qh0gbr6bv74pu9ieqm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

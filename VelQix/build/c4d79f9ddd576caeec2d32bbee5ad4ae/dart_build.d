@@ -1,0 +1,1 @@
+ C:\\Users\\glola\\VLQX\\velqix\\build\\c4d79f9ddd576caeec2d32bbee5ad4ae\\dart_build_result.json:  C:\\Users\\glola\\VLQX\\velqix\\.dart_tool\\package_config.json C:\\Users\\glola\\VLQX\\velqix\\pubspec.yaml C:\\flutter\\flutter\\bin\\cache\\dart-sdk\\version c:\\users\\glola\\vlqx\\velqix\\.dart_tool\\package_config.json
