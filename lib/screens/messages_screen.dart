@@ -322,6 +322,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String get _otherUserId => widget.otherUserId ?? (widget.user?.id as String? ?? '');
 
   bool _isTyping = false; // l'autre utilisateur est en train d'écrire
+  Timer? _typingTimer;    // permet d'annuler le timer précédent à chaque événement
 
   late StreamSubscription<MessageModel> _msgSub;
   late StreamSubscription<Map<String, dynamic>> _typingSub;
@@ -359,9 +360,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _typingSub = ChatService.instance.onTyping.listen((data) {
       if (data['senderId'] == _otherUserId && mounted) {
         setState(() => _isTyping = data['isTyping'] == true);
+        // On annule le timer précédent à chaque nouvel événement : sinon,
+        // si l'autre personne tape en continu, plusieurs timers s'accumulent
+        // et l'un d'eux coupe l'indicateur alors qu'elle tape toujours.
+        _typingTimer?.cancel();
         if (_isTyping) {
-          // Éteindre l'indicateur après 3 secondes si pas de mise à jour
-          Future.delayed(const Duration(seconds: 3), () {
+          _typingTimer = Timer(const Duration(seconds: 3), () {
             if (mounted) setState(() => _isTyping = false);
           });
         }
@@ -379,6 +383,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgSub.cancel();
     _typingSub.cancel();
     _readSub.cancel();
+    _typingTimer?.cancel();
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     // Arrêter l'indicateur de frappe si on quitte

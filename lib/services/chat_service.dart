@@ -231,13 +231,13 @@ class ChatService {
     return [];
   }
 
-  // ─── Envoi avec optimistic UI ─────────────────────────────────────
+  // ─── Envoi avec optimistic UI + fallback HTTP ─────────────────────
+  // Si le socket est indisponible (ou ne répond pas), on retombe sur
+  // POST /api/messages plutôt que d'abandonner silencieusement le message.
   Future<MessageModel?> sendMessage({
     required String receiverId,
     required String text,
   }) async {
-    if (!_isConnected || _socket == null) return null;
-
     final tempId  = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final tempMsg = MessageModel(
       id: tempId, senderId: _currentUserId ?? '',
@@ -250,27 +250,63 @@ class ChatService {
       lastMessageAt: tempMsg.sentAt, incrementUnread: false,
     );
 
-    final completer = Completer<MessageModel?>();
-    _socket!.emitWithAck(
-      'message:send',
-      {'receiverId': receiverId, 'text': text},
-      ack: (response) {
-        if (response is Map && response['success'] == true) {
-          final confirmed = _msgFromPayload(
-              Map<String, dynamic>.from(response['data']));
-          _replaceInCache(receiverId, tempId, confirmed);
-          completer.complete(confirmed);
-        } else {
-          _markFailed(receiverId, tempId);
-          completer.complete(null);
-        }
-      },
-    );
+    if (_isConnected && _socket != null) {
+      final completer = Completer<MessageModel?>();
+      _socket!.emitWithAck(
+        'message:send',
+        {'receiverId': receiverId, 'text': text},
+        ack: (response) {
+          if (response is Map && response['success'] == true) {
+            final confirmed = _msgFromPayload(
+                Map<String, dynamic>.from(response['data']));
+            _replaceInCache(receiverId, tempId, confirmed);
+            completer.complete(confirmed);
+          } else {
+            completer.complete(null);
+          }
+        },
+      );
 
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () { _markFailed(receiverId, tempId); return null; },
-    );
+      final viaSocket = await completer.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+      if (viaSocket != null) return viaSocket;
+      // Le socket a échoué ou n'a pas répondu à temps → on tente le fallback HTTP
+      debugPrint('⚠️ message:send sans réponse, fallback HTTP…');
+    }
+
+    return _sendViaHttp(receiverId: receiverId, text: text, tempId: tempId);
+  }
+
+  // ─── Fallback HTTP : POST /api/messages ───────────────────────────
+  Future<MessageModel?> _sendViaHttp({
+    required String receiverId,
+    required String text,
+    required String tempId,
+  }) async {
+    try {
+      final token = await ApiService.instance.getToken();
+      final res = await http.post(
+        Uri.parse('${ApiService.baseUrl}/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'receiverId': receiverId, 'text': text}),
+      );
+
+      if (res.statusCode == 201) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final confirmed = _msgFromPayload(body['data'] as Map<String, dynamic>);
+        _replaceInCache(receiverId, tempId, confirmed);
+        return confirmed;
+      }
+    } catch (e) {
+      debugPrint('❌ _sendViaHttp: $e');
+    }
+    _markFailed(receiverId, tempId);
+    return null;
   }
 
   // ─── Marquer comme lu ─────────────────────────────────────────────

@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.innorent"
+    namespace = "com.example.velqix"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.innorent"
+        applicationId = "com.example.velqix"
         minSdk = flutter.minSdkVersion                              // ✅ forcé à 21 (webview_flutter + google_sign_in)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
