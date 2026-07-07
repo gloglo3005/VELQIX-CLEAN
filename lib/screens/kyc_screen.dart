@@ -438,6 +438,7 @@ class _KycScreenState extends State<KycScreen> {
             : 'Permis';
     final entry = KycEntry(
       userId: user?.id ?? 'unknown',
+      docId: 'local_${DateTime.now().millisecondsSinceEpoch}', // ⚠️ voir note plus bas : cette soumission ne touche pas le backend
       nom: _nomCtrl.text.trim(),
       prenom: _prenomCtrl.text.trim(),
       docType: docLabel,
