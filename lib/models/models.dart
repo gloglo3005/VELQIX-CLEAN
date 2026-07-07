@@ -233,19 +233,22 @@ class PropertyModel {
             telephone: '', createdAt: DateTime.now(),
           );
 
-    final adresseJson = json['adresse'] as Map<String, dynamic>?;
-    final adresse = adresseJson != null
+    // NOTE : dans le schéma Prisma réel, Property.adresse est une simple String?
+    // (jamais un objet imbriqué). L'ancien code tentait un cast `as Map`, qui
+    // levait une exception dès qu'une vraie annonce avait une adresse renseignée.
+    final adresseRaw = json['adresse'];
+    final adresse = adresseRaw is Map<String, dynamic>
         ? AddressModel(
-            rue:       adresseJson['rue']       ?? '',
-            ville:     adresseJson['ville']     ?? json['ville'] ?? '',
-            pays:      adresseJson['pays']      ?? 'Togo',
-            latitude:  (adresseJson['latitude']  as num?)?.toDouble(),
-            longitude: (adresseJson['longitude'] as num?)?.toDouble(),
+            rue:       adresseRaw['rue']       ?? '',
+            ville:     adresseRaw['ville']     ?? json['ville'] ?? '',
+            pays:      adresseRaw['pays']      ?? 'Togo',
+            latitude:  (adresseRaw['latitude']  as num?)?.toDouble(),
+            longitude: (adresseRaw['longitude'] as num?)?.toDouble(),
           )
         : AddressModel(
-            rue:   json['adresse'] as String? ?? '',
-            ville: json['ville']   as String? ?? '',
-            pays:  json['pays']    as String? ?? 'Togo',
+            rue:   adresseRaw as String? ?? '',
+            ville: json['ville'] as String? ?? '',
+            pays:  json['pays']  as String? ?? 'Togo',
           );
 
     return PropertyModel(
