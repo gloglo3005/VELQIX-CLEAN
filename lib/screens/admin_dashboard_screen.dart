@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/admin_socket_service.dart'; // NEW
+import '../services/api_service.dart'; // NEW : vraies routes /api/admin/*
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, pushNotification, followedOwnersNotifier, notifyFollowersOfOwner, PropertyCard, PrimaryButton, StatCard, UserAvatar, kycPendingNotifier, KycEntry;
 import '../models/models.dart';
@@ -33,38 +34,98 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     {'id': 'l2', 'titre': 'Non-restitution Toyota', 'parties': 'Mawuli A. vs Sena A.', 'statut': 'En cours', 'date': 'Il y a 3j'},
   ];
 
+  // ── NEW : vraies données chargées depuis l'API (remplacent MockDataService) ─
+  List<UserModel> _users = [];
+  int _totalUsers = 0;
+  int _totalProperties = 0;
+  bool _loadingDashboard = true;
+  String? _dashboardError;
+
+  Future<void> _loadDashboardData() async {
+    setState(() {
+      _loadingDashboard = true;
+      _dashboardError = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        ApiService.instance.get('/admin/users?limit=100', auth: true),
+        ApiService.instance.get('/admin/stats', auth: true),
+        ApiService.instance.get('/admin/properties/pending', auth: true),
+        ApiService.instance.get('/admin/kyc/pending', auth: true),
+      ]);
+
+      final usersRes = results[0];
+      final statsRes = results[1];
+      final pendingPropsRes = results[2];
+      final kycRes = results[3];
+
+      if (usersRes['success'] == true) {
+        final list = (usersRes['data'] as List)
+            .map((j) => UserModel.fromJson(j as Map<String, dynamic>))
+            .toList();
+        _users = list;
+      }
+
+      if (statsRes['success'] == true) {
+        _totalUsers = statsRes['data']['totalUsers'] ?? _users.length;
+        _totalProperties = statsRes['data']['totalProperties'] ?? 0;
+      }
+
+      if (pendingPropsRes['success'] == true) {
+        pendingPropertiesNotifier.value = (pendingPropsRes['data'] as List)
+            .map((j) => PropertyModel.fromJson(j as Map<String, dynamic>))
+            .toList();
+      }
+
+      if (kycRes['success'] == true) {
+        kycPendingNotifier.value = (kycRes['data'] as List).map((j) {
+          final doc = j as Map<String, dynamic>;
+          final user = doc['user'] as Map<String, dynamic>? ?? {};
+          return KycEntry(
+            userId: user['id'] ?? '',
+            // NEW : on garde l'id du document KYC séparément de l'userId,
+            // il est indispensable pour appeler PUT /admin/kyc/:id/approve|reject
+            docId: doc['id'] ?? '',
+            nom: user['nom'] ?? '',
+            prenom: user['prenom'] ?? '',
+            docType: doc['docType'] ?? doc['type'] ?? 'Document',
+            numDoc: doc['numDoc'] ?? '—',
+            soumisLabel: doc['createdAt'] != null ? 'Soumis' : '',
+            soumisAt: doc['createdAt'] != null
+                ? DateTime.tryParse(doc['createdAt']) ?? DateTime.now()
+                : DateTime.now(),
+          );
+        }).toList();
+      }
+    } catch (e) {
+      _dashboardError = 'Impossible de charger les données admin : $e';
+    } finally {
+      if (mounted) setState(() => _loadingDashboard = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
 
+    // ── NEW : Charger les vraies données (users/stats/annonces/KYC) ─────────
+    _loadDashboardData();
+
     // ── NEW : Connexion Socket.io ────────────────────────────────────────────
-    // Récupère le token JWT depuis AuthService.
-    // Si AuthService n'expose pas encore 'token', utilise 'currentToken' ou
-    // stocke-le manuellement après login (ex: AuthService.instance.currentToken).
-    final token = _getAuthToken();
-    if (token != null && token.isNotEmpty) {
-      AdminSocketService.instance.connect(token: token);
-    }
+    // Le token JWT est stocké côté ApiService (SharedPreferences), pas sur
+    // AuthService lui-même (qui n'expose aucun getter `token`).
+    _connectAdminSocket();
 
     // ── NEW : Écouter les notifs live pour afficher le bandeau ──────────────
     adminLiveNotifNotifier.addListener(_onLiveNotif);
   }
 
-  @override
-  /// Retourne le token JWT de l'utilisateur connecté.
-  /// À adapter selon la signature réelle de ton AuthService.
-  String? _getAuthToken() {
-    try {
-      // Essaie les getters courants — décommente celui qui correspond à ton AuthService :
-      // return AuthService.instance.token;
-      // return AuthService.instance.currentToken;
-      // return AuthService.instance.jwtToken;
-      final auth = AuthService.instance;
-      // Accès dynamique pour éviter l'erreur de compilation si le getter n'existe pas
-      return (auth as dynamic).token as String?;
-    } catch (_) {
-      return null;
+  Future<void> _connectAdminSocket() async {
+    final token = await ApiService.instance.getToken();
+    if (token != null && token.isNotEmpty) {
+      AdminSocketService.instance.connect(token: token);
     }
   }
 
@@ -130,8 +191,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final users = MockDataService.users;
-    final properties = MockDataService.properties;
+    if (_loadingDashboard) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_dashboardError != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_dashboardError!, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            ElevatedButton(onPressed: _loadDashboardData, child: const Text('Réessayer')),
+          ]),
+        ),
+      );
+    }
+    final users = _users;
+    final properties = _totalProperties;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -204,7 +279,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           builder: (context, published, __) => TabBarView(
             controller: _tabController,
             children: [
-              _buildDashboard(users.length, properties.length + (published as List).length),
+              _buildDashboard(users.length, properties + (published as List).length),
               _buildAnnoncesValidation(),
               _buildKycValidation(),
               _buildLitiges(),
@@ -243,7 +318,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           const SizedBox(height: 20),
           Text('Utilisateurs récents', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
-          ...MockDataService.users.map((u) => Container(
+          ..._users.take(10).map((u) => Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
@@ -433,16 +508,29 @@ class _AdminRealAnnonceCard extends StatefulWidget {
 class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
   String _status = 'pending';
 
-  void _approve() {
+  bool _submitting = false;
+
+  Future<void> _approve() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
     final p = widget.property;
-    final bool isActuallyPremium;
-    final currentUser = AuthService.instance.currentUserOrEmpty;
-    if (currentUser.id == p.proprietaire.id) {
-      isActuallyPremium = currentUser.isPremium;
-    } else {
-      final found = MockDataService.users.where((u) => u.id == p.proprietaire.id);
-      isActuallyPremium = found.isNotEmpty ? found.first.isPremium : p.proprietaire.isPremium;
+    final res = await ApiService.instance.put('/admin/properties/${p.id}/approve', {}, auth: true);
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (res['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Erreur lors de l\'approbation')),
+      );
+      return;
     }
+
+    final currentUser = AuthService.instance.currentUserOrEmpty;
+    final isActuallyPremium = currentUser.id == p.proprietaire.id
+        ? currentUser.isPremium
+        : p.proprietaire.isPremium;
 
     final updatedOwner = UserModel(
       id: p.proprietaire.id,
@@ -502,8 +590,23 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
     if (mounted) setState(() => _status = 'approved');
   }
 
-  void _reject() {
+  Future<void> _reject() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
     final p = widget.property;
+    final res = await ApiService.instance.put('/admin/properties/${p.id}/reject', {}, auth: true);
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (res['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Erreur lors du rejet')),
+      );
+      return;
+    }
+
     pendingPropertiesNotifier.value =
         pendingPropertiesNotifier.value.where((e) => (e as PropertyModel).id != p.id).toList();
     pushNotification(
@@ -586,9 +689,7 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
                 final currentUser = AuthService.instance.currentUserOrEmpty;
                 final isPrem = currentUser.id == p.proprietaire.id
                     ? currentUser.isPremium
-                    : MockDataService.users.where((u) => u.id == p.proprietaire.id).isNotEmpty
-                        ? MockDataService.users.firstWhere((u) => u.id == p.proprietaire.id).isPremium
-                        : p.proprietaire.isPremium;
+                    : p.proprietaire.isPremium;
                 return Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 6, children: [
                   Text('Par ${p.proprietaire.fullName}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
                   if (isPrem) Container(
@@ -660,14 +761,49 @@ class _KycCard extends StatefulWidget {
 
 class _KycCardState extends State<_KycCard> {
   String _status = 'pending';
+  bool _submitting = false;
 
-  void _approve() {
+  Future<void> _approve() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
+    final res = await ApiService.instance.put(
+      '/admin/kyc/${widget.entry.docId}/approve', {}, auth: true,
+    );
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (res['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Erreur lors de l\'approbation du KYC')),
+      );
+      return;
+    }
+
     kycPendingNotifier.value =
         kycPendingNotifier.value.where((e) => e.userId != widget.entry.userId).toList();
     if (mounted) setState(() => _status = 'approved');
   }
 
-  void _reject() {
+  Future<void> _reject() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+
+    final res = await ApiService.instance.put(
+      '/admin/kyc/${widget.entry.docId}/reject', {}, auth: true,
+    );
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    if (res['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'Erreur lors du rejet du KYC')),
+      );
+      return;
+    }
+
     kycPendingNotifier.value =
         kycPendingNotifier.value.where((e) => e.userId != widget.entry.userId).toList();
     if (mounted) setState(() => _status = 'rejected');

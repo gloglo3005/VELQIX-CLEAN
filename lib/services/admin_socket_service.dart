@@ -1,20 +1,17 @@
 // lib/services/admin_socket_service.dart
 //
-// Service singleton qui connecte l'admin au backend via WebSocket natif.
-// Compatible Flutter Web (dart:html) ET mobile/desktop (dart:io).
-// Il écoute les événements en temps réel et met à jour les ValueNotifiers
-// existants (pendingPropertiesNotifier, kycPendingNotifier).
-//
-// Usage :
-//   Dans AdminDashboardScreen.initState() :
-//     AdminSocketService.instance.connect(token: myJwtToken);
-//   Dans AdminDashboardScreen.dispose() :
-//     AdminSocketService.instance.disconnect();
+// Service singleton qui connecte l'admin au backend via Socket.io.
+// ⚠️ Réécriture : l'ancienne version utilisait un WebSocket natif brut
+// (dart:io / dart:html), incompatible avec le protocole Socket.io utilisé
+// par le backend (voir messageRoutes.ts / adminNotificationService.ts).
+// On utilise ici le même package `socket_io_client` que chat_service.dart,
+// et on écoute l'événement `admin_notification` diffusé à la room "admin_room"
+// (que le backend fait désormais rejoindre automatiquement aux sockets admin).
 
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'api_service.dart';
 import '../widgets/widgets.dart' show pendingPropertiesNotifier, kycPendingNotifier, KycEntry;
 import '../models/models.dart';
 
@@ -37,152 +34,85 @@ class AdminSocketService {
   AdminSocketService._();
   static final instance = AdminSocketService._();
 
-  dynamic _socket; // WebSocket (dart:io ou dart:html selon la plateforme)
+  IO.Socket? _socket;
   bool _connected = false;
-  Timer? _reconnectTimer;
   String? _lastToken;
-
-  /// URL de ton backend WebSocket (production Render)
-  static const String _backendUrl = String.fromEnvironment(
-    'WS_URL',
-    defaultValue: 'wss://velqix.onrender.com/admin',
-  );
 
   // ── Connexion ───────────────────────────────────────────────────────────────
 
   void connect({required String token}) {
-    if (_connected) return;
+    if (_connected && _socket != null) return;
     _lastToken = token;
-    _connectInternal(token);
-  }
 
-  void _connectInternal(String token) {
-    try {
-      if (kIsWeb) {
-        _connectWeb(token);
-      } else {
-        _connectNative(token);
-      }
-    } catch (e) {
-      debugPrint('❌ AdminSocket erreur connexion : $e');
-      _scheduleReconnect();
-    }
-  }
-
-  // ── Connexion Flutter Web (dart:html WebSocket) ───────────────────────────
-
-  void _connectWeb(String token) {
-    // Utilisation de js_interop pour éviter l'import direct de dart:html
-    // On passe par un conditional import via une abstraction
-    _WebSocketHelper.connect(
-      url: '$_backendUrl?token=$token',
-      onOpen: () {
-        debugPrint('⚡ AdminSocket connecté (Web)');
-        _connected = true;
-        _sendRaw(jsonEncode({'type': 'join_admin_room', 'token': token}));
-      },
-      onMessage: (data) => _handleRawMessage(data),
-      onClose: () {
-        debugPrint('🔌 AdminSocket déconnecté (Web)');
-        _connected = false;
-        _scheduleReconnect();
-      },
-      onError: (e) => debugPrint('❌ AdminSocket erreur : $e'),
-      setSocket: (s) => _socket = s,
+    // Même serveur Socket.io que la messagerie (pas de namespace /admin séparé
+    // côté backend : on se connecte à la racine et on rejoint "admin_room"
+    // côté serveur en fonction du rôle décodé depuis le JWT).
+    _socket = IO.io(
+      ApiService.wsUrl,
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .setAuth({'token': token})
+          .build(),
     );
-  }
 
-  // ── Connexion Mobile/Desktop (dart:io WebSocket) ──────────────────────────
+    _socket!.onConnect((_) {
+      debugPrint('⚡ AdminSocket connecté');
+      _connected = true;
+    });
 
-  void _connectNative(String token) async {
-    // Import conditionnel via abstraction
-    _NativeSocketHelper.connect(
-      url: '$_backendUrl?token=$token',
-      onOpen: () {
-        debugPrint('⚡ AdminSocket connecté (Native)');
-        _connected = true;
-        _sendRaw(jsonEncode({'type': 'join_admin_room', 'token': token}));
-      },
-      onMessage: (data) => _handleRawMessage(data),
-      onClose: () {
-        debugPrint('🔌 AdminSocket déconnecté (Native)');
-        _connected = false;
-        _scheduleReconnect();
-      },
-      onError: (e) => debugPrint('❌ AdminSocket erreur : $e'),
-      setSocket: (s) => _socket = s,
-    );
-  }
-
-  void _sendRaw(String data) {
-    try {
-      if (_socket != null) {
-        (_socket as dynamic).send(data);
-      }
-    } catch (e) {
-      debugPrint('❌ AdminSocket send error: $e');
-    }
-  }
-
-  // ── Reconnexion automatique ──────────────────────────────────────────────
-
-  void _scheduleReconnect() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () {
-      if (!_connected && _lastToken != null) {
-        debugPrint('🔄 AdminSocket reconnexion...');
-        _connectInternal(_lastToken!);
+    _socket!.on('admin_notification', (data) {
+      if (data is Map) {
+        _handleNotification(Map<String, dynamic>.from(data));
       }
     });
+
+    _socket!.onDisconnect((_) {
+      debugPrint('🔌 AdminSocket déconnecté');
+      _connected = false;
+    });
+
+    _socket!.onConnectError((e) => debugPrint('❌ AdminSocket erreur connexion : $e'));
+    _socket!.onError((e) => debugPrint('❌ AdminSocket erreur : $e'));
+
+    _socket!.connect();
   }
 
   // ── Déconnexion ─────────────────────────────────────────────────────────────
 
   void disconnect() {
-    _reconnectTimer?.cancel();
-    try {
-      if (_socket != null) {
-        _sendRaw(jsonEncode({'type': 'leave_admin_room'}));
-        (_socket as dynamic).close();
-      }
-    } catch (_) {}
+    _socket?.disconnect();
+    _socket?.dispose();
     _socket = null;
     _connected = false;
     debugPrint('🚪 AdminSocket déconnecté proprement');
   }
 
-  // ── Handler des messages entrants ──────────────────────────────────────────
+  bool get isConnected => _connected;
 
-  void _handleRawMessage(dynamic raw) {
-    try {
-      final data = jsonDecode(raw.toString()) as Map<String, dynamic>;
-      final type    = data['type']    as String? ?? '';
-      final title   = data['title']   as String? ?? '';
-      final message = data['message'] as String? ?? '';
-      final payload = data['data'] != null
-          ? Map<String, dynamic>.from(data['data'] as Map)
-          : <String, dynamic>{};
+  // ── Handler des notifications entrantes ─────────────────────────────────────
 
-      debugPrint('📨 Admin notif reçue : $type – $title');
+  void _handleNotification(Map<String, dynamic> data) {
+    final type    = data['type']    as String? ?? '';
+    final title   = data['title']   as String? ?? '';
+    final message = data['message'] as String? ?? '';
+    final payload = data['data'] != null
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : <String, dynamic>{};
 
-      adminLiveNotifNotifier.value = AdminNotif(
-        type: type,
-        title: title,
-        message: message,
-      );
+    debugPrint('📨 Admin notif reçue : $type – $title');
 
-      switch (type) {
-        case 'NEW_PROPERTY':
-          _handleNewProperty(payload);
-          break;
-        case 'NEW_KYC':
-          _handleNewKyc(payload);
-          break;
-        default:
-          break;
-      }
-    } catch (e) {
-      debugPrint('❌ AdminSocket parse error: $e');
+    adminLiveNotifNotifier.value = AdminNotif(type: type, title: title, message: message);
+
+    switch (type) {
+      case 'NEW_PROPERTY':
+        _handleNewProperty(payload);
+        break;
+      case 'NEW_KYC':
+        _handleNewKyc(payload);
+        break;
+      default:
+        break;
     }
   }
 
@@ -241,6 +171,7 @@ class AdminSocketService {
 
   void _handleNewKyc(Map<String, dynamic> payload) {
     final userId  = payload['userId']    as String? ?? '';
+    final docId   = payload['docId']     as String? ?? payload['kycId'] as String? ?? '';
     final email   = payload['userEmail'] as String? ?? '';
     final docType = payload['docType']   as String? ?? 'Document';
 
@@ -250,6 +181,7 @@ class AdminSocketService {
     final nameParts = email.split('@').first.split('.');
     final newEntry = KycEntry(
       userId:      userId,
+      docId:       docId,
       nom:         nameParts.length > 1 ? nameParts.last  : email,
       prenom:      nameParts.isNotEmpty ? nameParts.first : email,
       docType:     docType,
@@ -262,54 +194,5 @@ class AdminSocketService {
       newEntry,
       ...kycPendingNotifier.value,
     ];
-  }
-}
-
-// ── Abstractions WebSocket (évitent les imports dart:html / dart:io directs) ─
-
-class _WebSocketHelper {
-  static void connect({
-    required String url,
-    required VoidCallback onOpen,
-    required void Function(dynamic) onMessage,
-    required VoidCallback onClose,
-    required void Function(dynamic) onError,
-    required void Function(dynamic) setSocket,
-  }) {
-    // ignore: undefined_prefixed_name
-    final ws = _createWebSocket(url);
-    setSocket(ws);
-    (ws as dynamic).onopen  = (_) => onOpen();
-    (ws as dynamic).onmessage = (e) => onMessage((e as dynamic).data);
-    (ws as dynamic).onclose = (_) => onClose();
-    (ws as dynamic).onerror = (e) => onError(e);
-  }
-
-  static dynamic _createWebSocket(String url) {
-    // dart:html n'est importable que sur Web — on passe par dart:js_util
-    throw UnimplementedError('Use _NativeSocketHelper on non-web platforms');
-  }
-}
-
-class _NativeSocketHelper {
-  static void connect({
-    required String url,
-    required VoidCallback onOpen,
-    required void Function(dynamic) onMessage,
-    required VoidCallback onClose,
-    required void Function(dynamic) onError,
-    required void Function(dynamic) setSocket,
-  }) async {
-    try {
-      // Import conditionnel réel : à remplacer par un conditional import file
-      // Pour l'instant on utilise une approche générique
-      final uri = Uri.parse(url);
-      debugPrint('🔌 Tentative connexion WebSocket : $uri');
-      // Le WebSocket natif sera initialisé ici via dart:io dans un vrai projet
-      // avec un fichier _socket_native.dart / _socket_web.dart séparé
-      onOpen();
-    } catch (e) {
-      onError(e);
-    }
   }
 }

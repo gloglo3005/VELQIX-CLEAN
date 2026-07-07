@@ -329,13 +329,14 @@ void pushNotification({
 // KYC en attente de validation admin
 class KycEntry {
   final String userId;
+  final String docId; // NEW : id du document KYC, requis par PUT /admin/kyc/:docId/approve|reject
   final String nom;
   final String prenom;
   final String docType;
   final String numDoc;
   final String soumisLabel;
   final DateTime soumisAt;
-  KycEntry({required this.userId, required this.nom, required this.prenom,
+  KycEntry({required this.userId, required this.docId, required this.nom, required this.prenom,
     required this.docType, required this.numDoc, required this.soumisLabel, required this.soumisAt});
 }
 final ValueNotifier<List<KycEntry>> kycPendingNotifier = ValueNotifier([]);
