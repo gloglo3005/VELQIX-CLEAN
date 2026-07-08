@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart'; // NEW : vraie source de données
+import '../services/property_service.dart'; // NEW : suppression / mise à jour réelles
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'property_detail_screen.dart';
@@ -180,24 +181,77 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
       itemBuilder: (_, i) => _ListingManageCard(
         property: props[i],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: props[i]))),
-        onEdit: () {},
+        onEdit: () {}, // Modification pas encore implémentée
         onDelete: () => _confirmDelete(context, props[i]),
-        onToggle: () => setState(() {}),
+        onToggle: (newValue) => _toggleAvailability(props[i], newValue),
       ),
     );
+  }
+
+  // ─── Activer / mettre en pause une annonce (persisté côté serveur) ─────────
+  Future<void> _toggleAvailability(PropertyModel p, bool newValue) async {
+    final err = await PropertyService.instance.updateProperty(p.id, {'isAvailable': newValue});
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      // Le serveur n'a pas accepté le changement → on resynchronise la liste
+      // pour que le switch revienne à son vrai état.
+      _loadMyProperties();
+      return;
+    }
+    // Succès : on recharge depuis le serveur pour que les compteurs d'onglets
+    // (Actifs / Tous / En attente) restent cohérents avec le nouveau statut.
+    _loadMyProperties();
+  }
+
+  // ─── Suppression réelle (API + retrait immédiat de la liste) ──────────────
+  Future<void> _deleteProperty(PropertyModel p) async {
+    // Suppression optimiste : on retire tout de suite de l'écran.
+    final backup = List<PropertyModel>.from(_serverProps);
+    setState(() => _serverProps.removeWhere((e) => e.id == p.id));
+
+    final err = await PropertyService.instance.deleteProperty(p.id);
+    if (!mounted) return;
+
+    if (err != null) {
+      // Échec côté serveur : on restaure la liste et on informe l'utilisateur.
+      setState(() => _serverProps = backup);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(tr('mylist_deleted'), style: GoogleFonts.poppins(color: Colors.white)),
+      backgroundColor: AppTheme.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
 
   void _confirmDelete(BuildContext ctx, PropertyModel p) {
     showDialog(
       context: ctx,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(tr('mylist_delete'), style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
         content: Text('Voulez-vous vraiment supprimer "${p.titre}" ?', style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('mylist_cancel'), style: GoogleFonts.poppins())),
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: Text(tr('mylist_cancel'), style: GoogleFonts.poppins())),
           ElevatedButton(
-            onPressed: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('mylist_deleted'), style: GoogleFonts.poppins(color: Colors.white)), backgroundColor: AppTheme.error, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))); },
+            onPressed: () {
+              Navigator.pop(dialogCtx);
+              _deleteProperty(p); // NEW : vraie suppression via l'API
+            },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: Text(tr('mylist_confirm_del'), style: GoogleFonts.poppins()),
           ),
@@ -212,7 +266,7 @@ class _ListingManageCard extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback onToggle;
+  final ValueChanged<bool> onToggle; // NEW : transmet le nouvel état au parent
   const _ListingManageCard({required this.property, required this.onTap, required this.onEdit, required this.onDelete, required this.onToggle});
 
   @override
@@ -220,7 +274,17 @@ class _ListingManageCard extends StatefulWidget {
 }
 
 class _ListingManageCardState extends State<_ListingManageCard> {
-  bool _active = true;
+  late bool _active = widget.property.isAvailable;
+
+  @override
+  void didUpdateWidget(covariant _ListingManageCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si la liste parente a été rechargée (ex: après échec de sauvegarde),
+    // on resynchronise l'état visuel du switch avec la vraie donnée serveur.
+    if (oldWidget.property.isAvailable != widget.property.isAvailable) {
+      _active = widget.property.isAvailable;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +348,7 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                       scale: 0.8,
                       child: Switch(
                         value: _active,
-                        onChanged: (v) { setState(() => _active = v); widget.onToggle(); },
+                        onChanged: (v) { setState(() => _active = v); widget.onToggle(v); },
                         activeColor: AppTheme.success,
                       ),
                     ),
