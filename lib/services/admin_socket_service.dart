@@ -111,9 +111,33 @@ class AdminSocketService {
       case 'NEW_KYC':
         _handleNewKyc(payload);
         break;
+      case 'PROPERTY_APPROVED':
+      case 'PROPERTY_REJECTED':
+        // Source de vérité serveur : on retire l'annonce de la liste "en attente"
+        // même si la réponse HTTP de l'action de CET admin a timeout côté client
+        // (ex: cold start Render) — le socket confirme que le serveur a bien traité la demande.
+        _removePendingProperty(payload['propertyId'] as String?);
+        break;
+      case 'KYC_APPROVED':
+      case 'KYC_REJECTED':
+        _removePendingKyc(payload['userId'] as String?);
+        break;
       default:
         break;
     }
+  }
+
+  void _removePendingProperty(String? propertyId) {
+    if (propertyId == null) return;
+    pendingPropertiesNotifier.value = pendingPropertiesNotifier.value
+        .where((p) => (p as PropertyModel).id != propertyId)
+        .toList();
+  }
+
+  void _removePendingKyc(String? userId) {
+    if (userId == null) return;
+    kycPendingNotifier.value =
+        kycPendingNotifier.value.where((e) => e.userId != userId).toList();
   }
 
   void _handleNewProperty(Map<String, dynamic> payload) {

@@ -23,16 +23,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final _pendingAnnonces = [
-    {'id': 'pa1', 'titre': 'Appartement F2 – Adidogomé', 'proprietaire': 'Agbotse Kokou', 'date': 'Aujourd\'hui 09:12', 'categorie': 'Appartement', 'prix': '180 000 FCFA/mois'},
-    {'id': 'pa2', 'titre': 'Moto Yamaha 2021', 'proprietaire': 'Dovi Mensah', 'date': 'Hier 14:30', 'categorie': 'Moto', 'prix': '15 000 FCFA/jour'},
-    {'id': 'pa3', 'titre': 'Terrain 400 m² – Baguida', 'proprietaire': 'Amélé Atchou', 'date': 'Hier 11:05', 'categorie': 'Terrain', 'prix': '4 500 000 FCFA'},
-  ];
-
-  final _disputes = [
-    {'id': 'l1', 'titre': 'Litige villa – Lomé Tokoin', 'parties': 'Ama K. vs Kwame M.', 'statut': 'Ouvert', 'date': 'Il y a 1j'},
-    {'id': 'l2', 'titre': 'Non-restitution Toyota', 'parties': 'Mawuli A. vs Sena A.', 'statut': 'En cours', 'date': 'Il y a 3j'},
-  ];
+  // NOTE : listes de démo retirées. "Litiges" n'a pas encore de backend réel
+  // (aucune route/contrôleur fourni pour ça) — l'onglet affiche donc un état
+  // vide honnête plutôt que des données inventées, en attendant l'implémentation.
+  final List<Map<String, String>> _disputes = [];
 
   // ── NEW : vraies données chargées depuis l'API (remplacent MockDataService) ─
   List<UserModel> _users = [];
@@ -310,7 +304,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: StatCard(label: 'En attente', value: '${pendingPropertiesNotifier.value.length + _pendingAnnonces.length}', icon: Icons.pending_actions_rounded, color: AppTheme.warning)),
+              Expanded(child: StatCard(label: 'En attente', value: '${pendingPropertiesNotifier.value.length}', icon: Icons.pending_actions_rounded, color: AppTheme.warning)),
               const SizedBox(width: 12),
               Expanded(child: StatCard(label: 'Litiges', value: '${_disputes.length}', icon: Icons.gavel_rounded, color: AppTheme.error)),
             ],
@@ -351,7 +345,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       valueListenable: pendingPropertiesNotifier,
       builder: (context, pendingRaw, _) {
         final pendingList = (pendingRaw as List).cast<PropertyModel>();
-        final totalPending = pendingList.length + _pendingAnnonces.length;
+        final totalPending = pendingList.length;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -390,14 +384,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary),
                 ),
               ),
-              ...pendingList.map((prop) => _AdminRealAnnonceCard(property: prop)),
-            ],
-            if (_pendingAnnonces.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Annonces demo', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint)),
-              ),
-              ..._pendingAnnonces.map((a) => _AdminAnnonceCard(annonce: a)),
+              ...pendingList.map((prop) => _AdminRealAnnonceCard(property: prop, key: ValueKey(prop.id))),
             ],
           ],
         );
@@ -433,6 +420,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Widget _buildLitiges() {
+    if (_disputes.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.gavel_rounded, size: 56, color: AppTheme.textHint),
+            const SizedBox(height: 16),
+            Text('Aucun litige pour le moment',
+                style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text('La gestion des litiges n\'est pas encore connectée au backend.',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint),
+                textAlign: TextAlign.center),
+          ]),
+        ),
+      );
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: _disputes.map((l) => Container(
@@ -864,93 +869,6 @@ class _KycCardState extends State<_KycCard> {
                 child: const Icon(Icons.close_rounded, color: AppTheme.error, size: 18)),
           ),
         ]),
-      ]),
-    );
-  }
-}
-
-class _AdminAnnonceCard extends StatefulWidget {
-  final Map<String, dynamic> annonce;
-  const _AdminAnnonceCard({required this.annonce});
-  @override
-  State<_AdminAnnonceCard> createState() => _AdminAnnonceCardState();
-}
-
-class _AdminAnnonceCardState extends State<_AdminAnnonceCard> {
-  String _status = 'pending';
-
-  @override
-  Widget build(BuildContext context) {
-    final a = widget.annonce;
-    if (_status != 'pending') {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _status == 'approved' ? AppTheme.success.withOpacity(0.05) : AppTheme.error.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _status == 'approved' ? AppTheme.success.withOpacity(0.3) : AppTheme.error.withOpacity(0.3)),
-        ),
-        child: Row(children: [
-          Icon(_status == 'approved' ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: _status == 'approved' ? AppTheme.success : AppTheme.error),
-          const SizedBox(width: 10),
-          Expanded(child: Text('${a['titre']} – ${_status == 'approved' ? 'Approuvée' : 'Rejetée'}',
-              style: GoogleFonts.poppins(fontSize: 13, color: _status == 'approved' ? AppTheme.success : AppTheme.error))),
-          TextButton(onPressed: () => setState(() => _status = 'pending'), child: Text('Annuler', style: GoogleFonts.poppins(fontSize: 11))),
-        ]),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.border),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(children: [
-            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.home_outlined, color: AppTheme.primary, size: 24)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(a['titre']!, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
-              Text('Par ${a['proprietaire']} · ${a['date']}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-              const SizedBox(height: 4),
-              Row(children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: AppTheme.info.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
-                    child: Text(a['categorie']!, style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.info, fontWeight: FontWeight.w600))),
-                const SizedBox(width: 6),
-                Text(a['prix']!, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary)),
-              ]),
-            ])),
-          ]),
-        ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(children: [
-            Expanded(child: GestureDetector(
-              onTap: () => setState(() => _status = 'rejected'),
-              child: Container(padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(color: AppTheme.error.withOpacity(0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.error.withOpacity(0.2))),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.close_rounded, color: AppTheme.error, size: 16),
-                    const SizedBox(width: 5),
-                    Text('Rejeter', style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.error, fontWeight: FontWeight.w600)),
-                  ])),
-            )),
-            const SizedBox(width: 10),
-            Expanded(child: GestureDetector(
-              onTap: () => setState(() => _status = 'approved'),
-              child: Container(padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(color: AppTheme.success, borderRadius: BorderRadius.circular(10)),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Icon(Icons.check_rounded, color: Colors.white, size: 16),
-                    const SizedBox(width: 5),
-                    Text('Approuver', style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),
-                  ])),
-            )),
-          ]),
-        ),
       ]),
     );
   }

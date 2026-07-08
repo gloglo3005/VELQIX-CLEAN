@@ -79,7 +79,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'refreshToken': refreshToken}),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 40));
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (res.statusCode == 200 && data['success'] == true) {
@@ -124,7 +124,7 @@ class ApiService {
       final uri = Uri.parse('$baseUrl$path');
       final res = await http
           .get(uri, headers: await _headers(auth: auth))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 40));
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -150,7 +150,7 @@ class ApiService {
       final bodyJson = jsonEncode(body);
       final res = await http
           .post(uri, headers: await _headers(auth: auth), body: bodyJson)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 40));
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -176,7 +176,7 @@ class ApiService {
       final bodyJson = jsonEncode(body);
       final res = await http
           .put(uri, headers: await _headers(auth: auth), body: bodyJson)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 40));
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -197,7 +197,7 @@ class ApiService {
       final uri = Uri.parse('$baseUrl$path');
       final res = await http
           .delete(uri, headers: await _headers(auth: auth))
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 40));
       if (auth) {
         return _parseWithRefresh(
           res,

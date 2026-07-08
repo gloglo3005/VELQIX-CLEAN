@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart'; // NEW : vraie source des annonces publiques
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../widgets/widgets.dart';
@@ -56,8 +56,25 @@ class _HomeScreenState extends State<HomeScreen> {
     'cat_autre':        PropertyCategory.autre,
   };
 
+  // NOTE : remplace MockDataService + publishedProperties (session-local) par
+  // les vraies annonces approuvées, chargées depuis GET /properties.
+  List<PropertyModel> _serverProps = [];
+  bool _loadingProps = true;
+
+  Future<void> _loadProperties() async {
+    if (mounted) setState(() => _loadingProps = true);
+    final res = await ApiService.instance.get('/properties');
+    if (!mounted) return;
+    if (res['success'] == true) {
+      _serverProps = (res['data'] as List)
+          .map((j) => PropertyModel.fromJson(j as Map<String, dynamic>))
+          .toList();
+    }
+    setState(() => _loadingProps = false);
+  }
+
   // _banners calculé dans build() pour réagir aux changements de locale
-  void _onNewProperty() => setState(() {});
+  void _onNewProperty() => _loadProperties();
 
   @override
   void initState() {
@@ -65,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _bannerController = PageController();
 
     _focusNode.addListener(() => setState(() => _isSearchFocused = _focusNode.hasFocus));
+    _loadProperties();
     publishedPropertiesNotifier.addListener(_onNewProperty);
     // Reconnaissance vocale désactivée sur mobile (disponible sur Edge/Chrome via IA)
     _speechAvailable = false;
@@ -95,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final q = _searchQuery.trim();
     if (q.length < 2) return [];
     final tokens = q.toLowerCase().split(RegExp(r'\s+'));
-    final allProps = [...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()];
+    final allProps = _serverProps;
     return allProps.where((p) {
       final blob = [
         p.titre, p.description, p.adresse.ville, p.adresse.rue,
@@ -110,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<PropertyModel> get _filteredProps {
-    var allProps = [...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()];
+    var allProps = _serverProps;
 
     // ── Filtre par pays sélectionné ──
     if (_filterCountryCode != null) {
@@ -443,7 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return ValueListenableBuilder(
       valueListenable: userStateNotifier,
       builder: (context, _, __) {
-    final featured = [...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()]
+    final featured = _serverProps
         .where((p) => p.isFeatured).toList();
     final results = _searchResults;
 
@@ -759,17 +777,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(children: [
                         _QuickStat(
                             icon: Icons.home_work_rounded,
-                            value: '${MockDataService.properties.length + publishedProperties.length}',
+                            value: '${_serverProps.length}',
                             label: tr('home_annonces')),
                         const SizedBox(width: 10),
                         _QuickStat(
                             icon: Icons.directions_car_rounded,
-                            value: '${[...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()].where((p) => p.type == PropertyType.mobilier).length}',
+                            value: '${_serverProps.where((p) => p.type == PropertyType.mobilier).length}',
                             label: tr('home_mobilier')),
                         const SizedBox(width: 10),
                         _QuickStat(
                             icon: Icons.apartment_rounded,
-                            value: '${[...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()].where((p) => p.type == PropertyType.immobilier).length}',
+                            value: '${_serverProps.where((p) => p.type == PropertyType.immobilier).length}',
                             label: tr('home_immobilier')),
                       ]),
                     ],

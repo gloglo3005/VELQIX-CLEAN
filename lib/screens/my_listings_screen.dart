@@ -3,8 +3,8 @@ import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart'; // NEW : vraie source de données
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'property_detail_screen.dart';
@@ -19,25 +19,48 @@ class MyListingsScreen extends StatefulWidget {
 class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  List<PropertyModel> get _myProps {
-    final all = [...MockDataService.properties, ...publishedProperties.cast<PropertyModel>()];
-    return all.where((p) => p.proprietaire.id == AuthService.instance.currentUserOrEmpty.id).toList();
-  }
+  bool _loading = true;
+  String? _loadError;
+  List<PropertyModel> _serverProps = [];
 
-  List<PropertyModel> get _myPendingProps {
-    return pendingProperties.cast<PropertyModel>()
-        .where((p) => p.proprietaire.id == AuthService.instance.currentUserOrEmpty.id).toList();
-  }
+  // NOTE : /properties/my renvoie TOUTES les annonces de l'utilisateur, quel
+  // que soit leur statut (en_attente, approuve, rejete) — donc plus besoin de
+  // fusionner avec MockDataService ni de deviner l'état localement.
+  List<PropertyModel> get _myProps => _serverProps;
 
-  List<PropertyModel> get _activeProps => _myProps.where((p) => p.isAvailable).toList();
+  List<PropertyModel> get _myPendingProps =>
+      _serverProps.where((p) => p.status == 'en_attente').toList();
+
+  List<PropertyModel> get _activeProps =>
+      _serverProps.where((p) => p.isAvailable && p.status == 'approuve').toList();
   List<PropertyModel> get _allProps => _myProps;
 
-  void _onNewProperty() => setState(() {});
+  Future<void> _loadMyProperties() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    final res = await ApiService.instance.get('/properties/my', auth: true);
+    if (!mounted) return;
+    if (res['success'] == true) {
+      _serverProps = (res['data'] as List)
+          .map((j) => PropertyModel.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } else {
+      _loadError = res['message'] ?? 'Impossible de charger tes annonces';
+    }
+    setState(() => _loading = false);
+  }
+
+  // Un événement temps réel (approbation/rejet par l'admin pendant que cet
+  // écran est ouvert) déclenche un rechargement — source de vérité serveur.
+  void _onNewProperty() => _loadMyProperties();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadMyProperties();
     publishedPropertiesNotifier.addListener(_onNewProperty);
     pendingPropertiesNotifier.addListener(_onNewProperty);
   }
@@ -94,14 +117,24 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildList(_activeProps),
-          _buildList(_allProps),
-          _buildPendingList(_myPendingProps),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_loadError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    ElevatedButton(onPressed: _loadMyProperties, child: const Text('Réessayer')),
+                  ]),
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildList(_activeProps),
+                    _buildList(_allProps),
+                    _buildPendingList(_myPendingProps),
+                  ],
+                ),
     ));
   }
 
