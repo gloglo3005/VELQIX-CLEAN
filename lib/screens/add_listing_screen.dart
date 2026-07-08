@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/app_translations.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +6,7 @@ import '../models/models.dart';
 import '../services/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart'; // NEW : appel réel au backend
+import '../services/property_service.dart'; // NEW : upload d'images en multipart
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/web_file_picker.dart';
@@ -202,6 +204,28 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
   }
 
+  // ─── Upload d'une data URI base64 → URL Cloudinary ──────────────────────────
+  /// Les photos web arrivent en "data:image/jpeg;base64,...". On ne peut pas
+  /// les envoyer telles quelles dans le JSON de /properties (trop volumineux,
+  /// provoque une erreur 413 côté serveur). On les upload d'abord en
+  /// multipart via /upload/image, et on récupère une URL Cloudinary courte.
+  Future<String?> _uploadDataUri(String dataUri, int index) async {
+    try {
+      final parts = dataUri.split(',');
+      if (parts.length != 2) return null; // pas une data URI valide
+
+      final bytes = base64Decode(parts[1]);
+      final result = await PropertyService.instance.uploadImageBytes(
+        bytes,
+        'photo_$index.jpg',
+      );
+      return result.url;
+    } catch (e) {
+      debugPrint('Erreur upload photo $index : $e');
+      return null;
+    }
+  }
+
   // ─── Soumission réelle au backend ───────────────────────────────────────────
   void _submit() async {
     if (!_validateStep()) return;
@@ -212,10 +236,37 @@ class _AddListingScreenState extends State<AddListingScreen> {
         ) ??
         0;
 
-    final images = _selectedPhotos.isNotEmpty
-        ? List<String>.from(_selectedPhotos)
+    // ── Étape 1 : uploader chaque photo (base64 → Cloudinary) avant le JSON ──
+    final List<String> uploadedImages = [];
+    for (var i = 0; i < _selectedPhotos.length; i++) {
+      final photo = _selectedPhotos[i];
+      if (photo.startsWith('data:')) {
+        final url = await _uploadDataUri(photo, i);
+        if (url != null) uploadedImages.add(url);
+      } else {
+        // Cas de secours : déjà une URL distante (http/https)
+        uploadedImages.add(photo);
+      }
+    }
+
+    if (_selectedPhotos.isNotEmpty && uploadedImages.isEmpty) {
+      setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Échec de l\'envoi des photos. Réessaie.'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+      return;
+    }
+
+    final images = uploadedImages.isNotEmpty
+        ? uploadedImages
         : [_categoryImageUrl(_category)];
 
+    // ── Étape 2 : créer l'annonce avec les URLs (légères) au lieu du base64 ──
     final res = await ApiService.instance.post(
       '/properties',
       {
