@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/mock_data.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart'; // NEW : appel réel au backend
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/web_file_picker.dart';
@@ -201,45 +202,57 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
   }
 
-  // ─── Soumission + publication dans le store global ──────────────────────────
+  // ─── Soumission réelle au backend ───────────────────────────────────────────
   void _submit() async {
     if (!_validateStep()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
 
-    // Construire un PropertyModel réel avec les données saisies
-    final newProperty = PropertyModel(
-      id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-      titre: _titreCtrl.text.trim(),
-      description: _descCtrl.text.trim(),
-      type: _type,
-      listingType: _listingType,
-      categorie: _category,
-      prix: double.tryParse(_prixCtrl.text.replaceAll(' ', '').replaceAll(',', '.')) ?? 0,
-      images: _selectedPhotos.isNotEmpty
-          ? List<String>.from(_selectedPhotos)
-          : [_categoryImageUrl(_category)],
-      adresse: AddressModel(
-        rue: _rueCtrl.text.trim(),
-        ville: _villeCtrl.text.trim(),
-        pays: AuthService.instance.currentUserOrEmpty.countryName ?? 'Togo',
-      ),
-      // ✅ Snapshot frais au moment de la soumission (isPremium est à jour)
-proprietaire: AuthService.instance.currentUserOrEmpty,      caracteristiques: [],
-      rating: 0, totalAvis: 0,
-      // isFeatured reste false à la soumission — c'est l'admin qui le fixe à l'approbation
-      isFeatured: false, vues: 0,
-      createdAt: DateTime.now(),
-      status: 'en_attente', // ← En attente de validation admin
+    final prix = double.tryParse(
+          _prixCtrl.text.replaceAll(' ', '').replaceAll(',', '.'),
+        ) ??
+        0;
+
+    final images = _selectedPhotos.isNotEmpty
+        ? List<String>.from(_selectedPhotos)
+        : [_categoryImageUrl(_category)];
+
+    final res = await ApiService.instance.post(
+      '/properties',
+      {
+        'titre': _titreCtrl.text.trim(),
+        'description': _descCtrl.text.trim(),
+        'prix': prix,
+        'images': images,
+        'type': _type.name,
+        'listingType': _listingType.name,
+        'categorie': _category.name,
+        'adresse': _rueCtrl.text.trim(),
+        'ville': _villeCtrl.text.trim(),
+        'pays': AuthService.instance.currentUserOrEmpty.countryName ?? 'Togo',
+      },
+      auth: true,
     );
 
-    // Soumettre à la file d'attente admin (pas encore visible sur la home)
-    pendingPropertiesNotifier.value = [...pendingPropertiesNotifier.value, newProperty];
-
+    if (!mounted) return;
     setState(() => _loading = false);
 
-    if (!mounted) return;
+    if (res['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] ?? 'Erreur lors de la soumission de l\'annonce'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
+
+    // Le backend a créé l'annonce et notifié l'admin (Socket.io + email).
+    // On construit aussi un PropertyModel local pour un affichage optimiste
+    // immédiat côté "Mes annonces" si l'écran l'utilise déjà ainsi.
+    final data = res['data'] as Map<String, dynamic>;
+    final newProperty = PropertyModel.fromJson(data);
+    pendingPropertiesNotifier.value = [...pendingPropertiesNotifier.value, newProperty];
+
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [
         const Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 18),
