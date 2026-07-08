@@ -505,7 +505,7 @@ class _TabWithBadge extends StatelessWidget {
 
 class _AdminRealAnnonceCard extends StatefulWidget {
   final PropertyModel property;
-  const _AdminRealAnnonceCard({required this.property});
+  const _AdminRealAnnonceCard({required this.property, super.key});
   @override
   State<_AdminRealAnnonceCard> createState() => _AdminRealAnnonceCardState();
 }
