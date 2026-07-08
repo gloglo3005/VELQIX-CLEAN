@@ -167,7 +167,7 @@ class PropertyService {
     }, auth: true);
 
     if (res['success'] != true) {
-      return (property: null, error: res['message'] ?? 'Erreur création');
+      return (property: null, error: (res['message'] as String?) ?? 'Erreur création');
     }
     return (property: _fromJson(res['data'] as Map<String, dynamic>), error: null);
   }
@@ -212,7 +212,7 @@ class PropertyService {
   Future<({String? url, String? error})> uploadImage(File imageFile) async {
     final res = await _api.uploadFile('/upload/image', imageFile);
     if (res['success'] != true) {
-      return (url: null, error: res['message'] ?? 'Erreur upload');
+      return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
     }
     return (url: res['data']['url'] as String?, error: null);
   }
@@ -224,7 +224,7 @@ class PropertyService {
   ) async {
     final res = await _api.uploadBytes('/upload/image', bytes, filename);
     if (res['success'] != true) {
-      return (url: null, error: res['message'] ?? 'Erreur upload');
+      return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
     }
     return (url: res['data']['url'] as String?, error: null);
   }
