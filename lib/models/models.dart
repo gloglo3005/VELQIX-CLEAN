@@ -321,6 +321,7 @@ class TransactionModel {
   final DateTime dateDebut;
   final DateTime? dateFin;
   final String methode; // 'mobile_money', 'carte', 'paypal'
+  final String? paymentRef;
   final DateTime createdAt;
 
   TransactionModel({
@@ -333,6 +334,7 @@ class TransactionModel {
     required this.dateDebut,
     this.dateFin,
     required this.methode,
+    this.paymentRef,
     required this.createdAt,
   });
 

@@ -69,21 +69,21 @@ class TransactionService {
     );
 
     return TransactionModel(
-      id:            json['id'] ?? '',
-      property:      property,
-      client:        client,
-      type:          json['type'] ?? 'achat',
-      montant:       (json['montant'] ?? 0).toDouble(),
-      status:        json['status'] ?? 'en_attente',
-      dateDebut:     json['dateDebut'] != null
+      id:         json['id'] ?? '',
+      property:   property,
+      client:     client,
+      type:       json['type'] ?? 'achat',
+      montant:    (json['montant'] ?? 0).toDouble(),
+      statut:     json['status'] ?? 'en_attente',
+      dateDebut:  json['dateDebut'] != null
           ? DateTime.tryParse(json['dateDebut']) ?? DateTime.now()
           : DateTime.now(),
-      dateFin:       json['dateFin'] != null
+      dateFin:    json['dateFin'] != null
           ? DateTime.tryParse(json['dateFin'])
           : null,
-      moyenPaiement: json['moyenPaiement'] ?? 'mobile_money',
-      paymentRef:    json['paymentRef'],
-      createdAt:     json['createdAt'] != null
+      methode:    json['moyenPaiement'] ?? 'mobile_money',
+      paymentRef: json['paymentRef'],
+      createdAt:  json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
           : DateTime.now(),
     );

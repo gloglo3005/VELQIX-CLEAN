@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
 import '../services/app_translations.dart';
+import '../services/transaction_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 // PAYMENT SCREEN — Intégration FedaPay (sandbox)
@@ -75,7 +76,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     super.dispose();
   }
 
-  // ── Paiement simulé ──────────────────────────────────────────────────────────
+  // ── Paiement (sandbox FedaPay) ────────────────────────────────────────────
   Future<void> _startFedaPay() async {
     final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
@@ -88,11 +89,49 @@ class _PaymentScreenState extends State<PaymentScreen> {
       setState(() => _errorMsg = 'Veuillez saisir un email valide.');
       return;
     }
+    if (widget.type == 'location' && _dateFin == null) {
+      setState(() => _errorMsg = 'Veuillez choisir une date de fin de location.');
+      return;
+    }
+    if (widget.type == 'location' && _dateFin != null && !_dateFin!.isAfter(_dateDebut)) {
+      setState(() => _errorMsg = 'La date de fin doit être après la date de début.');
+      return;
+    }
 
     setState(() { _processing = true; _errorMsg = null; });
+
+    // TODO: remplacer par le véritable appel au SDK/API FedaPay (checkout + webhook
+    // de confirmation). Ici on simule seulement la validation du paiement.
     await Future.delayed(const Duration(seconds: 2));
+    final fakePaymentRef = 'fp_${DateTime.now().millisecondsSinceEpoch}';
+
+    if (!mounted) return;
+
+    if (widget.type == 'premium') {
+      // TODO: brancher sur le service d'abonnement premium (pas de propertyId
+      // à associer ici) — pas de création de TransactionModel dans ce cas.
+      setState(() => _processing = false);
+      _showSuccess();
+      return;
+    }
+
+    final result = await TransactionService.instance.createTransaction(
+      propertyId: widget.property.id,
+      montant: _total,
+      type: widget.type == 'location' ? 'location' : 'achat',
+      moyenPaiement: 'mobile_money',
+      dateDebut: widget.type == 'location' ? _dateDebut : null,
+      dateFin: widget.type == 'location' ? _dateFin : null,
+      paymentRef: fakePaymentRef,
+    );
+
     if (!mounted) return;
     setState(() => _processing = false);
+
+    if (result.error != null) {
+      setState(() => _errorMsg = result.error);
+      return;
+    }
     _showSuccess();
   }
 
