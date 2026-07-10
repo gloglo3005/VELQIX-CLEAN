@@ -146,7 +146,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
   void _sendGreeting() {
     _addAiMessage(
-      tr('ai_greeting'),
+      tr('ai_hello_reply'),
     );
   }
 

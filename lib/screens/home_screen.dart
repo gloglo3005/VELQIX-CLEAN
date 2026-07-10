@@ -12,7 +12,6 @@ import 'premium_screen.dart';
 import 'add_listing_screen.dart';
 import 'kyc_screen.dart';
 import 'explore_screen.dart';
-import 'ai_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -608,22 +607,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-
-                        // 🤖 VelqIA — assistant IA
-                        GestureDetector(
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surface,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)],
-                            ),
-                            child: const Icon(Icons.smart_toy_rounded, size: 22, color: AppTheme.primary),
                           ),
                         ),
                         const SizedBox(width: 10),
