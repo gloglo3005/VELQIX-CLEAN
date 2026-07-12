@@ -125,7 +125,10 @@ class TransactionService {
     }, auth: true);
 
     if (res['success'] != true) {
-      return (transaction: null, error: res['message'] ?? 'Erreur création');
+      return (
+        transaction: null,
+        error: (res['message'] ?? 'Erreur création') as String,
+      );
     }
     return (
       transaction: _fromJson(res['data'] as Map<String, dynamic>),
