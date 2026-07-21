@@ -65,3 +65,5 @@ class NotificationService {
     await _api.put('/notifications/read-all', {}, auth: true);
   }
 }
+
+
