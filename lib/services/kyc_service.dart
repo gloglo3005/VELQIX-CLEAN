@@ -44,7 +44,7 @@ class KycService {
     // 1. Upload
     final uploadRes = await _api.uploadFile('/upload/image', file);
     if (uploadRes['success'] != true) {
-      return (success: false, error: uploadRes['message'] ?? 'Erreur upload');
+      return (success: false, error: (uploadRes['message'] as String?) ?? 'Erreur upload');
     }
     final fileUrl = uploadRes['data']['url'] as String?;
     if (fileUrl == null) return (success: false, error: 'URL introuvable');
@@ -52,7 +52,7 @@ class KycService {
     // 2. Soumettre
     final res = await _api.post('/kyc', {'type': type, 'fileUrl': fileUrl}, auth: true);
     if (res['success'] != true) {
-      return (success: false, error: res['message'] ?? 'Erreur soumission');
+      return (success: false, error: (res['message'] as String?) ?? 'Erreur soumission');
     }
     return (success: true, error: null);
   }

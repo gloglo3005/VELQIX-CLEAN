@@ -20,6 +20,7 @@ class AvisService {
         nom:       auteurJson['nom']     ?? '',
         prenom:    auteurJson['prenom']  ?? '',
         email:     '',
+        telephone: auteurJson['telephone'] ?? '',
         avatarUrl: auteurJson['avatarUrl'],
         rating: 0, totalAvis: 0, createdAt: DateTime.now(),
       ),
@@ -52,7 +53,7 @@ class AvisService {
       auth: true,
     );
     if (res['success'] != true) {
-      return (avis: null, error: res['message'] ?? 'Erreur');
+      return (avis: null, error: (res['message'] as String?) ?? 'Erreur');
     }
     return (avis: _fromJson(res['data'] as Map<String, dynamic>), error: null);
   }

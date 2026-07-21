@@ -46,13 +46,15 @@ class NotificationService {
   Future<({List<NotificationModel> items, int unreadCount})>
       getNotifications() async {
     final res = await _api.get('/notifications', auth: true);
-    if (res['success'] != true) return (items: [], unreadCount: 0);
+    if (res['success'] != true) {
+      return (items: <NotificationModel>[], unreadCount: 0);
+    }
 
     final list = (res['data'] as List<dynamic>)
         .map((e) => NotificationModel.fromJson(e as Map<String, dynamic>))
         .toList();
 
-    return (items: list, unreadCount: res['unreadCount'] ?? 0);
+    return (items: list, unreadCount: (res['unreadCount'] as int?) ?? 0);
   }
 
   Future<void> markOneRead(String id) async {
