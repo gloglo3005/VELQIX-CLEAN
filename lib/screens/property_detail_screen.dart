@@ -8,7 +8,7 @@ import '../services/mock_data.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../main.dart' show currencyNotifier, localeNotifier;
-// import 'payment_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de transaction directe
+import 'payment_screen.dart';
 import 'messages_screen.dart';
 import 'owner_profile_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -590,63 +590,37 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         ],
       ),
 
-      // ─ Bottom CTA ─ 🚫 Louer/Acheter DÉSACTIVÉS (25/08/2026) : plus de
-      // transaction directe dans l'app — remplacé par un accès direct à la
-      // discussion avec le propriétaire.
+      // ─ Bottom CTA ─
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 12, offset: const Offset(0, -3))],
         ),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
-            )),
-            icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-            label: Text(tr('detail_contact_owner')),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
+        child: Row(
+          children: [
+            if (p.listingType == ListingType.location || p.listingType == ListingType.les_deux)
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'location'))),
+                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                  label: Text(tr('detail_reserve')),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info),
+                ),
+              ),
+            if (p.listingType == ListingType.les_deux) const SizedBox(width: 10),
+            if (p.listingType == ListingType.vente || p.listingType == ListingType.les_deux)
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'achat'))),
+                  icon: const Icon(Icons.shopping_cart_rounded, size: 18),
+                  label: Text(tr('detail_buy')),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+                ),
+              ),
+          ],
         ),
       ),
-
-      // ── Ancienne barre Louer/Acheter (désactivée) ──────────────────────
-      // bottomNavigationBar: Container(
-      //   padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-      //   decoration: BoxDecoration(
-      //     color: AppTheme.surface,
-      //     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 12, offset: const Offset(0, -3))],
-      //   ),
-      //   child: Row(
-      //     children: [
-      //       if (p.listingType == ListingType.location || p.listingType == ListingType.les_deux)
-      //         Expanded(
-      //           child: ElevatedButton.icon(
-      //             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'location'))),
-      //             icon: const Icon(Icons.calendar_month_rounded, size: 18),
-      //             label: Text(tr('detail_reserve')),
-      //             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info),
-      //           ),
-      //         ),
-      //       if (p.listingType == ListingType.les_deux) const SizedBox(width: 10),
-      //       if (p.listingType == ListingType.vente || p.listingType == ListingType.les_deux)
-      //         Expanded(
-      //           child: ElevatedButton.icon(
-      //             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'achat'))),
-      //             icon: const Icon(Icons.shopping_cart_rounded, size: 18),
-      //             label: Text(tr('detail_buy')),
-      //             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
-      //           ),
-      //         ),
-      //     ],
-      //   ),
-      // ),
     );
       }, // ferme builder
     ); // ferme ValueListenableBuilder
