@@ -294,42 +294,6 @@ class AuthService {
     return null;
   }
 
-  // ─── Mise à jour du profil (persiste réellement côté serveur) ──────
-  // ⚠️ Avant : updateUser() ci-dessous ne faisait que du cache local
-  // (SharedPreferences), jamais envoyé au backend — les infos étaient
-  // perdues au changement d'appareil et invisibles pour les autres
-  // utilisateurs/l'admin. email n'est volontairement pas modifiable ici
-  // (le backend PUT /auth/profile ne l'accepte pas).
-  Future<String?> updateProfile({
-    required String nom,
-    required String prenom,
-    String? telephone,
-  }) async {
-    final res = await _api.put('/auth/profile', {
-      'nom': nom,
-      'prenom': prenom,
-      'telephone': telephone,
-    }, auth: true);
-
-    if (res['success'] != true) return res['message'] ?? 'Erreur';
-
-    // Le serveur renvoie l'utilisateur à jour — on s'en sert comme source
-    // de vérité plutôt que de reconstruire l'objet à la main.
-    final data = res['data'] as Map<String, dynamic>?;
-    if (data != null && _currentUser != null) {
-      final updated = _copyWith(
-        _currentUser!,
-        nom: data['nom'] ?? nom,
-        prenom: data['prenom'] ?? prenom,
-        telephone: data['telephone'] ?? telephone,
-      );
-      _currentUser = updated;
-      await _cacheUser(updated, method: 'email');
-      notifyUserChanged();
-    }
-    return null;
-  }
-
   // ─── Premium / KYC ───────────────────────────────────────────────
   Future<void> setPremium(bool value) async {
     if (_currentUser == null) return;
