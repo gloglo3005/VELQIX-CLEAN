@@ -46,13 +46,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ApiService.instance.get('/admin/users?limit=100', auth: true),
         ApiService.instance.get('/admin/stats', auth: true),
         ApiService.instance.get('/admin/properties/pending', auth: true),
-        ApiService.instance.get('/admin/kyc/pending', auth: true),
+        // ApiService.instance.get('/admin/kyc/pending', auth: true), // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause côté backend — l'onglet KYC reste affiché mais restera vide (voir plus bas)
       ]);
 
       final usersRes = results[0];
       final statsRes = results[1];
       final pendingPropsRes = results[2];
-      final kycRes = results[3];
 
       if (usersRes['success'] == true) {
         final list = (usersRes['data'] as List)
@@ -72,26 +71,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             .toList();
       }
 
-      if (kycRes['success'] == true) {
-        kycPendingNotifier.value = (kycRes['data'] as List).map((j) {
-          final doc = j as Map<String, dynamic>;
-          final user = doc['user'] as Map<String, dynamic>? ?? {};
-          return KycEntry(
-            userId: user['id'] ?? '',
-            // NEW : on garde l'id du document KYC séparément de l'userId,
-            // il est indispensable pour appeler PUT /admin/kyc/:id/approve|reject
-            docId: doc['id'] ?? '',
-            nom: user['nom'] ?? '',
-            prenom: user['prenom'] ?? '',
-            docType: doc['docType'] ?? doc['type'] ?? 'Document',
-            numDoc: doc['numDoc'] ?? '—',
-            soumisLabel: doc['createdAt'] != null ? 'Soumis' : '',
-            soumisAt: doc['createdAt'] != null
-                ? DateTime.tryParse(doc['createdAt']) ?? DateTime.now()
-                : DateTime.now(),
-          );
-        }).toList();
-      }
+      // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause — kycPendingNotifier reste vide,
+      // l'onglet KYC affiche donc naturellement son état "aucune demande".
+      // if (kycRes['success'] == true) {
+      //   kycPendingNotifier.value = (kycRes['data'] as List).map((j) {
+      //     final doc = j as Map<String, dynamic>;
+      //     final user = doc['user'] as Map<String, dynamic>? ?? {};
+      //     return KycEntry(
+      //       userId: user['id'] ?? '',
+      //       // NEW : on garde l'id du document KYC séparément de l'userId,
+      //       // il est indispensable pour appeler PUT /admin/kyc/:id/approve|reject
+      //       docId: doc['id'] ?? '',
+      //       nom: user['nom'] ?? '',
+      //       prenom: user['prenom'] ?? '',
+      //       docType: doc['docType'] ?? doc['type'] ?? 'Document',
+      //       numDoc: doc['numDoc'] ?? '—',
+      //       soumisLabel: doc['createdAt'] != null ? 'Soumis' : '',
+      //       soumisAt: doc['createdAt'] != null
+      //           ? DateTime.tryParse(doc['createdAt']) ?? DateTime.now()
+      //           : DateTime.now(),
+      //     );
+      //   }).toList();
+      // }
     } catch (e) {
       _dashboardError = 'Impossible de charger les données admin : $e';
     } finally {

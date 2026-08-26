@@ -534,36 +534,36 @@ class _PremiumSuccessDialog extends StatelessWidget {
             ]),
           ),
           if (!isFree) const SizedBox(height: 24),
-          // KYC suggestion (payant seulement)
-          if (!isFree)
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppTheme.info.withOpacity(0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.info.withOpacity(0.2))),
-            child: Column(children: [
-              Row(children: [
-                const Icon(Icons.verified_user_rounded, color: AppTheme.info, size: 18),
-                const SizedBox(width: 8),
-                Expanded(child: Text(tr('prem_verify_id'), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.info))),
-              ]),
-              const SizedBox(height: 6),
-              Text('Augmentez la confiance des acheteurs et débloquez toutes les fonctionnalités Premium.',
-                  style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary, height: 1.4)),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onKyc,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.info,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  child: Text('Vérifier mon identité maintenant', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                ),
-              ),
-            ]),
-          ),
+          // KYC suggestion (payant seulement) — 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause
+          // if (!isFree)
+          // Container(
+          //   padding: const EdgeInsets.all(14),
+          //   decoration: BoxDecoration(color: AppTheme.info.withOpacity(0.07), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.info.withOpacity(0.2))),
+          //   child: Column(children: [
+          //     Row(children: [
+          //       const Icon(Icons.verified_user_rounded, color: AppTheme.info, size: 18),
+          //       const SizedBox(width: 8),
+          //       Expanded(child: Text(tr('prem_verify_id'), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.info))),
+          //     ]),
+          //     const SizedBox(height: 6),
+          //     Text('Augmentez la confiance des acheteurs et débloquez toutes les fonctionnalités Premium.',
+          //         style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary, height: 1.4)),
+          //     const SizedBox(height: 10),
+          //     SizedBox(
+          //       width: double.infinity,
+          //       child: ElevatedButton(
+          //         onPressed: onKyc,
+          //         style: ElevatedButton.styleFrom(
+          //           backgroundColor: AppTheme.info,
+          //           padding: const EdgeInsets.symmetric(vertical: 10),
+          //           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          //           elevation: 0,
+          //         ),
+          //         child: Text('Vérifier mon identité maintenant', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          //       ),
+          //     ),
+          //   ]),
+          // ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: onContinue,

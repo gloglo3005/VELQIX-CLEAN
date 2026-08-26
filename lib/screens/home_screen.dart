@@ -10,7 +10,7 @@ import 'property_detail_screen.dart';
 import 'notifications_screen.dart';
 import 'premium_screen.dart';
 import 'add_listing_screen.dart';
-import 'kyc_screen.dart';
+// import 'kyc_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause
 import 'explore_screen.dart';
 
 class HomeScreen extends StatefulWidget {

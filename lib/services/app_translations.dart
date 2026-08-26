@@ -284,6 +284,7 @@ const _translations = <String, Map<String, String>>{
 
   // ── Property Detail ───────────────────────────────────────────────────────
   'detail_reserve':       {'fr': 'Réserver',             'en': 'Book',               'es': 'Reservar',           'pt': 'Reservar',           'de': 'Buchen',             'ar': 'حجز'},
+  'detail_contact_owner': {'fr': 'Contacter le propriétaire', 'en': 'Contact owner',  'es': 'Contactar propietario', 'pt': 'Contatar proprietário', 'de': 'Eigentümer kontaktieren', 'ar': 'الاتصال بالمالك'},
   'detail_buy':           {'fr': 'Acheter',              'en': 'Buy',                'es': 'Comprar',            'pt': 'Comprar',            'de': 'Kaufen',             'ar': 'شراء'},
   'detail_submit_admin':  {'fr': 'Soumettre à la validation', 'en': 'Submit for validation', 'es': 'Enviar para validación', 'pt': 'Enviar para validação', 'de': 'Zur Validierung einreichen', 'ar': 'إرسال للمراجعة'},
   'detail_submit_desc':   {'fr': 'Envoyez ce bien à l\'administrateur pour qu\'il soit validé et visible par tous les utilisateurs.', 'en': 'Send this property to the administrator to be validated and visible to all users.', 'es': 'Envía este bien al administrador para que sea validado y visible para todos los usuarios.', 'pt': 'Envie este imóvel ao administrador para ser validado e visível para todos os usuários.', 'de': 'Senden Sie dieses Objekt an den Administrator zur Validierung und Sichtbarkeit für alle Nutzer.', 'ar': 'أرسل هذا العقار للمشرف ليتم التحقق منه وجعله مرئياً لجميع المستخدمين.'},

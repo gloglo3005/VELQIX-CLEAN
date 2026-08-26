@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// AGORA VIDEO CALL SCREEN — Appel vidéo payant
-// Tarif : 10 FCFA / minute (côté client uniquement)
+// AGORA VIDEO CALL SCREEN
+// 🚫 Facturation 10 FCFA/min DÉSACTIVÉE (25/08/2026) — appels gratuits/illimités
+// pour l'instant (wallet plus utilisé). Voir _startBillingTimer ci-dessous.
 // 🔑 Remplace VOTRE_APP_ID_AGORA par ton App ID Agora
 // ═══════════════════════════════════════════════════════════════════
 
@@ -12,7 +13,7 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
-import '../services/wallet_service.dart';
+// import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : appels vidéo gratuits/illimités
 
 const String _agoraAppId = '5c00b5a87a274771bb20ef52f0f0fb43'; // 🔑 À remplacer
 
@@ -56,14 +57,15 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBalance();
+    // _loadBalance(); // 🚫 DÉSACTIVÉ (25/08/2026) : appels gratuits, plus de solde à charger
     _initAgora();
   }
 
-  Future<void> _loadBalance() async {
-    final b = await WalletService.instance.getBalance();
-    if (mounted) setState(() => _balance = b);
-  }
+  // 🚫 DÉSACTIVÉ (25/08/2026) : appels vidéo gratuits/illimités, plus de solde à suivre
+  // Future<void> _loadBalance() async {
+  //   final b = await WalletService.instance.getBalance();
+  //   if (mounted) setState(() => _balance = b);
+  // }
 
   Future<void> _initAgora() async {
     await [Permission.camera, Permission.microphone].request();
@@ -112,33 +114,34 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     );
   }
 
-  // ── Facturation par minute ─────────────────────────────────────────
+  // ── Facturation par minute ── 🚫 DÉSACTIVÉE (25/08/2026) : appels
+  // gratuits/illimités — le timer ne sert plus qu'à afficher la durée.
   void _startBillingTimer() {
     _secondTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (!mounted) return;
       setState(() => _callSeconds++);
 
-      // Facturer chaque nouvelle minute commencée
-      final minuteElapsed = _callSeconds ~/ 60;
-      if (minuteElapsed > _billedMinutes && widget.isCaller) {
-        _billedMinutes = minuteElapsed;
-        final ok = await WalletService.instance.deduct(
-            WalletService.kCallRatePerMin);
-
-        if (!ok) {
-          // Solde épuisé → couper l'appel
-          _showInsufficientFunds();
-          await _endCall();
-          return;
-        }
-
-        final newBalance = await WalletService.instance.getBalance();
-        if (!mounted) return;
-        setState(() {
-          _balance    = newBalance;
-          _lowBalance = newBalance < WalletService.kCallRatePerMin * 3;
-        });
-      }
+      // // Facturer chaque nouvelle minute commencée
+      // final minuteElapsed = _callSeconds ~/ 60;
+      // if (minuteElapsed > _billedMinutes && widget.isCaller) {
+      //   _billedMinutes = minuteElapsed;
+      //   final ok = await WalletService.instance.deduct(
+      //       WalletService.kCallRatePerMin);
+      //
+      //   if (!ok) {
+      //     // Solde épuisé → couper l'appel
+      //     _showInsufficientFunds();
+      //     await _endCall();
+      //     return;
+      //   }
+      //
+      //   final newBalance = await WalletService.instance.getBalance();
+      //   if (!mounted) return;
+      //   setState(() {
+      //     _balance    = newBalance;
+      //     _lowBalance = newBalance < WalletService.kCallRatePerMin * 3;
+      //   });
+      // }
     });
   }
 
@@ -159,16 +162,17 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     if (mounted) Navigator.pop(context);
   }
 
-  void _showInsufficientFunds() {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Solde insuffisant — appel coupé',
-          style: GoogleFonts.poppins(color: Colors.white)),
-      backgroundColor: AppTheme.error,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
-  }
+  // 🚫 DÉSACTIVÉ (25/08/2026) : plus jamais appelée, appels gratuits/illimités
+  // void _showInsufficientFunds() {
+  //   if (!mounted) return;
+  //   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  //     content: Text('Solde insuffisant — appel coupé',
+  //         style: GoogleFonts.poppins(color: Colors.white)),
+  //     backgroundColor: AppTheme.error,
+  //     behavior: SnackBarBehavior.floating,
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  //   ));
+  // }
 
   // ── Contrôles ─────────────────────────────────────────────────────
   void _toggleMute() async {
@@ -259,28 +263,28 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
                 Text(widget.remoteUser.fullName,
                     style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                 const Spacer(),
-                // Solde (affiché seulement côté client)
-                if (widget.isCaller)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: _lowBalance
-                          ? AppTheme.error.withOpacity(0.85)
-                          : Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.account_balance_wallet_rounded,
-                          size: 14,
-                          color: _lowBalance ? Colors.white : Colors.white70),
-                      const SizedBox(width: 5),
-                      Text('${_balance.toStringAsFixed(0)} FCFA',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white)),
-                    ]),
-                  ),
+                // Solde (affiché seulement côté client) — 🚫 DÉSACTIVÉ (25/08/2026) : appels gratuits
+                // if (widget.isCaller)
+                //   Container(
+                //     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                //     decoration: BoxDecoration(
+                //       color: _lowBalance
+                //           ? AppTheme.error.withOpacity(0.85)
+                //           : Colors.black54,
+                //       borderRadius: BorderRadius.circular(20),
+                //     ),
+                //     child: Row(mainAxisSize: MainAxisSize.min, children: [
+                //       Icon(Icons.account_balance_wallet_rounded,
+                //           size: 14,
+                //           color: _lowBalance ? Colors.white : Colors.white70),
+                //       const SizedBox(width: 5),
+                //       Text('${_balance.toStringAsFixed(0)} FCFA',
+                //           style: GoogleFonts.poppins(
+                //               fontSize: 12,
+                //               fontWeight: FontWeight.w600,
+                //               color: Colors.white)),
+                //     ]),
+                //   ),
               ]),
             ),
           ),
@@ -300,32 +304,33 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
                 const SizedBox(width: 6),
                 Text(_formattedDuration,
                     style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
-                if (widget.isCaller) ...[
-                  const SizedBox(width: 6),
-                  Text('• 10 FCFA/min',
-                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.white60)),
-                ],
+                // 🚫 DÉSACTIVÉ (25/08/2026) : appels gratuits, plus de tarif à afficher
+                // if (widget.isCaller) ...[
+                //   const SizedBox(width: 6),
+                //   Text('• 10 FCFA/min',
+                //       style: GoogleFonts.poppins(fontSize: 11, color: Colors.white60)),
+                // ],
               ]),
             ),
           ),
 
-        // ── Alerte solde faible ───────────────────────────────────────
-        if (_lowBalance && widget.isCaller)
-          Positioned(
-            top: 100, left: 16, right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: AppTheme.error.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [
-                const Icon(Icons.warning_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Text('Solde faible — rechargez bientôt',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white)),
-              ]),
-            ),
-          ),
+        // ── Alerte solde faible ── 🚫 DÉSACTIVÉE (25/08/2026) : appels gratuits
+        // if (_lowBalance && widget.isCaller)
+        //   Positioned(
+        //     top: 100, left: 16, right: 16,
+        //     child: Container(
+        //       padding: const EdgeInsets.all(10),
+        //       decoration: BoxDecoration(
+        //           color: AppTheme.error.withOpacity(0.9),
+        //           borderRadius: BorderRadius.circular(12)),
+        //       child: Row(children: [
+        //         const Icon(Icons.warning_rounded, color: Colors.white, size: 18),
+        //         const SizedBox(width: 8),
+        //         Text('Solde faible — rechargez bientôt',
+        //             style: GoogleFonts.poppins(fontSize: 12, color: Colors.white)),
+        //       ]),
+        //     ),
+        //   ),
 
         // ── Contrôles bas ─────────────────────────────────────────────
         Positioned(

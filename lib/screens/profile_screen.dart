@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/mock_data.dart';
 import '../services/auth_service.dart';
-import '../services/wallet_service.dart';
-import 'wallet_screen.dart';
+// import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
+// import 'wallet_screen.dart';               // 🚫 DÉSACTIVÉ (25/08/2026)
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../widgets/widgets.dart';
@@ -12,8 +12,8 @@ import 'legal_screen.dart';
 import 'auth_screens.dart';
 import 'my_listings_screen.dart';
 import 'favorites_screen.dart';
-import 'transactions_screen.dart';
-import 'kyc_screen.dart';
+// import 'transactions_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
+// import 'kyc_screen.dart';          // 🚫 DÉSACTIVÉ (25/08/2026)
 import 'premium_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'notifications_screen.dart';
@@ -352,7 +352,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = user.fullName.trim().isNotEmpty
         ? user.fullName
         : AuthService.instance.loggedUsername;
-    final transactions = MockDataService.myTransactions;
+    // final transactions = MockDataService.myTransactions; // 🚫 DÉSACTIVÉ (25/08/2026) : section "Mes transactions" retirée ci-dessous
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -465,32 +465,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // ── Solde portefeuille ──
-                          FutureBuilder<double>(
-                            future: WalletService.instance.getBalance(),
-                            builder: (_, snap) {
-                              final balance = snap.data ?? 0.0;
-                              return GestureDetector(
-                                onTap: () => _navigateTo(const WalletScreen()),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                                  ),
-                                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                    const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white70),
-                                    const SizedBox(width: 6),
-                                    Text('Solde : ${balance.toStringAsFixed(0)} FCFA',
-                                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                                    const SizedBox(width: 6),
-                                    const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white70),
-                                  ]),
-                                ),
-                              );
-                            },
-                          ),
+                          // ── Solde portefeuille ── 🚫 DÉSACTIVÉ (25/08/2026) : wallet plus utilisé
+                          // FutureBuilder<double>(
+                          //   future: WalletService.instance.getBalance(),
+                          //   builder: (_, snap) {
+                          //     final balance = snap.data ?? 0.0;
+                          //     return GestureDetector(
+                          //       onTap: () => _navigateTo(const WalletScreen()),
+                          //       child: Container(
+                          //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          //         decoration: BoxDecoration(
+                          //           color: Colors.white.withOpacity(0.12),
+                          //           borderRadius: BorderRadius.circular(20),
+                          //           border: Border.all(color: Colors.white.withOpacity(0.2)),
+                          //         ),
+                          //         child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          //           const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white70),
+                          //           const SizedBox(width: 6),
+                          //           Text('Solde : ${balance.toStringAsFixed(0)} FCFA',
+                          //               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                          //           const SizedBox(width: 6),
+                          //           const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white70),
+                          //         ]),
+                          //       ),
+                          //     );
+                          //   },
+                          // ),
                         ],
                       ),
                     ),
@@ -499,18 +499,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 16),
 
-                // Mes transactions
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SectionHeader(title: tr('profile_transactions'), actionLabel: 'Tout voir', onAction: () {}),
-                      const SizedBox(height: 12),
-                      ...transactions.map((t) => _TransactionCard(t: t)),
-                    ],
-                  ),
-                ),
+                // Mes transactions 🚫 DÉSACTIVÉ (25/08/2026) : plus de transaction directe, section retirée
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(horizontal: 20),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       SectionHeader(title: tr('profile_transactions'), actionLabel: 'Tout voir', onAction: () {}),
+                //       const SizedBox(height: 12),
+                //       ...transactions.map((t) => _TransactionCard(t: t)),
+                //     ],
+                //   ),
+                // ),
 
                 const SizedBox(height: 20),
 
@@ -524,41 +524,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 12),
                       _MenuGroup(items: [
                         _MenuItem(icon: Icons.person_outline_rounded, label: tr('profile_edit'), onTap: () => _showEditProfileModal(user)),
-                        _MenuItem(
-                          icon: Icons.verified_user_outlined,
-                          label: tr('profile_kyc'),
-                          // ✅ Badge "Premium requis" si pas premium, "Requis" si pas encore vérifié
-                          badge: !user.isPremium ? 'Premium requis' : (!user.isVerified ? 'Requis' : null),
-                          badgeColor: !user.isPremium ? AppTheme.accent : AppTheme.warning,
-                          onTap: () {
-                            if (!user.isPremium) {
-                              // ✅ Pas premium → va sur Premium, rafraîchit au retour
-                              _navigateTo(const PremiumScreen());
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text(tr('prof_upgrade_kyc'),
-                                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
-                                backgroundColor: AppTheme.accent,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                duration: const Duration(seconds: 3),
-                              ));
-                            } else {
-                              // ✅ Est premium → accès KYC, rafraîchit au retour
-                              _navigateTo(const KycScreen());
-                            }
-                          },
-                        ),
+                        // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause
+                        // _MenuItem(
+                        //   icon: Icons.verified_user_outlined,
+                        //   label: tr('profile_kyc'),
+                        //   // ✅ Badge "Premium requis" si pas premium, "Requis" si pas encore vérifié
+                        //   badge: !user.isPremium ? 'Premium requis' : (!user.isVerified ? 'Requis' : null),
+                        //   badgeColor: !user.isPremium ? AppTheme.accent : AppTheme.warning,
+                        //   onTap: () {
+                        //     if (!user.isPremium) {
+                        //       // ✅ Pas premium → va sur Premium, rafraîchit au retour
+                        //       _navigateTo(const PremiumScreen());
+                        //       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        //         content: Text(tr('prof_upgrade_kyc'),
+                        //             style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                        //         backgroundColor: AppTheme.accent,
+                        //         behavior: SnackBarBehavior.floating,
+                        //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        //         duration: const Duration(seconds: 3),
+                        //       ));
+                        //     } else {
+                        //       // ✅ Est premium → accès KYC, rafraîchit au retour
+                        //       _navigateTo(const KycScreen());
+                        //     }
+                        //   },
+                        // ),
                         _MenuItem(icon: Icons.home_outlined, label: tr('profile_listings'), onTap: () => _navigateTo(const MyListingsScreen())),
                         _MenuItem(icon: Icons.favorite_outline_rounded, label: tr('profile_favorites'), onTap: () => _navigateTo(const FavoritesScreen())),
                         _MenuItem(icon: Icons.notifications_outlined, label: tr('profile_notifs'), onTap: () => _navigateTo(const NotificationsScreen())),
                       ]),
                       const SizedBox(height: 16),
-                      Text(tr('profile_payment'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
-                      const SizedBox(height: 12),
-                      _MenuGroup(items: [
-                        _MenuItem(icon: Icons.receipt_long_outlined, label: tr('profile_transactions'), onTap: () => _navigateTo(const TransactionsScreen())),
-                        _MenuItem(icon: Icons.account_balance_wallet_rounded, label: 'Mon portefeuille', onTap: () => _navigateTo(const WalletScreen())),
-                      ]),
+                      // 🚫 DÉSACTIVÉ (25/08/2026) : transactions directes + wallet plus utilisés
+                      // Text(tr('profile_payment'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
+                      // const SizedBox(height: 12),
+                      // _MenuGroup(items: [
+                      //   _MenuItem(icon: Icons.receipt_long_outlined, label: tr('profile_transactions'), onTap: () => _navigateTo(const TransactionsScreen())),
+                      //   _MenuItem(icon: Icons.account_balance_wallet_rounded, label: 'Mon portefeuille', onTap: () => _navigateTo(const WalletScreen())),
+                      // ]),
                       const SizedBox(height: 16),
                       Text(tr('profile_support'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
                       const SizedBox(height: 12),
@@ -923,30 +925,28 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Future<void> _saveInfo() async {
     if (!(_formKeyInfo.currentState?.validate() ?? false)) return;
     setState(() => _savingInfo = true);
-    // Seul le téléphone est modifiable — prénom, nom et email restent inchangés
-    final updated = UserModel(
-      id: widget.user.id,
-      nom: widget.user.nom,           // verrouillé
-      prenom: widget.user.prenom,     // verrouillé
-      email: widget.user.email,       // verrouillé
-      telephone: _telCtrl.text.trim(), // modifiable
-      avatarUrl: widget.user.avatarUrl,
-      isVerified: widget.user.isVerified,
-      isPremium: widget.user.isPremium,
-      rating: widget.user.rating,
-      totalAvis: widget.user.totalAvis,
-      createdAt: widget.user.createdAt,
-      role: widget.user.role,
-      countryCode: widget.user.countryCode,
-      countryName: widget.user.countryName,
+
+    // ⚠️ Persiste réellement côté serveur (avant : sauvegarde locale
+    // uniquement, jamais envoyée au backend — donc perdue à la
+    // désinstallation/changement d'appareil, invisible pour les autres
+    // utilisateurs et l'admin).
+    final error = await AuthService.instance.updateProfile(
+      nom: _nomCtrl.text.trim(),
+      prenom: _prenomCtrl.text.trim(),
+      telephone: _telCtrl.text.trim(),
     );
-    await AuthService.instance.updateUser(updated);
-    userStateNotifier.value++;
-    if (mounted) {
-      setState(() => _savingInfo = false);
-      Navigator.pop(context);
-      _showSnack('Téléphone mis à jour avec succès !');
+
+    if (!mounted) return;
+    setState(() => _savingInfo = false);
+
+    if (error != null) {
+      _showSnack(error, success: false);
+      return;
     }
+
+    userStateNotifier.value++;
+    Navigator.pop(context);
+    _showSnack('Profil mis à jour avec succès !');
   }
 
   Future<void> _savePassword() async {
@@ -1022,29 +1022,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  // Champs verrouillés
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      const Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.textHint),
-                      const SizedBox(width: 6),
-                      Text(tr('prof_non_editable'), style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint)),
-                    ]),
-                  ),
-                  _EditField(ctrl: _prenomCtrl, label: tr('auth_field_prenom').replaceAll(' *',''),
-                      icon: Icons.person_outline_rounded,
-                      readOnly: true),
-                  const SizedBox(height: 12),
-                  _EditField(ctrl: _nomCtrl, label: tr('auth_field_nom').replaceAll(' *',''),
-                      icon: Icons.badge_outlined,
-                      readOnly: true),
-                  const SizedBox(height: 12),
-                  _EditField(ctrl: _emailCtrl, label: tr('auth_field_email').replaceAll(' *',''),
-                      icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      readOnly: true),
-                  const SizedBox(height: 20),
-                  // Champ modifiable
+                  // Champs modifiables
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(children: [
@@ -1053,11 +1031,35 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       Text(tr('prof_editable'), style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w500)),
                     ]),
                   ),
+                  _EditField(ctrl: _prenomCtrl, label: tr('auth_field_prenom').replaceAll(' *',''),
+                      icon: Icons.person_outline_rounded,
+                      readOnly: false,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null),
+                  const SizedBox(height: 12),
+                  _EditField(ctrl: _nomCtrl, label: tr('auth_field_nom').replaceAll(' *',''),
+                      icon: Icons.badge_outlined,
+                      readOnly: false,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null),
+                  const SizedBox(height: 12),
                   _EditField(ctrl: _telCtrl, label: tr('auth_field_phone').replaceAll(' *',''),
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       readOnly: false,
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null),
+                  const SizedBox(height: 20),
+                  // Champ verrouillé (email non modifiable côté backend)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      const Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.textHint),
+                      const SizedBox(width: 6),
+                      Text(tr('prof_non_editable'), style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint)),
+                    ]),
+                  ),
+                  _EditField(ctrl: _emailCtrl, label: tr('auth_field_email').replaceAll(' *',''),
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      readOnly: true),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -1279,4 +1281,3 @@ class _EditField extends StatelessWidget {
     );
   }
 }
-
