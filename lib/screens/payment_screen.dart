@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
 import '../services/app_translations.dart';
 import '../services/transaction_service.dart';
 
@@ -12,14 +14,15 @@ import '../services/transaction_service.dart';
 // ═══════════════════════════════════════════════════════════════════
 
 class PaymentScreen extends StatefulWidget {
-  final PropertyModel property;
+  final PropertyModel? property; // null pour le type 'premium' (pas de bien associé)
   final String type; // 'location' | 'achat' | 'premium'
-  final double? montantOverride; // pour le premium
+  final double? montantOverride; // affichage indicatif seulement pour le premium —
+  // le montant réellement facturé est toujours décidé par le backend (voir _startFedaPay)
   final String? descriptionOverride;
 
   const PaymentScreen({
     super.key,
-    required this.property,
+    this.property,
     required this.type,
     this.montantOverride,
     this.descriptionOverride,
@@ -29,7 +32,7 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserver {
   // ── Formulaire ─────────────────────────────────────────────────────────────
   DateTime _dateDebut = DateTime.now().add(const Duration(days: 1));
   DateTime? _dateFin;
@@ -40,6 +43,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _processing = false;
   String? _errorMsg;
 
+  // ── Confirmation Premium (post-redirection FedaPay) ─────────────────────────
+  // Le statut Premium ne vient JAMAIS d'une valeur locale : on interroge
+  // toujours le backend (via AuthService.refreshUser → GET /auth/me), qui ne
+  // reflète isPremium que si le webhook FedaPay a confirmé le paiement.
+  bool _awaitingConfirmation = false;
+  bool _checkingStatus = false;
+
   // ── Calculs ────────────────────────────────────────────────────────────────
   int get _nbJours => _dateFin != null
       ? _dateFin!.difference(_dateDebut).inDays.clamp(1, 9999)
@@ -49,12 +59,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     if (widget.montantOverride != null) return widget.montantOverride!;
     if (widget.type == 'location') {
       // Utiliser prixParJour si dispo, sinon prix fixe
-      final rawJour = widget.property.prixParJour ?? '';
+      final rawJour = widget.property!.prixParJour ?? '';
       final numStr  = rawJour.replaceAll(RegExp(r'[^\d]'), '');
       final parJour = double.tryParse(numStr) ?? 50000.0;
       return parJour * _nbJours;
     }
-    return widget.property.prix;
+    return widget.property!.prix;
   }
 
   double get _fraisService => _baseAmount * 0.02;
@@ -64,6 +74,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final user = AuthService.instance.currentUserOrEmpty;
     if (user.email.isNotEmpty) _emailCtrl.text = user.email;
     if ((user.telephone ?? '').isNotEmpty) _phoneCtrl.text = user.telephone!;
@@ -71,13 +82,33 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
   }
 
-  // ── Paiement (sandbox FedaPay) ────────────────────────────────────────────
+  // L'utilisateur revient dans l'appli après être passé par le navigateur
+  // pour payer (checkout hébergé FedaPay) → on revérifie son vrai statut
+  // côté serveur, sans jamais le supposer côté client.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _awaitingConfirmation) {
+      _checkPremiumStatus();
+    }
+  }
+
+  // ── Paiement ───────────────────────────────────────────────────────────────
   Future<void> _startFedaPay() async {
+    if (widget.type == 'premium') {
+      await _startPremiumCheckout();
+      return;
+    }
+
+    // ⚠️ Flux location/achat : la route /api/transactions correspondante est
+    // désactivée côté backend depuis le 25/08/2026 (voir index.ts — seul
+    // /api/premium reste actif). Ce chemin ne créera donc rien de réel tant
+    // qu'elle n'est pas réactivée côté serveur.
     final phone = _phoneCtrl.text.trim();
     final email = _emailCtrl.text.trim();
 
@@ -100,23 +131,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     setState(() { _processing = true; _errorMsg = null; });
 
-    // TODO: remplacer par le véritable appel au SDK/API FedaPay (checkout + webhook
-    // de confirmation). Ici on simule seulement la validation du paiement.
     await Future.delayed(const Duration(seconds: 2));
     final fakePaymentRef = 'fp_${DateTime.now().millisecondsSinceEpoch}';
 
     if (!mounted) return;
 
-    if (widget.type == 'premium') {
-      // TODO: brancher sur le service d'abonnement premium (pas de propertyId
-      // à associer ici) — pas de création de TransactionModel dans ce cas.
-      setState(() => _processing = false);
-      _showSuccess();
-      return;
-    }
-
     final result = await TransactionService.instance.createTransaction(
-      propertyId: widget.property.id,
+      propertyId: widget.property!.id,
       montant: _total,
       type: widget.type == 'location' ? 'location' : 'achat',
       moyenPaiement: 'mobile_money',
@@ -133,6 +154,81 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
     _showSuccess();
+  }
+
+  // ── Premium : vrai checkout FedaPay ──────────────────────────────────────
+  // Étape 1 — On demande au backend de créer la transaction FedaPay (lui
+  //   seul connaît le prix réel, voir PREMIUM_PRICE_FCFA côté serveur).
+  // Étape 2 — On ouvre l'URL de paiement hébergé dans le navigateur.
+  // Étape 3 — On ne débloque JAMAIS le badge Premium depuis le client : on
+  //   attend que le webhook FedaPay confirme le paiement côté serveur, puis
+  //   on rafraîchit le vrai profil utilisateur (GET /auth/me) pour lire isPremium.
+  Future<void> _startPremiumCheckout() async {
+    setState(() { _processing = true; _errorMsg = null; });
+
+    final result = await ApiService.instance.post('/premium/checkout', {}, auth: true);
+
+    if (!mounted) return;
+
+    if (result['success'] != true) {
+      setState(() {
+        _processing = false;
+        _errorMsg = result['message'] ?? 'Erreur lors de la création du paiement.';
+      });
+      return;
+    }
+
+    final paymentUrl = result['data']?['paymentUrl'] as String?;
+    if (paymentUrl == null) {
+      setState(() {
+        _processing = false;
+        _errorMsg = 'Réponse inattendue du serveur.';
+      });
+      return;
+    }
+
+    final opened = await launchUrl(
+      Uri.parse(paymentUrl),
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!mounted) return;
+
+    if (!opened) {
+      setState(() {
+        _processing = false;
+        _errorMsg = "Impossible d'ouvrir la page de paiement FedaPay.";
+      });
+      return;
+    }
+
+    setState(() {
+      _processing = false;
+      _awaitingConfirmation = true;
+    });
+  }
+
+  Future<void> _checkPremiumStatus() async {
+    if (_checkingStatus) return;
+    setState(() => _checkingStatus = true);
+
+    await AuthService.instance.refreshUser();
+
+    if (!mounted) return;
+    setState(() => _checkingStatus = false);
+
+    if (AuthService.instance.currentUserOrEmpty.isPremium) {
+      setState(() => _awaitingConfirmation = false);
+      _showSuccess();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Paiement pas encore confirmé. Réessaie dans quelques instants.',
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.textSecondary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    }
   }
 
   @override
@@ -156,7 +252,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
           children: [
 
             // ── Résumé bien / offre ───────────────────────────────────────
-            if (!isPremium) _PropertySummaryCard(property: p),
+            // p n'est non-null que pour les types location/achat — garanti par
+            // les points d'appel de cet écran.
+            if (!isPremium) _PropertySummaryCard(property: p!),
             if (isPremium)  _PremiumSummaryCard(),
 
             // ── Dates (location seulement) ────────────────────────────────
@@ -217,7 +315,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               baseAmount: _baseAmount,
               frais: _fraisService,
               total: _total,
-              property: p,
             ),
 
             // ── Erreur ────────────────────────────────────────────────
@@ -239,11 +336,50 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
 
+            // ── En attente de confirmation (retour du checkout FedaPay) ──
+            if (_awaitingConfirmation) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.info.withOpacity(0.25)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(
+                      'En attente de confirmation du paiement…',
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.info),
+                    )),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Reviens sur l'appli une fois le paiement terminé — on vérifie automatiquement. Tu peux aussi le faire toi-même :",
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: _checkingStatus ? null : _checkPremiumStatus,
+                    child: Text(
+                      _checkingStatus ? 'Vérification…' : 'Vérifier mon paiement',
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+
             const SizedBox(height: 24),
 
             // ── Bouton paiement ────────────────────────────────────────
             PrimaryButton(
-              label: 'Payer ${formatFcfa(_total)} via FedaPay',
+              label: isPremium ? 'Continuer vers FedaPay' : 'Payer ${formatFcfa(_total)} via FedaPay',
               icon: Icons.lock_rounded,
               isLoading: _processing,
               onPressed: _startFedaPay,
@@ -457,11 +593,10 @@ class _AmountSummary extends StatelessWidget {
   final double baseAmount;
   final double frais;
   final double total;
-  final PropertyModel property;
 
   const _AmountSummary({
     required this.type, required this.nbJours, required this.baseAmount,
-    required this.frais, required this.total, required this.property,
+    required this.frais, required this.total,
   });
 
   @override

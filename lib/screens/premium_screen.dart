@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
+import 'payment_screen.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -12,14 +13,19 @@ class PremiumScreen extends StatefulWidget {
 }
 
 class _PremiumScreenState extends State<PremiumScreen> {
-  int _selectedPlan = 1; // 0=mensuel, 1=semestriel, 2=annuel
+  int _selectedPlan = 1; // 0=gratuit, 1=premium
   bool _loading = false;
 
+  // Un seul palier payant pour l'instant : le backend (initPremiumCheckout)
+  // ne gère qu'un tarif/durée fixes (PREMIUM_PRICE_FCFA / PREMIUM_DURATION_DAYS,
+  // par défaut 2000 FCFA / 30 jours). Si un jour le backend accepte plusieurs
+  // formules (planId → prix/durée), ce sélecteur pourra être ré-étoffé.
+  static const double _premiumPriceFcfa = 2000;
+  static const int _premiumDurationDays = 30;
+
   List<Map<String, dynamic>> get _plans => [
-    {'labelKey': 'prem_free',       'price': '0',      'periodKey': 'prem_forever',     'discountKey': null,           'color': AppTheme.success, 'isFree': true},
-    {'labelKey': 'prem_mensuel',    'price': r'$5',    'periodKey': 'prem_per_month',   'discountKey': null,           'color': AppTheme.info,    'isFree': false},
-    {'labelKey': 'prem_semestriel', 'price': r'$26',   'periodKey': 'prem_per_6months', 'discountKey': 'prem_saved_15','color': AppTheme.primary, 'isFree': false},
-    {'labelKey': 'prem_annuel',     'price': r'$48.5', 'periodKey': 'prem_per_year',    'discountKey': 'prem_saved_35','color': AppTheme.accent,  'isFree': false},
+    {'label': 'Gratuit',  'price': '0 FCFA', 'period': '', 'color': AppTheme.success, 'isFree': true},
+    {'label': 'Premium',  'price': formatFcfa(_premiumPriceFcfa), 'period': ' / $_premiumDurationDays jours', 'color': AppTheme.primary, 'isFree': false},
   ];
 
   List<Map<String, dynamic>> get _features => [
@@ -94,19 +100,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
                               border: Border.all(color: selected ? (plan['color'] as Color) : AppTheme.border, width: selected ? 2 : 1),
                             ),
                             child: Column(children: [
-                              if (plan['discountKey'] != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(6)),
-                                  child: Text(tr((plan['discountKey'] ?? '') as String), style: GoogleFonts.poppins(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
-                                ),
-                              if (plan['discountKey'] == null) const SizedBox(height: 14),
+                              const SizedBox(height: 14),
                               const SizedBox(height: 6),
                               Text(plan['price'] as String, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: selected ? plan['color'] as Color : AppTheme.textPrimary)),
-                              
-                              Text(tr(plan['periodKey'] as String), style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.textSecondary)),
+                              if ((plan['period'] as String).isNotEmpty)
+                                Text(plan['period'] as String, style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.textSecondary)),
                               const SizedBox(height: 6),
-                              Text(tr(plan['labelKey'] as String), style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: selected ? plan['color'] as Color : AppTheme.textSecondary)),
+                              Text(plan['label'] as String, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: selected ? plan['color'] as Color : AppTheme.textSecondary)),
                             ]),
                           ),
                         ),
@@ -144,7 +144,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   PrimaryButton(
                     label: (_plans[_selectedPlan]['isFree'] as bool? ?? false)
                         ? 'Commencer gratuitement'
-                        : "${tr('prem_start_with')} ${tr(_plans[_selectedPlan]['labelKey'] as String)}",
+                        : 'Passer Premium — ${_plans[_selectedPlan]['price']}${_plans[_selectedPlan]['period']}',
                     icon: (_plans[_selectedPlan]['isFree'] as bool? ?? false)
                         ? Icons.rocket_launch_rounded
                         : Icons.workspace_premium_rounded,
@@ -169,34 +169,53 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
     if (isFree) {
       // Plan gratuit → activation directe sans paiement, pas de badge
-      _onPaymentSuccess(isFree: true);
+      _activateFreePlan();
       return;
     }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PaymentSheet(
-        planLabel: tr(plan['labelKey'] as String),
-        planPrice: plan['price'] as String,
-        planPeriod: tr(plan['periodKey'] as String),
-        onPaid: () => _onPaymentSuccess(isFree: false),
-      ),
-    );
+    // Plan payant → vrai checkout FedaPay côté backend. Le montant réel est
+    // décidé par le serveur (PREMIUM_PRICE_FCFA) ; le badge Premium n'est
+    // débloqué que si le webhook FedaPay confirme le paiement — jamais depuis
+    // ce client. Voir PaymentScreen._startPremiumCheckout / _checkPremiumStatus.
+    //
+    // ⚠️ Limite actuelle : le backend ne gère qu'un seul tarif/durée fixes
+    // (PREMIUM_PRICE_FCFA / PREMIUM_DURATION_DAYS), alors que ce sélecteur
+    // propose 3 formules (mensuel/semestriel/annuel) à des prix différents.
+    // Tant que /api/premium/checkout n'accepte pas un planId, le prix
+    // effectivement facturé sera celui fixé côté serveur, quel que soit le
+    // plan choisi ici.
+    _goToRealCheckout();
   }
 
-  void _onPaymentSuccess({bool isFree = false}) async {
+  Future<void> _goToRealCheckout() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PaymentScreen(type: 'premium')),
+    );
+
+    // Au retour de l'écran de paiement, on ne se fie qu'à ce que le serveur
+    // a confirmé (PaymentScreen a déjà appelé AuthService.refreshUser() si
+    // le webhook FedaPay a validé le paiement pendant l'absence).
+    if (!mounted) return;
+    if (AuthService.instance.currentUserOrEmpty.isPremium) {
+      _showResultDialog(isFree: false);
+    }
+  }
+
+  void _activateFreePlan() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 1500));
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     setState(() => _loading = false);
 
-    // Plan payant → badge Premium activé / Plan gratuit → pas de badge
-    await AuthService.instance.setPremium(!isFree);
+    await AuthService.instance.setPremium(false);
     notifyUserChanged();
 
     if (!mounted) return;
+    _showResultDialog(isFree: true);
+  }
+
+  void _showResultDialog({required bool isFree}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -222,270 +241,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
 }
 
 
-
-// ─── Bottom Sheet Paiement ────────────────────────────────────────────────────
-class _PaymentSheet extends StatefulWidget {
-  final String planLabel, planPrice, planPeriod;
-  final VoidCallback onPaid;
-  const _PaymentSheet({required this.planLabel, required this.planPrice, required this.planPeriod, required this.onPaid});
-  @override
-  State<_PaymentSheet> createState() => _PaymentSheetState();
-}
-
-class _PaymentSheetState extends State<_PaymentSheet> {
-  int _methodIndex = 0; // 0=MobileMoney, 1=Carte, 2=PayPal
-  int _mobileOperator = 0; // 0=Flooz, 1=T-Money, 2=MTN MoMo
-  bool _processing = false;
-
-  final _phoneController = TextEditingController();
-  final _cardNumberController = TextEditingController();
-  final _cardExpiryController = TextEditingController();
-  final _cardCvvController = TextEditingController();
-  final _cardNameController = TextEditingController();
-
-  List<Map<String, dynamic>> get _methods => [
-    {"label": tr('pay_mobile_money'), 'subtitle': 'Flooz, T-Money, MTN MoMo...', 'icon': Icons.phone_android_rounded, 'color': Color(0xFF10B981)},
-    {"label": tr('pay_card'), "subtitle": tr('pay_card_sub'), 'icon': Icons.credit_card_rounded, 'color': Color(0xFF6366F1)},
-    {'label': 'PayPal', "subtitle": tr('pay_intl'), 'icon': Icons.account_balance_wallet_rounded, 'color': Color(0xFF0070BA)},
-  ];
-
-  final _operators = ['Flooz', 'T-Money', 'MTN MoMo'];
-
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    _cardNumberController.dispose();
-    _cardExpiryController.dispose();
-    _cardCvvController.dispose();
-    _cardNameController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Handle
-          Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-          const SizedBox(height: 20),
-          // Titre
-          Text(tr('prem_payment_title'), style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2),
-          Text('Plan ${widget.planLabel} · ${widget.planPrice}${widget.planPeriod}',
-              style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
-          const SizedBox(height: 20),
-          // Méthodes de paiement
-          ...List.generate(_methods.length, (i) {
-            final m = _methods[i];
-            final selected = i == _methodIndex;
-            return GestureDetector(
-              onTap: () => setState(() => _methodIndex = i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: selected ? (m['color'] as Color).withOpacity(0.06) : Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: selected ? m['color'] as Color : AppTheme.border, width: selected ? 2 : 1),
-                ),
-                child: Row(children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(color: (m['color'] as Color).withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                    child: Icon(m['icon'] as IconData, color: m['color'] as Color, size: 20),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m['label'] as String, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                    Text(m['subtitle'] as String, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-                  ])),
-                  if (selected)
-                    Container(width: 22, height: 22,
-                      decoration: BoxDecoration(color: m['color'] as Color, shape: BoxShape.circle),
-                      child: const Icon(Icons.check_rounded, color: Colors.white, size: 14))
-                  else
-                    Container(width: 22, height: 22,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppTheme.border, width: 1.5))),
-                ]),
-              ),
-            );
-          }),
-
-          // ── Champs dynamiques selon méthode ───────────────────────────────
-          if (_methodIndex == 0) ..._buildMobileMoneyFields(),
-          if (_methodIndex == 1) ..._buildCardFields(),
-          if (_methodIndex == 2) ..._buildPayPalFields(),
-
-          const SizedBox(height: 16),
-          // Résumé
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-            child: Column(children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Plan ${widget.planLabel}', style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textPrimary)),
-                Text(widget.planPrice, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-              ]),
-              const SizedBox(height: 6),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('TVA (0%)', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-                Text('0', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-              ]),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: Color(0xFFE2E8F0))),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Total', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                Text(widget.planPrice, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primary)),
-              ]),
-            ]),
-          ),
-          const SizedBox(height: 20),
-          // Bouton payer
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _processing ? null : _pay,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                backgroundColor: AppTheme.primary,
-              ),
-              child: _processing
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Icon(Icons.lock_rounded, size: 16, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Text('Payer ${widget.planPrice}', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-                    ]),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(child: Text('Paiement sécurisé · SSL · Sans engagement', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint))),
-        ]),
-      ),
-    );
-  }
-
-  List<Widget> _buildMobileMoneyFields() => [
-    const SizedBox(height: 16),
-    Text('Opérateur', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-    const SizedBox(height: 10),
-    Row(children: List.generate(_operators.length, (i) {
-      final selected = i == _mobileOperator;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => setState(() => _mobileOperator = i),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            margin: EdgeInsets.only(left: i > 0 ? 8 : 0),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: selected ? AppTheme.primary.withOpacity(0.08) : Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: selected ? AppTheme.primary : AppTheme.border, width: selected ? 2 : 1),
-            ),
-            child: Text(_operators[i], textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(fontSize: 12, fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                color: selected ? AppTheme.primary : AppTheme.textSecondary)),
-          ),
-        ),
-      );
-    })),
-    const SizedBox(height: 14),
-    Text('Numéro de téléphone', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-    const SizedBox(height: 8),
-    TextField(
-      controller: _phoneController,
-      keyboardType: TextInputType.phone,
-      style: GoogleFonts.poppins(fontSize: 14),
-      decoration: InputDecoration(
-        hintText: '+228 90 00 00 00',
-        hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint),
-        prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: AppTheme.textSecondary),
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    ),
-  ];
-
-  List<Widget> _buildCardFields() => [
-    const SizedBox(height: 16),
-    Text('Numéro de carte', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-    const SizedBox(height: 8),
-    _inputField(_cardNumberController, 'XXXX XXXX XXXX XXXX', Icons.credit_card_rounded, TextInputType.number),
-    const SizedBox(height: 12),
-    Text('Nom sur la carte', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-    const SizedBox(height: 8),
-    _inputField(_cardNameController, 'JOHN DOE', Icons.person_outline_rounded, TextInputType.text),
-    const SizedBox(height: 12),
-    Row(children: [
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Expiration', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-        const SizedBox(height: 8),
-        _inputField(_cardExpiryController, 'MM/AA', Icons.calendar_today_outlined, TextInputType.number),
-      ])),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('CVV', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-        const SizedBox(height: 8),
-        _inputField(_cardCvvController, '•••', Icons.lock_outline_rounded, TextInputType.number, obscure: true),
-      ])),
-    ]),
-  ];
-
-  List<Widget> _buildPayPalFields() => [
-    const SizedBox(height: 16),
-    Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFF0070BA).withOpacity(0.06), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF0070BA).withOpacity(0.2))),
-      child: Row(children: [
-        const Icon(Icons.info_outline_rounded, color: Color(0xFF0070BA), size: 18),
-        const SizedBox(width: 10),
-        Expanded(child: Text('Vous serez redirigé vers PayPal pour finaliser le paiement de manière sécurisée.',
-          style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4))),
-      ]),
-    ),
-  ];
-
-  Widget _inputField(TextEditingController ctrl, String hint, IconData icon, TextInputType type, {bool obscure = false}) {
-    return TextField(
-      controller: ctrl,
-      keyboardType: type,
-      obscureText: obscure,
-      style: GoogleFonts.poppins(fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint),
-        prefixIcon: Icon(icon, size: 18, color: AppTheme.textSecondary),
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 2)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
-  }
-
-  Future<void> _pay() async {
-    setState(() => _processing = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    Navigator.pop(context);
-    widget.onPaid();
-  }
-}
 
 // ─── Dialog Succès Premium ────────────────────────────────────────────────────
 class _PremiumSuccessDialog extends StatelessWidget {
