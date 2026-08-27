@@ -247,30 +247,6 @@ class AuthService {
     }
   }
 
-  // ─── Update profil ───────────────────────────────────────────────
-  Future<String?> updateProfile({
-    required String nom,
-    required String prenom,
-    String? telephone,
-    String? avatarUrl,
-    String? countryCode,
-    String? countryName,
-  }) async {
-    final res = await _api.put('/auth/profile', {
-      'nom': nom, 'prenom': prenom,
-      if (telephone != null)   'telephone': telephone,
-      if (avatarUrl != null)   'avatarUrl': avatarUrl,
-      if (countryCode != null) 'countryCode': countryCode,
-      if (countryName != null) 'countryName': countryName,
-    }, auth: true);
-
-    if (res['success'] != true) return res['message'] ?? 'Erreur lors de la mise à jour.';
-    _currentUser = _userFromJson(res['data']);
-    await _cacheUser(_currentUser!, method: 'email');
-    notifyUserChanged();
-    return null;
-  }
-
   // ─── Refresh user ────────────────────────────────────────────────
   Future<void> refreshUser() async {
     final res = await _api.get('/auth/me', auth: true);

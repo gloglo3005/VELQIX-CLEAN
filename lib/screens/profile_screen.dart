@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
+// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/auth_service.dart';
 // import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
 // import 'wallet_screen.dart';               // 🚫 DÉSACTIVÉ (25/08/2026)
@@ -176,18 +176,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: Text(c['name']!, style: GoogleFonts.poppins(fontSize: 14, fontWeight: isSel ? FontWeight.w600 : FontWeight.w400, color: isSel ? AppTheme.primary : AppTheme.textPrimary)),
                       trailing: isSel ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20) : null,
                       onTap: () async {
-                        // Mettre à jour le user dans AuthService et persister
-                        final updated = UserModel(
-                          id: user.id, nom: user.nom, prenom: user.prenom,
-                          email: user.email, telephone: user.telephone,
-                          avatarUrl: user.avatarUrl, isVerified: user.isVerified,
-                          isPremium: user.isPremium, rating: user.rating,
-                          totalAvis: user.totalAvis, createdAt: user.createdAt,
-                          role: user.role,
+                        // ⚠️ Persiste réellement côté serveur (avant :
+                        // AuthService.updateUser() = cache local uniquement).
+                        final error = await AuthService.instance.updateProfile(
+                          nom: user.nom,
+                          prenom: user.prenom,
+                          telephone: user.telephone,
                           countryCode: c['code'],
                           countryName: c['name'],
                         );
-                        AuthService.instance.updateUser(updated);
+                        if (error != null) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(error, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                              backgroundColor: AppTheme.error,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ));
+                          }
+                          return;
+                        }
                         // ✅ Changer la langue selon le pays sélectionné
                         localeNotifier.value = countryCodeToLocale(c['code']);
                         if (mounted) setState(() {});
@@ -457,7 +465,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _StatPill(label: 'Annonces', value: '${[...MockDataService.properties, ...publishedProperties.cast()].where((p) => p.proprietaire.id == user.id).length}'),
+                              _StatPill(label: 'Annonces', value: '${publishedProperties.cast<PropertyModel>().where((p) => p.proprietaire.id == user.id).length}'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
                               _StatPill(label: 'Note', value: '${user.rating} ⭐'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
@@ -1280,4 +1288,4 @@ class _EditField extends StatelessWidget {
       ),
     );
   }
-}
+}s
