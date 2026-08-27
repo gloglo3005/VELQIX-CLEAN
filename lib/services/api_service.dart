@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
@@ -213,12 +214,33 @@ class ApiService {
   }
 
   // ── Upload multipart (images) ────────────────────────────────────
+  // ⚠️ MultipartFile.fromBytes/fromPath n'infère PAS le type MIME depuis
+  // l'extension : sans contentType explicite, le champ part en
+  // "application/octet-stream", ce que le fileFilter Multer du backend
+  // rejette systématiquement (il exige "image/*"). D'où l'échec silencieux
+  // de tous les uploads de photos.
+  MediaType _mediaTypeFromFilename(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'png':  return MediaType('image', 'png');
+      case 'webp': return MediaType('image', 'webp');
+      case 'gif':  return MediaType('image', 'gif');
+      case 'jpg':
+      case 'jpeg':
+      default:     return MediaType('image', 'jpeg');
+    }
+  }
+
   Future<Map<String, dynamic>> uploadFile(String path, File file) async {
     try {
       final token   = await getToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        contentType: _mediaTypeFromFilename(file.path),
+      ));
       final streamed = await request.send().timeout(const Duration(seconds: 30));
       final res      = await http.Response.fromStream(streamed);
       return _parse(res);
@@ -238,7 +260,12 @@ class ApiService {
       final token   = await getToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
-      request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _mediaTypeFromFilename(filename),
+      ));
       final streamed = await request.send().timeout(const Duration(seconds: 30));
       final res      = await http.Response.fromStream(streamed);
       return _parse(res);
