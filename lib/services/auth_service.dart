@@ -294,6 +294,48 @@ class AuthService {
     return null;
   }
 
+  // ─── Mise à jour du profil (persiste réellement côté serveur) ──────
+  // ⚠️ Avant : updateUser() ci-dessous ne faisait que du cache local
+  // (SharedPreferences), jamais envoyé au backend — les infos étaient
+  // perdues au changement d'appareil et invisibles pour les autres
+  // utilisateurs/l'admin. email n'est volontairement pas modifiable ici
+  // (le backend PUT /auth/profile ne l'accepte pas).
+  Future<String?> updateProfile({
+    required String nom,
+    required String prenom,
+    String? telephone,
+    String? countryCode,
+    String? countryName,
+  }) async {
+    final res = await _api.put('/auth/profile', {
+      'nom': nom,
+      'prenom': prenom,
+      'telephone': telephone,
+      if (countryCode != null) 'countryCode': countryCode,
+      if (countryName != null) 'countryName': countryName,
+    }, auth: true);
+
+    if (res['success'] != true) return res['message'] ?? 'Erreur';
+
+    // Le serveur renvoie l'utilisateur à jour — on s'en sert comme source
+    // de vérité plutôt que de reconstruire l'objet à la main.
+    final data = res['data'] as Map<String, dynamic>?;
+    if (data != null && _currentUser != null) {
+      final updated = _copyWith(
+        _currentUser!,
+        nom: data['nom'] ?? nom,
+        prenom: data['prenom'] ?? prenom,
+        telephone: data['telephone'] ?? telephone,
+        countryCode: data['countryCode'] ?? countryCode,
+        countryName: data['countryName'] ?? countryName,
+      );
+      _currentUser = updated;
+      await _cacheUser(updated, method: 'email');
+      notifyUserChanged();
+    }
+    return null;
+  }
+
   // ─── Premium / KYC ───────────────────────────────────────────────
   Future<void> setPremium(bool value) async {
     if (_currentUser == null) return;
@@ -381,11 +423,11 @@ class AuthService {
     nomEntreprise: json['nomEntreprise'], typeActivite: json['typeActivite'],
   );
 
-  UserModel _copyWith(UserModel u, {bool? isPremium, bool? isVerified, String? nom, String? prenom, String? telephone}) => UserModel(
+  UserModel _copyWith(UserModel u, {bool? isPremium, bool? isVerified, String? nom, String? prenom, String? telephone, String? countryCode, String? countryName}) => UserModel(
     id: u.id, nom: nom ?? u.nom, prenom: prenom ?? u.prenom, email: u.email, telephone: telephone ?? u.telephone,
     avatarUrl: u.avatarUrl, isVerified: isVerified ?? u.isVerified,
     isPremium: isPremium ?? u.isPremium, rating: u.rating, totalAvis: u.totalAvis,
-    createdAt: u.createdAt, role: u.role, countryCode: u.countryCode, countryName: u.countryName,
+    createdAt: u.createdAt, role: u.role, countryCode: countryCode ?? u.countryCode, countryName: countryName ?? u.countryName,
     accountType: u.accountType, nomEntreprise: u.nomEntreprise, typeActivite: u.typeActivite,
   );
 }

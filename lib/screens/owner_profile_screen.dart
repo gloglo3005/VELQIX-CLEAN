@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
+// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de biens factices
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../widgets/widgets.dart';
@@ -29,26 +29,18 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
 
   /// Annonces publiées de ce propriétaire
   int get _annoncesCount {
-    final published = publishedPropertiesNotifier.value
+    return publishedPropertiesNotifier.value
         .whereType<PropertyModel>()
         .where((p) => p.proprietaire.id == _ownerId)
         .length;
-    final mock = MockDataService.properties
-        .where((p) => p.proprietaire.id == _ownerId)
-        .length;
-    return published + mock;
   }
 
   /// Total des vues de toutes ses annonces
   int get _views {
-    final published = publishedPropertiesNotifier.value
+    return publishedPropertiesNotifier.value
         .whereType<PropertyModel>()
         .where((p) => p.proprietaire.id == _ownerId)
         .fold<int>(0, (sum, p) => sum + p.vues);
-    final mock = MockDataService.properties
-        .where((p) => p.proprietaire.id == _ownerId)
-        .fold<int>(0, (sum, p) => sum + p.vues);
-    return published + mock;
   }
 
   bool get _isFollowing => followedOwnersNotifier.value.contains(_ownerId);
@@ -88,10 +80,10 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ownerListings = [
-      ...MockDataService.properties,
-      ...publishedPropertiesNotifier.value.cast<PropertyModel>(),
-    ].where((p) => p.proprietaire.id == widget.owner.id).toList();
+    final ownerListings = publishedPropertiesNotifier.value
+        .cast<PropertyModel>()
+        .where((p) => p.proprietaire.id == widget.owner.id)
+        .toList();
 
     return ValueListenableBuilder(
       valueListenable: localeNotifier,

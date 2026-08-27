@@ -207,6 +207,48 @@ class PropertyService {
     return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
   }
 
+  // ─── Avis ────────────────────────────────────────────────────────
+  // ⚠️ Avant : property_detail_screen.dart affichait MockDataService.avis
+  // (100% factice). Ces deux méthodes branchent sur les vrais endpoints
+  // GET/POST /api/properties/:id/avis qui existaient déjà côté backend.
+  Future<List<AvisModel>> getAvis(String propertyId) async {
+    final res = await _api.get('/properties/$propertyId/avis', auth: false);
+    if (res['success'] != true) return [];
+    final list = res['data'] as List<dynamic>;
+    return list.map((item) {
+      final j = item as Map<String, dynamic>;
+      final auteurJson = j['auteur'] as Map<String, dynamic>?;
+      return AvisModel(
+        id: j['id'] ?? '',
+        cible: j['propertyId'] ?? propertyId,
+        note: (j['note'] ?? 0).toDouble(),
+        commentaire: j['commentaire'] ?? '',
+        createdAt: j['createdAt'] != null
+            ? DateTime.tryParse(j['createdAt']) ?? DateTime.now()
+            : DateTime.now(),
+        auteur: UserModel(
+          id: auteurJson?['id'] ?? j['auteurId'] ?? '',
+          nom: auteurJson?['nom'] ?? '',
+          prenom: auteurJson?['prenom'] ?? '',
+          email: '', telephone: '',
+          avatarUrl: auteurJson?['avatarUrl'],
+          rating: 0, totalAvis: 0,
+          createdAt: DateTime.now(),
+        ),
+      );
+    }).toList();
+  }
+
+  /// Retourne null en cas de succès, ou un message d'erreur.
+  Future<String?> createAvis(String propertyId, {required double note, required String commentaire}) async {
+    final res = await _api.post('/properties/$propertyId/avis', {
+      'note': note,
+      'commentaire': commentaire,
+    }, auth: true);
+    if (res['success'] != true) return res['message'] ?? 'Erreur';
+    return null;
+  }
+
   // ─── Upload d'image ───────────────────────────────────────────────
   /// Upload une image et retourne l'URL Cloudinary à utiliser dans createProperty()
   Future<({String? url, String? error})> uploadImage(File imageFile) async {

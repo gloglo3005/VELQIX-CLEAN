@@ -5,10 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../models/models.dart';
 import '../services/mock_data.dart';
+import '../services/property_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../main.dart' show currencyNotifier, localeNotifier;
-import 'payment_screen.dart';
+// import 'payment_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de transaction directe
 import 'messages_screen.dart';
 import 'owner_profile_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,6 +27,26 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   bool _isFav = false;
   bool _showFullDesc = false;
 
+  // ⚠️ Avant : les avis venaient de MockDataService.avis (100% factice).
+  // Maintenant : chargés depuis GET /api/properties/:id/avis.
+  List<AvisModel> _avis = [];
+  bool _avisLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvis();
+  }
+
+  Future<void> _loadAvis() async {
+    try {
+      final list = await PropertyService.instance.getAvis(widget.property.id);
+      if (mounted) setState(() { _avis = list; _avisLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _avisLoading = false);
+    }
+  }
+
   void _openFullscreen(BuildContext context, List<String> images, int startIndex) {
     showDialog(
       context: context,
@@ -41,7 +62,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         .any((e) => (e as PropertyModel).id == p.id);
     final alreadyPublished = publishedPropertiesNotifier.value
         .any((e) => (e as PropertyModel).id == p.id);
-    final isMockData = MockDataService.properties.any((e) => e.id == p.id);
+    // 🚫 isMockData retiré (25/08/2026) : plus de biens factices, donc cette
+    // condition était toujours fausse — le banneau "soumettre à l'admin"
+    // s'affiche désormais simplement dès qu'un bien n'est ni en attente ni publié.
 
     void _doWhatsApp() async {
       final encoded = Uri.encodeComponent(p.shareText);
@@ -68,12 +91,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       ));
     }
 
-    _showFallbackSheet(ctx, p, lang, alreadyPending, alreadyPublished, isMockData, _doCopy, _doWhatsApp, _doEmail);
+    _showFallbackSheet(ctx, p, lang, alreadyPending, alreadyPublished, _doCopy, _doWhatsApp, _doEmail);
   }
 
   void _showFallbackSheet(
     BuildContext ctx, PropertyModel p, String lang,
-    bool alreadyPending, bool alreadyPublished, bool isMockData,
+    bool alreadyPending, bool alreadyPublished,
     VoidCallback onCopy, VoidCallback onWhatsApp, VoidCallback onEmail,
   ) {
     showModalBottomSheet(
@@ -96,7 +119,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           else if (alreadyPending)
             _StatusBanner(color: AppTheme.warning, icon: Icons.hourglass_top_rounded,
                 text: 'En attente de validation par l\'admin…')
-          else if (!isMockData)
+          else
             _SubmitToAdminBanner(property: p, ctx: ctx),
 
           const SizedBox(height: 16),
@@ -189,7 +212,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       builder: (context, _, __) {
     final p = widget.property;
     final lang = localeNotifier.value.languageCode;
-    final avis = MockDataService.avis.where((a) => a.cible == p.id).toList();
+    final avis = _avis;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -418,14 +441,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               final ownerId = p.proprietaire.id;
                               final followers = fMap[ownerId]?.length ?? 0;
                               final following = userFollowingMapNotifier.value[ownerId]?.length ?? 0;
-                              final annonces = [
-                                ...publishedPropertiesNotifier.value.whereType<PropertyModel>().where((a) => a.proprietaire.id == ownerId),
-                                ...MockDataService.properties.where((a) => a.proprietaire.id == ownerId),
-                              ].length;
-                              final vues = [
-                                ...publishedPropertiesNotifier.value.whereType<PropertyModel>().where((a) => a.proprietaire.id == ownerId),
-                                ...MockDataService.properties.where((a) => a.proprietaire.id == ownerId),
-                              ].fold<int>(0, (s, a) => s + a.vues);
+                              final annonces = publishedPropertiesNotifier.value
+                                  .whereType<PropertyModel>()
+                                  .where((a) => a.proprietaire.id == ownerId)
+                                  .length;
+                              final vues = publishedPropertiesNotifier.value
+                                  .whereType<PropertyModel>()
+                                  .where((a) => a.proprietaire.id == ownerId)
+                                  .fold<int>(0, (s, a) => s + a.vues);
                               return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                                 _OwnerStat(label: 'Abonnés',   value: '$followers'),
                                 _OwnerStatDivider(),
@@ -590,37 +613,63 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         ],
       ),
 
-      // ─ Bottom CTA ─
+      // ─ Bottom CTA ─ 🚫 Louer/Acheter DÉSACTIVÉS (25/08/2026) : plus de
+      // transaction directe dans l'app — remplacé par un accès direct à la
+      // discussion avec le propriétaire.
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         decoration: BoxDecoration(
           color: AppTheme.surface,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 12, offset: const Offset(0, -3))],
         ),
-        child: Row(
-          children: [
-            if (p.listingType == ListingType.location || p.listingType == ListingType.les_deux)
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'location'))),
-                  icon: const Icon(Icons.calendar_month_rounded, size: 18),
-                  label: Text(tr('detail_reserve')),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info),
-                ),
-              ),
-            if (p.listingType == ListingType.les_deux) const SizedBox(width: 10),
-            if (p.listingType == ListingType.vente || p.listingType == ListingType.les_deux)
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'achat'))),
-                  icon: const Icon(Icons.shopping_cart_rounded, size: 18),
-                  label: Text(tr('detail_buy')),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
-                ),
-              ),
-          ],
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
+            )),
+            icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+            label: Text(tr('detail_contact_owner')),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ),
       ),
+
+      // ── Ancienne barre Louer/Acheter (désactivée) ──────────────────────
+      // bottomNavigationBar: Container(
+      //   padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      //   decoration: BoxDecoration(
+      //     color: AppTheme.surface,
+      //     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 12, offset: const Offset(0, -3))],
+      //   ),
+      //   child: Row(
+      //     children: [
+      //       if (p.listingType == ListingType.location || p.listingType == ListingType.les_deux)
+      //         Expanded(
+      //           child: ElevatedButton.icon(
+      //             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'location'))),
+      //             icon: const Icon(Icons.calendar_month_rounded, size: 18),
+      //             label: Text(tr('detail_reserve')),
+      //             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.info),
+      //           ),
+      //         ),
+      //       if (p.listingType == ListingType.les_deux) const SizedBox(width: 10),
+      //       if (p.listingType == ListingType.vente || p.listingType == ListingType.les_deux)
+      //         Expanded(
+      //           child: ElevatedButton.icon(
+      //             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentScreen(property: p, type: 'achat'))),
+      //             icon: const Icon(Icons.shopping_cart_rounded, size: 18),
+      //             label: Text(tr('detail_buy')),
+      //             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+      //           ),
+      //         ),
+      //     ],
+      //   ),
+      // ),
     );
       }, // ferme builder
     ); // ferme ValueListenableBuilder

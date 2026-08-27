@@ -62,8 +62,11 @@ String get initials {
     id: json['id'],
     nom: json['nom'],
     prenom: json['prenom'],
-    email: json['email'],
-    telephone: json['telephone'],
+    // ⚠️ Certains endpoints (ex: GET /api/users recherche) n'exposent
+    // volontairement pas email/téléphone pour la confidentialité — on
+    // retombe sur '' plutôt que de planter (null → String non-nullable).
+    email: json['email'] ?? '',
+    telephone: json['telephone'] ?? '',
     avatarUrl: json['avatarUrl'],
     isVerified: json['isVerified'] ?? false,
     rating: (json['rating'] ?? 0.0).toDouble(),

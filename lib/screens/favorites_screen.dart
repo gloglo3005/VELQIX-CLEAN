@@ -3,7 +3,7 @@ import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
+import '../services/property_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'property_detail_screen.dart';
@@ -15,13 +15,45 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  // Branchée sur le Set global partagé avec les cartes de la home
-  List<PropertyModel> get _favorites => MockDataService.properties
-      .where((p) => globalFavorites.contains(p.id))
-      .toList();
+  // ⚠️ Avant : filtrait MockDataService.properties via le Set local
+  // globalFavorites (jamais persisté côté serveur). Maintenant : chargé
+  // depuis GET /api/properties/favorites, la vraie source de vérité.
+  List<PropertyModel> _favorites = [];
+  bool _loading = true;
+  String? _error;
 
-  void _removeFav(PropertyModel p) {
-    setState(() => globalFavorites.remove(p.id));
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final favs = await PropertyService.instance.getFavorites();
+      // Garde le Set local (utilisé par FavoriteButton sur les autres écrans) synchronisé
+      globalFavorites
+        ..clear()
+        ..addAll(favs.map((p) => p.id));
+      if (mounted) setState(() { _favorites = favs; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Impossible de charger les favoris'; _loading = false; });
+    }
+  }
+
+  Future<void> _removeFav(PropertyModel p) async {
+    setState(() {
+      _favorites.removeWhere((f) => f.id == p.id);
+      globalFavorites.remove(p.id);
+    });
+    try {
+      await PropertyService.instance.removeFavorite(p.id);
+    } catch (_) {
+      // Échec réseau : on ne recharge pas depuis le serveur pour rester simple,
+      // l'utilisateur peut tirer pour rafraîchir si besoin.
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(tr('fav_removed'),
           style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
@@ -31,7 +63,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       action: SnackBarAction(
         label: tr('fav_undo'),
         textColor: Colors.white,
-        onPressed: () => setState(() => globalFavorites.add(p.id)),
+        onPressed: () async {
+          setState(() {
+            _favorites.add(p);
+            globalFavorites.add(p.id);
+          });
+          try { await PropertyService.instance.addFavorite(p.id); } catch (_) {}
+        },
       ),
     ));
   }
@@ -63,13 +101,33 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         centerTitle: true,
       ),
-      body: favs.isEmpty
-          ? EmptyState(
-              icon: Icons.favorite_border_rounded,
-              title: tr('fav_no_fav'),
-              subtitle: tr('fav_no_fav_sub'),
-            )
-          : Column(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!, style: GoogleFonts.poppins(color: AppTheme.textSecondary)),
+                    const SizedBox(height: 12),
+                    TextButton(onPressed: _load, child: Text(tr('common_retry'))),
+                  ]),
+                )
+              : favs.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(children: [
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.7,
+                      child: EmptyState(
+                        icon: Icons.favorite_border_rounded,
+                        title: tr('fav_no_fav'),
+                        subtitle: tr('fav_no_fav_sub'),
+                      ),
+                    ),
+                  ]),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -98,6 +156,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
               ],
             ),
+                ),
     );
       }, // builder
     ); // ValueListenableBuilder

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/models.dart';
-import '../services/mock_data.dart';
+// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../screens/property_detail_screen.dart';
@@ -185,10 +185,9 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
   List<PropertyModel> _searchProperties(String query) {
     final q = _normalize(query);
-    final all = [
-      ...MockDataService.properties,
-      ...publishedPropertiesNotifier.value.cast<PropertyModel>(),
-    ];
+    // 🚫 Biens factices retirés (25/08/2026) : seuls les vrais biens approuvés
+    // sont maintenant proposés par l'assistant.
+    final all = publishedPropertiesNotifier.value.cast<PropertyModel>();
 
     // Mots vides à ignorer
     final stopWords = {'a', 'au', 'aux', 'le', 'la', 'les', 'de', 'du', 'des',

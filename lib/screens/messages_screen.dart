@@ -9,10 +9,11 @@ import 'agora_video_call_screen.dart';
 // import 'wallet_screen.dart';           // 🚫 DÉSACTIVÉ (25/08/2026)
 // import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
 import '../models/models.dart';
-import '../services/mock_data.dart';
+// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../theme/app_theme.dart';
 import '../services/web_file_picker.dart';
 import '../services/chat_service.dart';
+import '../services/api_service.dart';
 import '../widgets/widgets.dart';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -108,39 +109,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   void _showNewConversationDialog(BuildContext context) {
-    final users = MockDataService.users
-        .where((u) => u.id != MockDataService.currentUser.id)
-        .toList();
+    // ⚠️ Avant : liste d'utilisateurs 100% factice (MockDataService.users).
+    // Maintenant : recherche réelle via GET /api/users?search=... (nouvel
+    // endpoint, sans email/téléphone exposés — le contact se fait par chat).
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 12),
-        Container(width: 40, height: 4,
-            decoration: BoxDecoration(
-                color: AppTheme.divider, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: 16),
-        Text('Nouvelle conversation',
-            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700,
-                color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
-        const SizedBox(height: 12),
-        ...users.map((u) => ListTile(
-          leading: UserAvatar(user: u, radius: 22),
-          title: Text(u.fullName,
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
-          subtitle: Text(u.telephone ?? '',
-              style: GoogleFonts.poppins(fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
-          onTap: () {
-            Navigator.pop(context);
-            Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ChatScreen(user: u),
-            ));
-          },
-        )),
-        const SizedBox(height: 16),
-      ]),
+      builder: (_) => _NewConversationSheet(
+        onUserSelected: (u) {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => ChatScreen(user: u),
+          ));
+        },
+      ),
     );
   }
 
@@ -297,6 +281,116 @@ class _ConversationAvatar extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════
 // CHAT SCREEN — écran de conversation individuel
 // ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// NEW CONVERSATION SHEET — recherche réelle via GET /api/users?search=...
+// ═══════════════════════════════════════════════════════════════════
+class _NewConversationSheet extends StatefulWidget {
+  final void Function(UserModel) onUserSelected;
+  const _NewConversationSheet({required this.onUserSelected});
+
+  @override
+  State<_NewConversationSheet> createState() => _NewConversationSheetState();
+}
+
+class _NewConversationSheetState extends State<_NewConversationSheet> {
+  final _searchCtrl = TextEditingController();
+  Timer? _debounce;
+  List<UserModel> _results = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _search('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final qs = query.trim().isEmpty ? '' : '?search=${Uri.encodeComponent(query.trim())}';
+      final res = await ApiService.instance.get('/users$qs', auth: true);
+      if (res['success'] == true) {
+        final list = (res['data'] as List)
+            .map((j) => UserModel.fromJson(j as Map<String, dynamic>))
+            .toList();
+        if (mounted) setState(() { _results = list; _loading = false; });
+      } else {
+        if (mounted) setState(() { _error = res['message'] ?? 'Erreur'; _loading = false; });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Recherche impossible'; _loading = false; });
+    }
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () => _search(value));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Column(children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: AppTheme.divider, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 16),
+          Text('Nouvelle conversation',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700,
+                  color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: _onChanged,
+              decoration: InputDecoration(
+                hintText: 'Rechercher un utilisateur...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                filled: true,
+                fillColor: AppTheme.background,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text(_error!, style: GoogleFonts.poppins(color: AppTheme.textSecondary)))
+                    : _results.isEmpty
+                        ? Center(
+                            child: Text('Aucun utilisateur trouvé',
+                                style: GoogleFonts.poppins(color: AppTheme.textSecondary)))
+                        : ListView(
+                            children: _results.map((u) => ListTile(
+                              leading: UserAvatar(user: u, radius: 22),
+                              title: Text(u.fullName,
+                                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14)),
+                              onTap: () => widget.onUserSelected(u),
+                            )).toList(),
+                          ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
 
 class ChatScreen extends StatefulWidget {
   final dynamic user;

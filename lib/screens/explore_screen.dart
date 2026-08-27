@@ -3,7 +3,7 @@ import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
+// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de biens factices
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
@@ -44,11 +44,9 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
   }
 
   List<PropertyModel> get _filtered {
-    // ✅ Combine biens mock + biens approuvés par l'admin
-    final all = [
-      ...MockDataService.properties,
-      ...publishedPropertiesNotifier.value.cast<PropertyModel>(),
-    ];
+    // ⚠️ Avant : combinait des biens factices (MockDataService) avec les
+    // vrais biens approuvés, en permanence, pour tous les utilisateurs.
+    final all = publishedPropertiesNotifier.value.cast<PropertyModel>();
     var list = all.where((p) {
       final matchSearch = _search.isEmpty ||
           p.titre.toLowerCase().contains(_search.toLowerCase()) ||

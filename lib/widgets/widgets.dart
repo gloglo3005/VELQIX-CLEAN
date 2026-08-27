@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' show currencyNotifier, activeCurrency, localeNotifier;
+import '../services/property_service.dart';
 
 // ─── Helper pour ouvrir une URL (Mobile + Web) ────────────────────────────────
 Future<void> _openUrl(String url) async {
@@ -408,15 +409,44 @@ class FavoriteButton extends StatefulWidget {
 }
 class _FavoriteButtonState extends State<FavoriteButton> {
   bool get _isFav => globalFavorites.contains(widget.propertyId);
+  bool _busy = false;
 
-  void _toggle() {
+  // ⚠️ Avant : ne touchait que globalFavorites (Set en mémoire, perdu à
+  // chaque redémarrage de l'app, jamais envoyé au serveur). Maintenant :
+  // appel réel au backend (POST/DELETE /api/properties/:id/favorite),
+  // avec mise à jour optimiste de l'UI et annulation si l'appel échoue.
+  Future<void> _toggle() async {
+    if (_busy) return;
+    final wasFav = _isFav;
     setState(() {
-      if (_isFav) {
+      _busy = true;
+      if (wasFav) {
         globalFavorites.remove(widget.propertyId);
       } else {
         globalFavorites.add(widget.propertyId);
       }
     });
+
+    try {
+      if (wasFav) {
+        await PropertyService.instance.removeFavorite(widget.propertyId);
+      } else {
+        await PropertyService.instance.addFavorite(widget.propertyId);
+      }
+    } catch (_) {
+      // Rollback en cas d'échec réseau
+      if (mounted) {
+        setState(() {
+          if (wasFav) {
+            globalFavorites.add(widget.propertyId);
+          } else {
+            globalFavorites.remove(widget.propertyId);
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override

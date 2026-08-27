@@ -2,7 +2,7 @@ import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/mock_data.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 
@@ -13,56 +13,65 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // ✅ On fusionne les notifs mock (historique) + notifs temps réel (admin)
-  List<Map<String, dynamic>> get _allNotifs {
-    final realTime = List<Map<String, dynamic>>.from(appNotificationsNotifier.value);
-    final mock = List<Map<String, dynamic>>.from(MockDataService.notifications);
-    return [...realTime, ...mock];
-  }
-
-  void _onNotifChanged() => setState(() {});
+  // ⚠️ Avant : fusionnait des notifs 100% factices (MockDataService) avec
+  // appNotificationsNotifier (qui n'est lui-même qu'une file locale de
+  // toasts déclenchés par des actions dans CETTE session, jamais reçue par
+  // le vrai destinataire sur son propre appareil). Maintenant : chargé
+  // depuis GET /api/notifications, la vraie source persistée côté serveur.
+  //
+  // NOTE : le backend ne pousse pas encore ces notifications en temps réel
+  // via socket (uniquement écrites en base) — donc pas de mise à jour "live"
+  // ici pour l'instant, seulement au chargement et au tirer-pour-rafraîchir.
+  List<Map<String, dynamic>> _notifs = [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    appNotificationsNotifier.addListener(_onNotifChanged);
+    _load();
   }
 
-  @override
-  void dispose() {
-    appNotificationsNotifier.removeListener(_onNotifChanged);
-    super.dispose();
-  }
-
-  void _markRead(String id) {
-    final idx = appNotificationsNotifier.value.indexWhere((n) => n['id'] == id);
-    if (idx != -1) {
-      final updated = List<Map<String, dynamic>>.from(appNotificationsNotifier.value);
-      updated[idx] = {...updated[idx], 'lu': true};
-      appNotificationsNotifier.value = updated;
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await ApiService.instance.get('/notifications', auth: true);
+      if (res['success'] == true) {
+        final list = (res['data'] as List).cast<Map<String, dynamic>>();
+        if (mounted) setState(() { _notifs = list; _loading = false; });
+      } else {
+        if (mounted) setState(() { _error = res['message'] ?? 'Erreur'; _loading = false; });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Impossible de charger les notifications'; _loading = false; });
     }
   }
 
-  void _markAllRead() {
-    // Marquer les notifs temps réel
-    final updated = appNotificationsNotifier.value
-        .map((n) => {...n, 'lu': true})
-        .toList();
-    appNotificationsNotifier.value = updated;
-    // Marquer les mock
-    for (var n in MockDataService.notifications) {
-      n['lu'] = true;
+  Future<void> _markRead(String id) async {
+    final idx = _notifs.indexWhere((n) => n['id'] == id);
+    if (idx == -1) return;
+    setState(() => _notifs[idx] = {..._notifs[idx], 'isRead': true});
+    try {
+      await ApiService.instance.put('/notifications/$id/read', {}, auth: true);
+    } catch (_) {
+      // best-effort — l'utilisateur peut tirer pour rafraîchir si besoin
     }
-    setState(() {});
   }
 
-  void _deleteNotif(String id) {
-    // Supprimer des notifs temps réel
-    appNotificationsNotifier.value =
-        appNotificationsNotifier.value.where((n) => n['id'] != id).toList();
-    // Supprimer des mock
-    MockDataService.notifications.removeWhere((n) => n['id'] == id);
-    setState(() {});
+  Future<void> _markAllRead() async {
+    setState(() => _notifs = _notifs.map((n) => {...n, 'isRead': true}).toList());
+    try {
+      await ApiService.instance.put('/notifications/read-all', {}, auth: true);
+    } catch (_) {}
+  }
+
+  // Pas d'endpoint de suppression côté backend : on marque lu + on masque
+  // localement plutôt que de prétendre supprimer côté serveur.
+  Future<void> _dismiss(String id) async {
+    setState(() => _notifs.removeWhere((n) => n['id'] == id));
+    try {
+      await ApiService.instance.put('/notifications/$id/read', {}, auth: true);
+    } catch (_) {}
   }
 
   IconData _icon(String type) {
@@ -104,8 +113,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return ValueListenableBuilder(
       valueListenable: localeNotifier,
       builder: (context, _, __) {
-    final notifs = _allNotifs;
-    final unreadCount = notifs.where((n) => n['lu'] == false).length;
+    final notifs = _notifs;
+    final unreadCount = notifs.where((n) => n['isRead'] == false).length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -141,26 +150,45 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
         ],
       ),
-      body: notifs.isEmpty
-          ? const EmptyState(
-              icon: Icons.notifications_off_outlined,
-              title: 'Aucune notification',
-              subtitle: 'Vous êtes à jour !',
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_error!, style: GoogleFonts.poppins(color: AppTheme.textSecondary)),
+                    const SizedBox(height: 12),
+                    TextButton(onPressed: _load, child: Text(tr('common_retry'))),
+                  ]),
+                )
+              : notifs.isEmpty
+          ? RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(children: [
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const EmptyState(
+                    icon: Icons.notifications_off_outlined,
+                    title: 'Aucune notification',
+                    subtitle: 'Vous êtes à jour !',
+                  ),
+                ),
+              ]),
             )
-          : ListView.separated(
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               itemCount: notifs.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (_, i) {
                 final n = notifs[i];
                 final id = n['id']?.toString() ?? '$i';
-                final isUnread = n['lu'] == false;
-                final isRealTime = appNotificationsNotifier.value.any((r) => r['id'] == id);
+                final isUnread = n['isRead'] == false;
 
                 return Dismissible(
                   key: Key(id),
                   direction: DismissDirection.endToStart,
-                  onDismissed: (_) => _deleteNotif(id),
+                  onDismissed: (_) => _dismiss(id),
                   background: Container(
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 20),
@@ -171,7 +199,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: const Icon(Icons.delete_outline_rounded, color: AppTheme.error),
                   ),
                   child: GestureDetector(
-                    onTap: () => isRealTime ? _markRead(id) : setState(() => n['lu'] = true),
+                    onTap: () => _markRead(id),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.all(14),
@@ -188,10 +216,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: _color(n['type']).withOpacity(0.12),
+                            color: _color(n['type'] ?? '').withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(_icon(n['type']), size: 20, color: _color(n['type'])),
+                          child: Icon(_icon(n['type'] ?? ''), size: 20, color: _color(n['type'] ?? '')),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -215,13 +243,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 ),
                             ]),
                             const SizedBox(height: 3),
-                            Text(n['message'] ?? '',
+                            Text(n['corps'] ?? '',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12, color: AppTheme.textSecondary, height: 1.4,
                                 ),
                                 maxLines: 2, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 4),
-                            Text(_timeAgo(n['date']),
+                            Text(_timeAgo(n['createdAt']),
                                 style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
                           ]),
                         ),
@@ -230,6 +258,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 );
               },
+            ),
             ),
     );
       }, // builder
