@@ -6,6 +6,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../models/models.dart';
 import '../services/mock_data.dart';
 import '../services/property_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../main.dart' show currencyNotifier, localeNotifier;
@@ -32,10 +33,102 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   List<AvisModel> _avis = [];
   bool _avisLoading = true;
 
+  // ⚠️ Avant : le bouton "Suivre" et les stats Abonnés/Suivi(e)s lisaient
+  // followersMapNotifier/userFollowingMapNotifier — des ValueNotifier
+  // jamais initialisés depuis le backend, donc toujours vides au démarrage
+  // de l'app (état "pas abonné" même si on l'était déjà). Maintenant : état
+  // réel chargé une fois depuis GET /api/users/:id.
+  bool _ownerIsFollowing = false;
+  int _ownerFollowersCount = 0;
+  int _ownerFollowingCount = 0;
+  bool _followBusy = false;
+
   @override
   void initState() {
     super.initState();
     _loadAvis();
+    _registerView();
+    _loadOwnerFollowState();
+  }
+
+  // Incrémente le compteur de vues côté backend (POST /properties/:id/views).
+  // Le backend dédup déjà par IP sur 30 min (viewDedupe.ts), donc pas besoin
+  // de logique anti-spam ici. Échec silencieux : une vue ratée ne doit pas
+  // gêner l'utilisateur ni bloquer l'affichage de la fiche.
+  void _registerView() {
+    PropertyService.instance.incrementViews(widget.property.id).catchError((_) {});
+  }
+
+  Future<void> _loadOwnerFollowState() async {
+    final ownerId = widget.property.proprietaire.id;
+    final fresh = await PropertyService.instance.fetchUserProfile(
+      ownerId,
+      auth: AuthService.instance.isLoggedIn,
+    );
+    if (fresh != null && mounted) {
+      setState(() {
+        _ownerIsFollowing = fresh.isFollowedByMe;
+        _ownerFollowersCount = fresh.followersCount;
+        _ownerFollowingCount = fresh.followingCount;
+      });
+      // Garde followedOwnersNotifier cohérent pour les autres écrans
+      // (owner_profile_screen.dart, etc.) qui l'écoutent aussi.
+      final followed = Set<String>.from(followedOwnersNotifier.value);
+      if (fresh.isFollowedByMe) {
+        followed.add(ownerId);
+      } else {
+        followed.remove(ownerId);
+      }
+      followedOwnersNotifier.value = followed;
+    }
+  }
+
+  Future<void> _toggleOwnerFollow() async {
+    if (_followBusy) return;
+    final ownerId = widget.property.proprietaire.id;
+    final currentUserId = AuthService.instance.currentUser?.id;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connecte-toi pour suivre ce propriétaire.')),
+      );
+      return;
+    }
+
+    final wasFollowing = _ownerIsFollowing;
+    setState(() {
+      _followBusy = true;
+      _ownerIsFollowing = !wasFollowing;
+      _ownerFollowersCount += wasFollowing ? -1 : 1;
+    });
+    final followed = Set<String>.from(followedOwnersNotifier.value);
+    wasFollowing ? followed.remove(ownerId) : followed.add(ownerId);
+    followedOwnersNotifier.value = followed;
+
+    try {
+      if (wasFollowing) {
+        await PropertyService.instance.unfollowUser(ownerId);
+      } else {
+        await PropertyService.instance.followUser(ownerId);
+        pushNotification(
+          titre: '✅ Vous suivez ${widget.property.proprietaire.fullName}',
+          message: 'Vous serez notifié dès qu\'il publie une nouvelle annonce.',
+          type: 'info',
+        );
+      }
+    } catch (_) {
+      // Rollback en cas d'échec réseau
+      if (mounted) {
+        setState(() {
+          _ownerIsFollowing = wasFollowing;
+          _ownerFollowersCount += wasFollowing ? 1 : -1;
+        });
+        final rolledBack = Set<String>.from(followedOwnersNotifier.value);
+        wasFollowing ? rolledBack.add(ownerId) : rolledBack.remove(ownerId);
+        followedOwnersNotifier.value = rolledBack;
+      }
+    } finally {
+      if (mounted) setState(() => _followBusy = false);
+    }
   }
 
   Future<void> _loadAvis() async {
@@ -435,31 +528,26 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           const SizedBox(height: 14),
 
                           // ── Stats ligne ──────────────────────────────────────
-                          ValueListenableBuilder<Map<String, Set<String>>>(
-                            valueListenable: followersMapNotifier,
-                            builder: (_, fMap, __) {
-                              final ownerId = p.proprietaire.id;
-                              final followers = fMap[ownerId]?.length ?? 0;
-                              final following = userFollowingMapNotifier.value[ownerId]?.length ?? 0;
-                              final annonces = publishedPropertiesNotifier.value
-                                  .whereType<PropertyModel>()
-                                  .where((a) => a.proprietaire.id == ownerId)
-                                  .length;
-                              final vues = publishedPropertiesNotifier.value
-                                  .whereType<PropertyModel>()
-                                  .where((a) => a.proprietaire.id == ownerId)
-                                  .fold<int>(0, (s, a) => s + a.vues);
-                              return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                                _OwnerStat(label: 'Abonnés',   value: '$followers'),
-                                _OwnerStatDivider(),
-                                _OwnerStat(label: 'Suivi(e)s', value: '$following'),
-                                _OwnerStatDivider(),
-                                _OwnerStat(label: 'Annonces',  value: '$annonces'),
-                                _OwnerStatDivider(),
-                                _OwnerStat(label: 'Vues',      value: '$vues'),
-                              ]);
-                            },
-                          ),
+                          Builder(builder: (_) {
+                            final ownerId = p.proprietaire.id;
+                            final annonces = publishedPropertiesNotifier.value
+                                .whereType<PropertyModel>()
+                                .where((a) => a.proprietaire.id == ownerId)
+                                .length;
+                            final vues = publishedPropertiesNotifier.value
+                                .whereType<PropertyModel>()
+                                .where((a) => a.proprietaire.id == ownerId)
+                                .fold<int>(0, (s, a) => s + a.vues);
+                            return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                              _OwnerStat(label: 'Abonnés',   value: '$_ownerFollowersCount'),
+                              _OwnerStatDivider(),
+                              _OwnerStat(label: 'Suivi(e)s', value: '$_ownerFollowingCount'),
+                              _OwnerStatDivider(),
+                              _OwnerStat(label: 'Annonces',  value: '$annonces'),
+                              _OwnerStatDivider(),
+                              _OwnerStat(label: 'Vues',      value: '$vues'),
+                            ]);
+                          }),
                           const SizedBox(height: 18),
 
                           // ── Avatar centré ────────────────────────────────────
@@ -524,65 +612,48 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           const SizedBox(height: 16),
 
                           // ── Bouton Suivre pleine largeur ──────────────────────
-                          ValueListenableBuilder<Set<String>>(
-                            valueListenable: followedOwnersNotifier,
-                            builder: (_, followedSet, __) {
-                              final isFollowing = followedSet.contains(p.proprietaire.id);
-                              return Row(children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (isFollowing) {
-                                        unfollowOwner(p.proprietaire.id, 'me');
-                                      } else {
-                                        followOwner(p.proprietaire.id, 'me');
-                                        pushNotification(
-                                          titre: '✅ Vous suivez ${p.proprietaire.fullName}',
-                                          message: 'Vous serez notifié dès qu\'il publie une nouvelle annonce.',
-                                          type: 'info',
-                                        );
-                                      }
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      decoration: BoxDecoration(
-                                        color: isFollowing ? AppTheme.surface : AppTheme.primary,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: isFollowing ? AppTheme.border : AppTheme.primary),
-                                      ),
-                                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                        Icon(
-                                          isFollowing ? Icons.check_rounded : Icons.person_add_outlined,
-                                          size: 16,
-                                          color: isFollowing ? AppTheme.textSecondary : Colors.white,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          isFollowing ? tr('owner_following_btn') : tr('owner_follow_btn'),
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 14, fontWeight: FontWeight.w600,
-                                            color: isFollowing ? AppTheme.textSecondary : Colors.white,
-                                          ),
-                                        ),
-                                      ]),
+                          Row(children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: _followBusy ? null : _toggleOwnerFollow,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _ownerIsFollowing ? AppTheme.surface : AppTheme.primary,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: _ownerIsFollowing ? AppTheme.border : AppTheme.primary),
+                                  ),
+                                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                    Icon(
+                                      _ownerIsFollowing ? Icons.check_rounded : Icons.person_add_outlined,
+                                      size: 16,
+                                      color: _ownerIsFollowing ? AppTheme.textSecondary : Colors.white,
                                     ),
-                                  ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _ownerIsFollowing ? tr('owner_following_btn') : tr('owner_follow_btn'),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14, fontWeight: FontWeight.w600,
+                                        color: _ownerIsFollowing ? AppTheme.textSecondary : Colors.white,
+                                      ),
+                                    ),
+                                  ]),
                                 ),
-                                const SizedBox(width: 10),
-                                // Bouton chat
-                                GestureDetector(
-                                  onTap: () => Navigator.push(context, MaterialPageRoute(
-                                    builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
-                                  )),
-                                  child: Container(
-                                    width: 46, height: 46,
-                                    decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)),
-                                    child: const Icon(Icons.chat_bubble_rounded, size: 20, color: Colors.white),
-                                  ),
-                                ),
-                              ]);
-                            },
-                          ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            // Bouton chat
+                            GestureDetector(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(
+                                builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
+                              )),
+                              child: Container(
+                                width: 46, height: 46,
+                                decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)),
+                                child: const Icon(Icons.chat_bubble_rounded, size: 20, color: Colors.white),
+                              ),
+                            ),
+                          ]),
                         ],
                       ),
                     ),

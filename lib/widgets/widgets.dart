@@ -354,31 +354,49 @@ final ValueNotifier<Map<String, Set<String>>> followersMapNotifier = ValueNotifi
 /// Map userID → Set<ownerID> : les propriétaires que chaque utilisateur suit
 final ValueNotifier<Map<String, Set<String>>> userFollowingMapNotifier = ValueNotifier({});
 
-/// Abonner l'utilisateur courant à un propriétaire
-void followOwner(String ownerId, String currentUserId) {
-  // followers map
+// ⚠️ Avant : followOwner/unfollowOwner ne touchaient que les ValueNotifier
+// ci-dessus (Set/Map en mémoire), sans aucun appel réseau — l'abonnement ne
+// survivait pas à un redémarrage et n'était visible par personne d'autre.
+// Maintenant : mise à jour optimiste des notifiers (l'UI locale, dont
+// notifyFollowersOfOwner, continue de marcher comme avant) + vrai appel
+// POST/DELETE /api/users/:id/follow, avec rollback silencieux si ça échoue.
+
+void _applyFollowLocally(String ownerId, String currentUserId, {required bool following}) {
   final fMap = Map<String, Set<String>>.from(followersMapNotifier.value);
-  fMap.putIfAbsent(ownerId, () => {}).add(currentUserId);
-  followersMapNotifier.value = fMap;
-  // following map
   final uMap = Map<String, Set<String>>.from(userFollowingMapNotifier.value);
-  uMap.putIfAbsent(currentUserId, () => {}).add(ownerId);
+  final followed = Set<String>.from(followedOwnersNotifier.value);
+  if (following) {
+    fMap.putIfAbsent(ownerId, () => {}).add(currentUserId);
+    uMap.putIfAbsent(currentUserId, () => {}).add(ownerId);
+    followed.add(ownerId);
+  } else {
+    fMap[ownerId]?.remove(currentUserId);
+    uMap[currentUserId]?.remove(ownerId);
+    followed.remove(ownerId);
+  }
+  followersMapNotifier.value = fMap;
   userFollowingMapNotifier.value = uMap;
-  // shortcut set
-  final followed = Set<String>.from(followedOwnersNotifier.value)..add(ownerId);
   followedOwnersNotifier.value = followed;
 }
 
+/// Abonner l'utilisateur courant à un propriétaire
+Future<void> followOwner(String ownerId, String currentUserId) async {
+  _applyFollowLocally(ownerId, currentUserId, following: true);
+  try {
+    await PropertyService.instance.followUser(ownerId);
+  } catch (_) {
+    _applyFollowLocally(ownerId, currentUserId, following: false);
+  }
+}
+
 /// Se désabonner
-void unfollowOwner(String ownerId, String currentUserId) {
-  final fMap = Map<String, Set<String>>.from(followersMapNotifier.value);
-  fMap[ownerId]?.remove(currentUserId);
-  followersMapNotifier.value = fMap;
-  final uMap = Map<String, Set<String>>.from(userFollowingMapNotifier.value);
-  uMap[currentUserId]?.remove(ownerId);
-  userFollowingMapNotifier.value = uMap;
-  final followed = Set<String>.from(followedOwnersNotifier.value)..remove(ownerId);
-  followedOwnersNotifier.value = followed;
+Future<void> unfollowOwner(String ownerId, String currentUserId) async {
+  _applyFollowLocally(ownerId, currentUserId, following: false);
+  try {
+    await PropertyService.instance.unfollowUser(ownerId);
+  } catch (_) {
+    _applyFollowLocally(ownerId, currentUserId, following: true);
+  }
 }
 
 /// Notifier tous les abonnés d'un propriétaire quand il publie une annonce

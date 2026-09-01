@@ -27,6 +27,9 @@ class UserModel {
   final String accountType; // 'personal' | 'business'
   final String? nomEntreprise;
   final String? typeActivite;
+  final int followersCount;
+  final int followingCount;
+  final bool isFollowedByMe;
 
   UserModel({
     required this.id,
@@ -46,6 +49,9 @@ class UserModel {
     this.accountType = 'personal',
     this.nomEntreprise,
     this.typeActivite,
+    this.followersCount = 0,
+    this.followingCount = 0,
+    this.isFollowedByMe = false,
   });
 
   String get fullName {
@@ -79,6 +85,11 @@ String get initials {
     accountType: json['accountType'] ?? 'personal',
     nomEntreprise: json['nomEntreprise'],
     typeActivite: json['typeActivite'],
+    // Présents uniquement sur GET /api/users/:id — absents ailleurs (ex.
+    // proprietaire embarqué dans une annonce), d'où les valeurs par défaut.
+    followersCount: json['followersCount'] ?? 0,
+    followingCount: json['followingCount'] ?? 0,
+    isFollowedByMe: json['isFollowedByMe'] ?? false,
   );
 
   Map<String, dynamic> toJson() => {

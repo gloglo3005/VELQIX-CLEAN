@@ -207,6 +207,28 @@ class PropertyService {
     return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
   }
 
+  // ─── Abonnement (follow) ─────────────────────────────────────────
+  // ⚠️ Avant : followOwner/unfollowOwner (widgets.dart) ne touchaient que des
+  // ValueNotifier en mémoire — aucun appel réseau, rien de persisté. Ces
+  // méthodes branchent sur les vrais endpoints POST/DELETE /users/:id/follow.
+
+  /// Profil public d'un utilisateur, avec compteurs à jour et statut
+  /// d'abonnement (GET /api/users/:id, route publique mais optionalAuth :
+  /// passer auth: true si connecté pour obtenir isFollowedByMe).
+  Future<UserModel?> fetchUserProfile(String userId, {bool auth = false}) async {
+    final res = await _api.get('/users/$userId', auth: auth);
+    if (res['success'] != true) return null;
+    return UserModel.fromJson(res['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> followUser(String userId) async {
+    await _api.post('/users/$userId/follow', {}, auth: true);
+  }
+
+  Future<void> unfollowUser(String userId) async {
+    await _api.delete('/users/$userId/follow', auth: true);
+  }
+
   // ─── Avis ────────────────────────────────────────────────────────
   // ⚠️ Avant : property_detail_screen.dart affichait MockDataService.avis
   // (100% factice). Ces deux méthodes branchent sur les vrais endpoints
