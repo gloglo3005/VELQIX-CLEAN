@@ -282,6 +282,9 @@ class AuthService {
     String? telephone,
     String? countryCode,
     String? countryName,
+    String? avatarUrl,
+    String? nomEntreprise,
+    String? typeActivite,
   }) async {
     final res = await _api.put('/auth/profile', {
       'nom': nom,
@@ -289,6 +292,9 @@ class AuthService {
       'telephone': telephone,
       if (countryCode != null) 'countryCode': countryCode,
       if (countryName != null) 'countryName': countryName,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      if (nomEntreprise != null) 'nomEntreprise': nomEntreprise,
+      if (typeActivite != null) 'typeActivite': typeActivite,
     }, auth: true);
 
     if (res['success'] != true) return res['message'] ?? 'Erreur';
@@ -304,6 +310,9 @@ class AuthService {
         telephone: data['telephone'] ?? telephone,
         countryCode: data['countryCode'] ?? countryCode,
         countryName: data['countryName'] ?? countryName,
+        avatarUrl: data['avatarUrl'] ?? avatarUrl,
+        nomEntreprise: data['nomEntreprise'] ?? nomEntreprise,
+        typeActivite: data['typeActivite'] ?? typeActivite,
       );
       _currentUser = updated;
       await _cacheUser(updated, method: 'email');
@@ -399,11 +408,11 @@ class AuthService {
     nomEntreprise: json['nomEntreprise'], typeActivite: json['typeActivite'],
   );
 
-  UserModel _copyWith(UserModel u, {bool? isPremium, bool? isVerified, String? nom, String? prenom, String? telephone, String? countryCode, String? countryName}) => UserModel(
+  UserModel _copyWith(UserModel u, {bool? isPremium, bool? isVerified, String? nom, String? prenom, String? telephone, String? countryCode, String? countryName, String? avatarUrl, String? nomEntreprise, String? typeActivite}) => UserModel(
     id: u.id, nom: nom ?? u.nom, prenom: prenom ?? u.prenom, email: u.email, telephone: telephone ?? u.telephone,
-    avatarUrl: u.avatarUrl, isVerified: isVerified ?? u.isVerified,
+    avatarUrl: avatarUrl ?? u.avatarUrl, isVerified: isVerified ?? u.isVerified,
     isPremium: isPremium ?? u.isPremium, rating: u.rating, totalAvis: u.totalAvis,
     createdAt: u.createdAt, role: u.role, countryCode: countryCode ?? u.countryCode, countryName: countryName ?? u.countryName,
-    accountType: u.accountType, nomEntreprise: u.nomEntreprise, typeActivite: u.typeActivite,
+    accountType: u.accountType, nomEntreprise: nomEntreprise ?? u.nomEntreprise, typeActivite: typeActivite ?? u.typeActivite,
   );
 }

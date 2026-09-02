@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 // import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/auth_service.dart';
+import '../services/property_service.dart'; // upload de la photo de profil (Cloudinary)
+import '../services/web_file_picker.dart';   // sélection de la photo, compatible Web/Mobile
+import '../widgets/smart_image.dart';        // aperçu local avant upload (data:/blob:)
 // import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
 // import 'wallet_screen.dart';               // 🚫 DÉSACTIVÉ (25/08/2026)
 import '../theme/app_theme.dart';
@@ -385,11 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 16),
                           Stack(
                             children: [
-                              CircleAvatar(
-                                radius: 44,
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                child: Text(user.initials, style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white)),
-                              ),
+                              UserAvatar(user: user, radius: 44),
                               // ✅ Badge Premium sur l'avatar dès que isPremium est vrai
                               if (user.isPremium)
                                 Positioned(
@@ -877,6 +877,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _nomCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _telCtrl;
+  late final TextEditingController _nomEntrepriseCtrl;
+  late final TextEditingController _typeActiviteCtrl;
   late final TextEditingController _oldPwdCtrl;
   late final TextEditingController _newPwdCtrl;
   late final TextEditingController _confirmPwdCtrl;
@@ -890,6 +892,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   bool _showConfirmPwd = false;
   int _tab = 0; // 0 = infos, 1 = mot de passe
 
+  // ── Photo de profil ───────────────────────────────────────────────────
+  // _avatarPreview : data URI locale de la photo tout juste choisie, pas
+  // encore uploadée — affichée immédiatement via SmartImage pour un retour
+  // instantané, avant même l'appel réseau.
+  String? _avatarPreview;
+  bool _pickingAvatar = false;
+
   @override
   void initState() {
     super.initState();
@@ -897,6 +906,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _nomCtrl      = TextEditingController(text: widget.user.nom);
     _emailCtrl    = TextEditingController(text: widget.user.email);
     _telCtrl      = TextEditingController(text: widget.user.telephone ?? '');
+    _nomEntrepriseCtrl = TextEditingController(text: widget.user.nomEntreprise ?? '');
+    _typeActiviteCtrl  = TextEditingController(text: widget.user.typeActivite ?? '');
     _oldPwdCtrl   = TextEditingController();
     _newPwdCtrl   = TextEditingController();
     _confirmPwdCtrl = TextEditingController();
@@ -908,10 +919,23 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     _nomCtrl.dispose();
     _emailCtrl.dispose();
     _telCtrl.dispose();
+    _nomEntrepriseCtrl.dispose();
+    _typeActiviteCtrl.dispose();
     _oldPwdCtrl.dispose();
     _newPwdCtrl.dispose();
     _confirmPwdCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    setState(() => _pickingAvatar = true);
+    try {
+      final file = await WebFilePicker.pickImage();
+      if (file != null && mounted) setState(() => _avatarPreview = file);
+    } catch (_) {
+      // Échec silencieux — l'utilisateur peut retenter, pas bloquant.
+    }
+    if (mounted) setState(() => _pickingAvatar = false);
   }
 
   void _showSnack(String msg, {bool success = true}) {
@@ -930,18 +954,48 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     ));
   }
 
+  /// Décode une data URI locale et l'upload vers Cloudinary (même pattern
+  /// que add_listing_screen.dart pour les photos de biens).
+  Future<String?> _uploadAvatarDataUri(String dataUri) async {
+    try {
+      final parts = dataUri.split(',');
+      if (parts.length != 2) return null; // pas une data URI valide (ex: blob:)
+      final bytes = base64Decode(parts[1]);
+      final result = await PropertyService.instance.uploadImageBytes(bytes, 'avatar.jpg');
+      return result.url;
+    } catch (e) {
+      debugPrint('Erreur upload photo de profil : $e');
+      return null;
+    }
+  }
+
   Future<void> _saveInfo() async {
     if (!(_formKeyInfo.currentState?.validate() ?? false)) return;
     setState(() => _savingInfo = true);
 
+    // ── Photo de profil : upload d'abord si l'utilisateur en a choisi une ──
+    String? avatarUrl;
+    if (_avatarPreview != null) {
+      avatarUrl = await _uploadAvatarDataUri(_avatarPreview!);
+      if (avatarUrl == null) {
+        if (!mounted) return;
+        setState(() => _savingInfo = false);
+        _showSnack('Échec de l\'envoi de la photo. Réessaie.', success: false);
+        return;
+      }
+    }
+
     // ⚠️ Persiste réellement côté serveur (avant : sauvegarde locale
     // uniquement, jamais envoyée au backend — donc perdue à la
     // désinstallation/changement d'appareil, invisible pour les autres
-    // utilisateurs et l'admin).
+    // utilisateurs et l'admin). Photo et champs entreprise inclus désormais.
     final error = await AuthService.instance.updateProfile(
       nom: _nomCtrl.text.trim(),
       prenom: _prenomCtrl.text.trim(),
       telephone: _telCtrl.text.trim(),
+      avatarUrl: avatarUrl,
+      nomEntreprise: widget.user.accountType == 'business' ? _nomEntrepriseCtrl.text.trim() : null,
+      typeActivite: widget.user.accountType == 'business' ? _typeActiviteCtrl.text.trim() : null,
     );
 
     if (!mounted) return;
@@ -1030,6 +1084,40 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                  // ── Photo de profil ────────────────────────────────────────
+                  Center(
+                    child: GestureDetector(
+                      onTap: _pickingAvatar ? null : _pickAvatar,
+                      child: Stack(children: [
+                        ClipOval(
+                          child: _avatarPreview != null
+                              ? SmartImage(src: _avatarPreview!, width: 88, height: 88, fit: BoxFit.cover)
+                              : SizedBox(width: 88, height: 88, child: UserAvatar(user: widget.user, radius: 44)),
+                        ),
+                        if (_pickingAvatar)
+                          const Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                              child: Center(child: SizedBox(width: 20, height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
+                            ),
+                          ),
+                        Positioned(
+                          right: 0, bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   // Champs modifiables
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -1054,6 +1142,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       keyboardType: TextInputType.phone,
                       readOnly: false,
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null),
+                  if (widget.user.accountType == 'business') ...[
+                    const SizedBox(height: 12),
+                    _EditField(ctrl: _nomEntrepriseCtrl, label: 'Nom de l\'entreprise',
+                        icon: Icons.storefront_outlined,
+                        readOnly: false),
+                    const SizedBox(height: 12),
+                    _EditField(ctrl: _typeActiviteCtrl, label: 'Secteur d\'activité',
+                        icon: Icons.work_outline_rounded,
+                        readOnly: false),
+                  ],
                   const SizedBox(height: 20),
                   // Champ verrouillé (email non modifiable côté backend)
                   Padding(

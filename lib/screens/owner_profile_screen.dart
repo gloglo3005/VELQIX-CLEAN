@@ -189,17 +189,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                                     ),
                                   ],
                                 ),
-                                child: CircleAvatar(
-                                  radius: 52,
-                                  backgroundColor: Colors.white.withOpacity(0.25),
-                                  child: Text(
-                                    widget.owner.initials,
-                                    style: GoogleFonts.poppins(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white),
-                                  ),
-                                ),
+                                child: UserAvatar(user: widget.owner, radius: 52, showBadge: false),
                               ),
                               if (widget.owner.isPremium)
                                 Positioned(
