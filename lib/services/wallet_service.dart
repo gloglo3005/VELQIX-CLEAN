@@ -32,51 +32,49 @@ class WalletService {
   }
 
   // ── Recharger le solde ────────────────────────────────────────────
+  // ⚠️ Corrigé : l'ancien fallback créditait le solde localement
+  // (SharedPreferences) dès que l'appel réseau échouait, SANS AUCUNE
+  // vérification qu'un paiement avait réellement eu lieu. Comme
+  // /api/wallet/topup n'est aujourd'hui plus monté côté backend (routes
+  // désactivées, voir index.ts), cet appel échoue systématiquement — ce
+  // fallback aurait donc permis à n'importe qui de se créditer un solde
+  // illimité gratuitement dès qu'il coupait sa connexion. On ne fait
+  // désormais plus jamais confiance au solde local en cas d'échec réseau :
+  // on retourne le solde serveur connu (mis en cache en lecture seule) et
+  // on signale l'échec à l'appelant.
   Future<double> topUp(double amount) async {
     final prefs = await SharedPreferences.getInstance();
-    try {
-      final res = await ApiService.instance.post(
-        '/wallet/topup',
-        {'montant': amount, 'paymentRef': 'ref_${DateTime.now().millisecondsSinceEpoch}'},
-        auth: true,
-      );
-      if (res['success'] == true && res['data'] != null) {
-        final balance = (res['data']['balance'] ?? 0.0).toDouble();
-        await prefs.setDouble(_kBalance, balance);
-        return balance;
-      }
-    } catch (_) {
-      // Fallback local en cas d'erreur réseau
+    final res = await ApiService.instance.post(
+      '/wallet/topup',
+      {'montant': amount, 'paymentRef': 'ref_${DateTime.now().millisecondsSinceEpoch}'},
+      auth: true,
+    );
+    if (res['success'] == true && res['data'] != null) {
+      final balance = (res['data']['balance'] ?? 0.0).toDouble();
+      await prefs.setDouble(_kBalance, balance);
+      return balance;
     }
-    final current = prefs.getDouble(_kBalance) ?? 0.0;
-    final newBalance = current + amount;
-    await prefs.setDouble(_kBalance, newBalance);
-    return newBalance;
+    // Échec (réseau ou serveur) : on ne crédite jamais localement, on
+    // retourne le dernier solde confirmé par le serveur.
+    return prefs.getDouble(_kBalance) ?? 0.0;
   }
 
-  // ── Déduire (retourne false si solde insuffisant) ─────────────────
+  // ── Déduire (retourne false si solde insuffisant OU si la déduction
+  // n'a pas pu être confirmée par le serveur — voir note ci-dessus : on ne
+  // débite plus jamais un solde local non vérifié) ─────────────────
   Future<bool> deduct(double amount) async {
     final prefs = await SharedPreferences.getInstance();
-    try {
-      final res = await ApiService.instance.post(
-        '/wallet/deduct',
-        {'montant': amount, 'motif': 'Appel vidéo'},
-        auth: true,
-      );
-      if (res['success'] == true && res['data'] != null) {
-        final balance = (res['data']['balance'] ?? 0.0).toDouble();
-        await prefs.setDouble(_kBalance, balance);
-        return true;
-      } else if (res['statusCode'] == 402 || (res['message'] != null && res['message'].toString().contains('insuffisant'))) {
-        return false;
-      }
-    } catch (_) {
-      // Fallback local en cas d'erreur réseau
+    final res = await ApiService.instance.post(
+      '/wallet/deduct',
+      {'montant': amount, 'motif': 'Appel vidéo'},
+      auth: true,
+    );
+    if (res['success'] == true && res['data'] != null) {
+      final balance = (res['data']['balance'] ?? 0.0).toDouble();
+      await prefs.setDouble(_kBalance, balance);
+      return true;
     }
-    final current = prefs.getDouble(_kBalance) ?? 0.0;
-    if (current < amount) return false;
-    await prefs.setDouble(_kBalance, current - amount);
-    return true;
+    return false;
   }
 
   // ── Vérifier si le solde couvre au moins 1 minute ─────────────────

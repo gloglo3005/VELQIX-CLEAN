@@ -157,42 +157,38 @@ class AuthService {
       final googleAuth = await account.authentication;
       final idToken    = googleAuth.idToken;
 
-      if (idToken != null) {
-        // Backend attend { idToken } — on envoie exactement ça
-        final res = await _api.post('/auth/google', {'idToken': idToken});
-        if (res['success'] == true) {
-          await _api.saveToken(res['data']['accessToken']);
-          if (res['data']['refreshToken'] != null) {
-            await _api.saveRefreshToken(res['data']['refreshToken']);
-          }
-          _currentUser = _userFromJson(res['data']['user']);
-          await _cacheUser(_currentUser!, method: 'google');
-          notifyUserChanged();
-          await ChatService.instance.connect(userId: _currentUser!.id);
-          return null;
-        }
+      if (idToken == null) {
+        // Impossible d'obtenir un idToken Google exploitable côté serveur :
+        // on ne peut pas authentifier l'utilisateur, donc on ne simule
+        // surtout pas une connexion réussie (voir historique : l'ancien
+        // fallback local créait un faux compte sans jamais sauvegarder de
+        // token, laissant l'utilisateur "connecté" en apparence mais avec
+        // tous les appels API authentifiés qui échouaient silencieusement).
+        return "Connexion Google impossible : réessayez ou utilisez votre email.";
       }
 
-      // Fallback local si backend Google pas dispo
-      final names  = account.displayName?.split(' ') ?? ['', ''];
-      final prenom = names.isNotEmpty ? names.first : '';
-      final nom    = names.length > 1 ? names.sublist(1).join(' ') : '';
-      _currentUser = UserModel(
-        id: 'google_${account.id}', nom: nom.isEmpty ? account.email.split('@').first : nom,
-        prenom: prenom, email: account.email, telephone: '', avatarUrl: account.photoUrl,
-        isVerified: true, isPremium: false, rating: 0, totalAvis: 0,
-        createdAt: DateTime.now(), role: 'client',
-      );
-      await _cacheUser(_currentUser!, method: 'google');
-      notifyUserChanged();
-      await ChatService.instance.connect(userId: _currentUser!.id);
-      return null;
+      // Backend attend { idToken } — on envoie exactement ça
+      final res = await _api.post('/auth/google', {'idToken': idToken});
+      if (res['success'] == true) {
+        await _api.saveToken(res['data']['accessToken']);
+        if (res['data']['refreshToken'] != null) {
+          await _api.saveRefreshToken(res['data']['refreshToken']);
+        }
+        _currentUser = _userFromJson(res['data']['user']);
+        await _cacheUser(_currentUser!, method: 'google');
+        notifyUserChanged();
+        await ChatService.instance.connect(userId: _currentUser!.id);
+        return null;
+      }
+
+      // Le backend a refusé/échoué : on remonte l'erreur, pas de session
+      // fantôme sans token.
+      return res['message'] ?? "Connexion Google impossible. Réessayez.";
     } catch (e) {
-      if (_currentUser != null) return null;
       final msg = e.toString();
       if (msg.contains('popup_closed') || msg.contains('user_cancel') ||
           msg.contains('canceled') || msg.contains('annul')) return 'Connexion Google annulée.';
-      return null;
+      return "Connexion Google impossible : $e";
     }
   }
 
@@ -202,41 +198,28 @@ class AuthService {
       final result = await FacebookAuth.instance.login(permissions: ['email', 'public_profile']);
       if (result.status != LoginStatus.success) return 'Connexion Facebook annulée.';
 
-      final data     = await FacebookAuth.instance.getUserData(fields: 'name,email,picture.width(200)');
-      final fullName = data['name'] as String? ?? '';
-      final names    = fullName.split(' ');
-      final prenom   = names.isNotEmpty ? names.first : '';
-      final nom      = names.length > 1 ? names.sublist(1).join(' ') : fullName;
-      final email    = data['email'] as String? ?? 'facebook_user@velqix.tg';
-      final avatar   = (data['picture']?['data']?['url']) as String?;
-
       // Backend attend { accessToken } pour Facebook
       final fbToken = result.accessToken?.tokenString;
-      if (fbToken != null) {
-        final res = await _api.post('/auth/facebook', {'accessToken': fbToken});
-        if (res['success'] == true) {
-          await _api.saveToken(res['data']['accessToken']);
-          if (res['data']['refreshToken'] != null) {
-            await _api.saveRefreshToken(res['data']['refreshToken']);
-          }
-          _currentUser = _userFromJson(res['data']['user']);
-          await _cacheUser(_currentUser!, method: 'facebook');
-          notifyUserChanged();
-          return null;
-        }
+      if (fbToken == null) {
+        return "Connexion Facebook impossible : réessayez ou utilisez votre email.";
       }
 
-      // Fallback local
-      _currentUser = UserModel(
-        id: 'fb_${data['id'] ?? DateTime.now().millisecondsSinceEpoch}',
-        nom: nom, prenom: prenom, email: email, telephone: '', avatarUrl: avatar,
-        isVerified: true, isPremium: false, rating: 0, totalAvis: 0,
-        createdAt: DateTime.now(), role: 'client',
-      );
-      await _cacheUser(_currentUser!, method: 'facebook');
-      notifyUserChanged();
-      await ChatService.instance.connect(userId: _currentUser!.id);
-      return null;
+      final res = await _api.post('/auth/facebook', {'accessToken': fbToken});
+      if (res['success'] == true) {
+        await _api.saveToken(res['data']['accessToken']);
+        if (res['data']['refreshToken'] != null) {
+          await _api.saveRefreshToken(res['data']['refreshToken']);
+        }
+        _currentUser = _userFromJson(res['data']['user']);
+        await _cacheUser(_currentUser!, method: 'facebook');
+        notifyUserChanged();
+        await ChatService.instance.connect(userId: _currentUser!.id);
+        return null;
+      }
+
+      // Le backend a refusé/échoué : on remonte l'erreur, jamais de faux
+      // compte local sans token (voir note équivalente dans loginWithGoogle).
+      return res['message'] ?? "Connexion Facebook impossible. Réessayez.";
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('not supported') || msg.contains('MissingPluginException') ||

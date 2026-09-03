@@ -162,7 +162,10 @@ class PropertyModel {
   });
 
   /// Lien de partage vers la page du bien (deep link web)
-  String get shareUrl => 'https://libimmo.tg/bien/$id';
+  // ⚠️ Corrigé : pointait vers "libimmo.tg", un reliquat de l'ancien nom du
+  // projet avant son renommage en VelQix — lien mort et mauvaise marque
+  // affichés à chaque partage d'annonce.
+  String get shareUrl => 'https://velqix.tg/bien/$id';
 
   /// Texte de partage incluant le lien retour
   String get shareText {
@@ -173,7 +176,7 @@ class PropertyModel {
     return '🏠 $titre\n'
         '📍 ${adresse.full}\n'
         '💰 $montant FCFA\n'
-        '🔗 Disponible sur LibImmo\n'
+        '🔗 Disponible sur VelQix\n'
         '$shareUrl';
   }
 
@@ -290,6 +293,24 @@ class PropertyModel {
       nombrePieces:    json['nombrePieces'],
       annee:           json['annee'],
       status:          json['status'] ?? 'approuve',
+      // ⚠️ Corrigé : ces 3 champs existaient dans le modèle et étaient
+      // utilisés par getLocalizedTitre/getLocalizedDescription/
+      // getLocalizedCaracteristiques, mais n'étaient jamais lus depuis le
+      // JSON — les traductions ne s'affichaient donc jamais, quelle que
+      // soit la langue de l'utilisateur. Le backend ne renvoie pas encore
+      // ces champs aujourd'hui (voir schema.prisma : colonnes ajoutées mais
+      // pas encore peuplées), donc les valeurs resteront `null` tant que
+      // cette partie backend n'est pas branchée — mais le parsing est
+      // maintenant prêt à les recevoir dès qu'elle le sera.
+      titreTranslations: (json['titreTranslations'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
+      descriptionTranslations: (json['descriptionTranslations'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
+      caracteristiquesTranslations: (json['caracteristiquesTranslations'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), (v as List).cast<String>())),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'])
+          : null,
     );
   }
 
