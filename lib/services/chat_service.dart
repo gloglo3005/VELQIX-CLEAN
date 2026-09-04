@@ -309,6 +309,57 @@ class ChatService {
     return null;
   }
 
+  // ─── Envoi d'un message vocal ──────────────────────────────────────
+  // Pas de socket ici : le fichier doit être uploadé (multipart) avant
+  // que le message n'existe côté serveur. On affiche immédiatement une
+  // bulle "sending" qui pointe vers le fichier local (lecture optimiste),
+  // puis on la remplace par la version confirmée (URL Cloudinary) une
+  // fois l'upload terminé.
+  Future<MessageModel?> sendAudioMessage({
+    required String receiverId,
+    required String localFilePath,
+    required int durationSeconds,
+  }) async {
+    final tempId  = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final tempMsg = MessageModel(
+      id: tempId, senderId: _currentUserId ?? '',
+      receiverId: receiverId, content: '🎤 Message vocal',
+      sentAt: DateTime.now(), status: MessageStatus.sending,
+      type: MessageType.audio,
+      audioUrl: localFilePath, // fichier local, remplacé après upload
+      audioDuration: durationSeconds,
+    );
+    _addToCache(tempMsg);
+    _bumpConversation(
+      otherUserId: receiverId, lastMessage: '🎤 Message vocal',
+      lastMessageAt: tempMsg.sentAt, incrementUnread: false,
+    );
+
+    try {
+      final token = await ApiService.instance.getToken();
+      final request = http.MultipartRequest(
+        'POST', Uri.parse('${ApiService.baseUrl}/messages/audio'),
+      )
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['receiverId'] = receiverId
+        ..files.add(await http.MultipartFile.fromPath('audio', localFilePath));
+
+      final streamedRes = await request.send();
+      final res = await http.Response.fromStream(streamedRes);
+
+      if (res.statusCode == 201) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final confirmed = _msgFromPayload(body['data'] as Map<String, dynamic>);
+        _replaceInCache(receiverId, tempId, confirmed);
+        return confirmed;
+      }
+    } catch (e) {
+      debugPrint('❌ sendAudioMessage: $e');
+    }
+    _markFailed(receiverId, tempId);
+    return null;
+  }
+
   // ─── Marquer comme lu ─────────────────────────────────────────────
   void markAsRead(String senderId) {
     _socket?.emit('message:read', {'senderId': senderId});
@@ -321,7 +372,8 @@ class ChatService {
   }
 
   // ─── Convertir le payload backend → MessageModel ─────────────────
-  // Backend envoie : { id, senderId, receiverId, text, isRead, timestamp }
+  // Backend envoie : { id, senderId, receiverId, type, text, audioUrl,
+  // audioDuration, isRead, timestamp }
   // MessageModel attend : content, sentAt
   MessageModel _msgFromPayload(Map<String, dynamic> p) => MessageModel(
     id:         p['id']         as String? ?? '',
@@ -334,6 +386,9 @@ class ChatService {
             ? DateTime.tryParse(p['sentAt'].toString()) ?? DateTime.now()
             : DateTime.now(),
     status: MessageStatus.sent,
+    type: p['type'] == 'audio' ? MessageType.audio : MessageType.text,
+    audioUrl: p['audioUrl'] as String?,
+    audioDuration: p['audioDuration'] as int?,
   );
 
   // ─── Mettre à jour le statut en ligne ────────────────────────────
@@ -398,11 +453,7 @@ class ChatService {
     final list    = List<MessageModel>.from(current[otherUserId] ?? []);
     final idx     = list.indexWhere((m) => m.id == tempId);
     if (idx != -1) {
-      final old = list[idx];
-      list[idx] = MessageModel(
-        id: old.id, senderId: old.senderId, receiverId: old.receiverId,
-        content: old.content, sentAt: old.sentAt, status: MessageStatus.failed,
-      );
+      list[idx] = list[idx].copyWith(status: MessageStatus.failed);
     }
     current[otherUserId] = list;
     messagesNotifier.value = current;

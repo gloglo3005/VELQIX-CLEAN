@@ -385,6 +385,7 @@ class TransactionModel {
 }
 
 enum MessageStatus { sending, sent, delivered, read, failed }
+enum MessageType { text, audio }
 
 class MessageModel {
   final String id;
@@ -395,6 +396,12 @@ class MessageModel {
   final bool isRead;
   final String? propertyId;
   final MessageStatus status;
+  final MessageType type;
+  // Renseigné uniquement quand type == MessageType.audio.
+  // Peut pointer vers un fichier local (pendant l'upload, pour lecture
+  // optimiste immédiate) puis être remplacé par l'URL Cloudinary distante.
+  final String? audioUrl;
+  final int? audioDuration; // secondes
 
   MessageModel({
     required this.id,
@@ -405,12 +412,35 @@ class MessageModel {
     this.isRead = false,
     this.propertyId,
     this.status = MessageStatus.sent,
+    this.type = MessageType.text,
+    this.audioUrl,
+    this.audioDuration,
   });
 
   /// Alias pour le code qui utilise .text
   String get text => content;
   /// Alias pour le code qui utilise .timestamp
   DateTime get timestamp => sentAt;
+  bool get isAudio => type == MessageType.audio;
+
+  MessageModel copyWith({
+    String? id,
+    MessageStatus? status,
+    String? audioUrl,
+    int? audioDuration,
+  }) => MessageModel(
+    id: id ?? this.id,
+    senderId: senderId,
+    receiverId: receiverId,
+    content: content,
+    sentAt: sentAt,
+    isRead: isRead,
+    propertyId: propertyId,
+    status: status ?? this.status,
+    type: type,
+    audioUrl: audioUrl ?? this.audioUrl,
+    audioDuration: audioDuration ?? this.audioDuration,
+  );
 
   factory MessageModel.fromJson(Map<String, dynamic> json) => MessageModel(
     id:         json['id'] ?? '',
@@ -424,6 +454,9 @@ class MessageModel {
             : DateTime.now(),
     isRead:     json['isRead'] ?? false,
     propertyId: json['propertyId'],
+    type:       (json['type'] == 'audio') ? MessageType.audio : MessageType.text,
+    audioUrl:   json['audioUrl'],
+    audioDuration: json['audioDuration'],
   );
 }
 

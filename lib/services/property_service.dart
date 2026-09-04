@@ -1,326 +1,366 @@
-// ═══════════════════════════════════════════════════════════════════
-// PROPERTY SERVICE — VelQix
-// Remplace mock_data.dart — connecté au backend Node.js/Express
-// ═══════════════════════════════════════════════════════════════════
+import { Request, Response } from "express";
+import prisma from "../prisma";
+import { AdminEvents } from "../services/adminNotificationService";
+import { translateAndSavePropertyAsync } from "../services/translationService";
+import { shouldCountView } from "../utils/viewDedupe";
 
-import 'dart:io';
-import '../models/models.dart';
-import 'api_service.dart';
+// ─── HELPER : sélection standard des champs proprietaire ─────────────────────
+const proprietaireSelect = {
+  id: true, nom: true, prenom: true, email: true,
+  telephone: true, avatarUrl: true, isVerified: true,
+  isPremium: true, rating: true, totalAvis: true,
+  createdAt: true, role: true,
+};
 
-class PropertyService {
-  PropertyService._();
-  static final PropertyService instance = PropertyService._();
+// ─── CREATE ───────────────────────────────────────────────────────────────────
+export const createProperty = async (req: Request, res: Response) => {
+  try {
+    const {
+      titre, description, prix, imageUrl, images,
+      type, listingType, categorie,
+      adresse, ville, pays, prixParJour,
+      surface, nombrePieces, annee, caracteristiques,
+    } = req.body;
 
-  final _api = ApiService.instance;
+    const proprietaireId = (req as any).userId;
 
-  // ─── Convertir JSON backend → PropertyModel Flutter ──────────────
-  PropertyModel _fromJson(Map<String, dynamic> json) {
-    final prop = json['proprietaire'] as Map<String, dynamic>?;
+    // Accepte imageUrl (string) OU images (array) — compatibilité Flutter
+    const imageArray: string[] = Array.isArray(images)
+      ? images
+      : imageUrl
+      ? [imageUrl]
+      : [];
 
-    return PropertyModel(
-      id: json['id'] ?? '',
-      titre: json['titre'] ?? '',
-      description: json['description'] ?? '',
-      prix: (json['prix'] ?? 0).toDouble(),
-      prixParJour: json['prixParJour'],
-      // Enums : convertir string → enum
-      type: _parsePropertyType(json['type']),
-      listingType: _parseListingType(json['listingType']),
-      categorie: _parseCategorie(json['categorie']),
-      // Images : le backend stocke une seule imageUrl, Flutter attend une liste
-      images: json['images'] != null
-          ? List<String>.from(json['images'])
-          : (json['imageUrl'] != null ? [json['imageUrl'] as String] : []),
-      adresse: AddressModel(
-        rue: json['adresse'] ?? '',
-        ville: json['ville'] ?? '',
-        pays: json['pays'] ?? 'TG',
-      ),
-      proprietaire: prop != null
-          ? UserModel(
-              id: prop['id'] ?? '',
-              nom: prop['nom'] ?? '',
-              prenom: prop['prenom'] ?? '',
-              email: prop['email'] ?? '',
-              telephone: prop['telephone'] ?? '',
-              avatarUrl: prop['avatarUrl'],
-              isVerified: prop['isVerified'] ?? false,
-              isPremium: prop['isPremium'] ?? false,
-              rating: (prop['rating'] ?? 0.0).toDouble(),
-              totalAvis: prop['totalAvis'] ?? 0,
-              createdAt: prop['createdAt'] != null
-                  ? DateTime.tryParse(prop['createdAt']) ?? DateTime.now()
-                  : DateTime.now(),
-              role: prop['role'] ?? 'client',
-            )
-          : UserModel(
-              id: json['proprietaireId'] ?? '',
-              nom: '', prenom: '', email: '',
-              telephone: '', rating: 0, totalAvis: 0,
-              createdAt: DateTime.now(),
-            ),
-      caracteristiques: json['caracteristiques'] != null
-          ? List<String>.from(json['caracteristiques'])
-          : [],
-      rating: (json['rating'] ?? 0.0).toDouble(),
-      totalAvis: json['totalAvis'] ?? 0,
-      isAvailable: json['isAvailable'] ?? true,
-      isFeatured: json['isFeatured'] ?? false,
-      status: json['status'] ?? 'en_attente',
-      vues: json['vues'] ?? 0,
-      surface: json['surface']?.toString(),
-      nombrePieces: json['nombrePieces'],
-      annee: json['annee'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
-          : DateTime.now(),
-    );
-  }
+    const property = await prisma.property.create({
+      data: {
+        titre,
+        description,
+        prix: Number(prix),
+        images: imageArray,
+        type: type ?? "immobilier",
+        listingType: listingType ?? "vente",
+        categorie: categorie ?? "appartement",
+        adresse: adresse ?? null,
+        ville: ville ?? null,
+        pays: pays ?? "TG",
+        prixParJour: prixParJour ?? null,
+        surface: surface ? Number(surface) : null,
+        nombrePieces: nombrePieces ? Number(nombrePieces) : null,
+        annee: annee ? Number(annee) : null,
+        caracteristiques: caracteristiques ?? [],
+        proprietaireId,
+        status: "en_attente",
+      },
+      include: { proprietaire: { select: proprietaireSelect } },
+    });
 
-  // ─── GET — Liste des biens ────────────────────────────────────────
-  Future<List<PropertyModel>> getProperties({
-    String? type,
-    String? listingType,
-    String? categorie,
-    String? ville,
-    String? pays,
-    double? prixMin,
-    double? prixMax,
-  }) async {
-    // Construire les query params de filtrage
-    final params = <String, String>{};
-    if (type != null) params['type'] = type;
-    if (listingType != null) params['listingType'] = listingType;
-    if (categorie != null) params['categorie'] = categorie;
-    if (ville != null) params['ville'] = ville;
-    if (pays != null) params['pays'] = pays;
-    if (prixMin != null) params['prixMin'] = prixMin.toString();
-    if (prixMax != null) params['prixMax'] = prixMax.toString();
-
-    final query = params.isNotEmpty
-        ? '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}'
-        : '';
-
-    final res = await _api.get('/properties$query');
-    if (res['success'] != true) return [];
-
-    final list = res['data'] as List<dynamic>;
-    return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
-  }
-
-  // ─── GET — Biens vedettes (Premium) ──────────────────────────────
-  Future<List<PropertyModel>> getFeaturedProperties() async {
-    final res = await _api.get('/properties/featured');
-    if (res['success'] != true) return [];
-    final list = res['data'] as List<dynamic>;
-    return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
-  }
-
-  // ─── GET — Mes annonces ───────────────────────────────────────────
-  Future<List<PropertyModel>> getMyProperties() async {
-    final res = await _api.get('/properties/my', auth: true);
-    if (res['success'] != true) return [];
-    final list = res['data'] as List<dynamic>;
-    return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
-  }
-
-  // ─── GET — Détail d'un bien ───────────────────────────────────────
-  Future<PropertyModel?> getProperty(String id) async {
-    final res = await _api.get('/properties/$id');
-    if (res['success'] != true || res['data'] == null) return null;
-    return _fromJson(res['data'] as Map<String, dynamic>);
-  }
-
-  // ─── POST — Créer un bien ─────────────────────────────────────────
-  /// [imageUrl] : URL Cloudinary obtenue après un appel à uploadImage()
-  Future<({PropertyModel? property, String? error})> createProperty({
-    required String titre,
-    required String description,
-    required double prix,
-    required String imageUrl,
-    String type = 'immobilier',
-    String listingType = 'vente',
-    String categorie = 'appartement',
-    String? adresse,
-    String? ville,
-    String pays = 'TG',
-    String? prixParJour,
-    double? surface,
-    int? nombrePieces,
-    List<String> caracteristiques = const [],
-  }) async {
-    final res = await _api.post('/properties', {
-      'titre': titre,
-      'description': description,
-      'prix': prix,
-      'imageUrl': imageUrl,
-      'type': type,
-      'listingType': listingType,
-      'categorie': categorie,
-      if (adresse != null) 'adresse': adresse,
-      if (ville != null) 'ville': ville,
-      'pays': pays,
-      if (prixParJour != null) 'prixParJour': prixParJour,
-      if (surface != null) 'surface': surface,
-      if (nombrePieces != null) 'nombrePieces': nombrePieces,
-      if (caracteristiques.isNotEmpty) 'caracteristiques': caracteristiques,
-    }, auth: true);
-
-    if (res['success'] != true) {
-      return (property: null, error: (res['message'] as String?) ?? 'Erreur création');
-    }
-    return (property: _fromJson(res['data'] as Map<String, dynamic>), error: null);
-  }
-
-  // ─── PUT — Modifier un bien ───────────────────────────────────────
-  Future<String?> updateProperty(String id, Map<String, dynamic> data) async {
-    final res = await _api.put('/properties/$id', data, auth: true);
-    if (res['success'] != true) return res['message'] ?? 'Erreur mise à jour';
-    return null;
-  }
-
-  // ─── DELETE — Supprimer un bien ───────────────────────────────────
-  Future<String?> deleteProperty(String id) async {
-    final res = await _api.delete('/properties/$id', auth: true);
-    if (res['success'] != true) return res['message'] ?? 'Erreur suppression';
-    return null;
-  }
-
-  // ─── POST — Incrémenter les vues ──────────────────────────────────
-  Future<void> incrementViews(String id) async {
-    await _api.post('/properties/$id/views', {});
-  }
-
-  // ─── Favoris ─────────────────────────────────────────────────────
-  Future<void> addFavorite(String propertyId) async {
-    await _api.post('/properties/$propertyId/favorite', {}, auth: true);
-  }
-
-  Future<void> removeFavorite(String propertyId) async {
-    await _api.delete('/properties/$propertyId/favorite', auth: true);
-  }
-
-  Future<List<PropertyModel>> getFavorites() async {
-    final res = await _api.get('/properties/favorites', auth: true);
-    if (res['success'] != true) return [];
-    final list = res['data'] as List<dynamic>;
-    return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
-  }
-
-  // ─── Abonnement (follow) ─────────────────────────────────────────
-  // ⚠️ Avant : followOwner/unfollowOwner (widgets.dart) ne touchaient que des
-  // ValueNotifier en mémoire — aucun appel réseau, rien de persisté. Ces
-  // méthodes branchent sur les vrais endpoints POST/DELETE /users/:id/follow.
-
-  /// Profil public d'un utilisateur, avec compteurs à jour et statut
-  /// d'abonnement (GET /api/users/:id, route publique mais optionalAuth :
-  /// passer auth: true si connecté pour obtenir isFollowedByMe).
-  Future<UserModel?> fetchUserProfile(String userId, {bool auth = false}) async {
-    final res = await _api.get('/users/$userId', auth: auth);
-    if (res['success'] != true) return null;
-    return UserModel.fromJson(res['data'] as Map<String, dynamic>);
-  }
-
-  Future<void> followUser(String userId) async {
-    await _api.post('/users/$userId/follow', {}, auth: true);
-  }
-
-  Future<void> unfollowUser(String userId) async {
-    await _api.delete('/users/$userId/follow', auth: true);
-  }
-
-  // ─── Avis ────────────────────────────────────────────────────────
-  // ⚠️ Avant : property_detail_screen.dart affichait MockDataService.avis
-  // (100% factice). Ces deux méthodes branchent sur les vrais endpoints
-  // GET/POST /api/properties/:id/avis qui existaient déjà côté backend.
-  Future<List<AvisModel>> getAvis(String propertyId) async {
-    final res = await _api.get('/properties/$propertyId/avis', auth: false);
-    if (res['success'] != true) return [];
-    final list = res['data'] as List<dynamic>;
-    return list.map((item) {
-      final j = item as Map<String, dynamic>;
-      final auteurJson = j['auteur'] as Map<String, dynamic>?;
-      return AvisModel(
-        id: j['id'] ?? '',
-        cible: j['propertyId'] ?? propertyId,
-        note: (j['note'] ?? 0).toDouble(),
-        commentaire: j['commentaire'] ?? '',
-        createdAt: j['createdAt'] != null
-            ? DateTime.tryParse(j['createdAt']) ?? DateTime.now()
-            : DateTime.now(),
-        auteur: UserModel(
-          id: auteurJson?['id'] ?? j['auteurId'] ?? '',
-          nom: auteurJson?['nom'] ?? '',
-          prenom: auteurJson?['prenom'] ?? '',
-          email: '', telephone: '',
-          avatarUrl: auteurJson?['avatarUrl'],
-          rating: 0, totalAvis: 0,
-          createdAt: DateTime.now(),
-        ),
+    // 🔔 Notifier l'admin en temps réel + email — TOUJOURS avant res.json()
+    // (jamais après, sous peine de ERR_HTTP_HEADERS_SENT si ça échoue une
+    // fois la réponse déjà partie). On isole cet appel dans son propre
+    // try/catch : une notification qui échoue ne doit pas faire croire à
+    // l'utilisateur que la création de son annonce a échoué alors qu'elle
+    // a bien été enregistrée en base.
+    try {
+      await AdminEvents.newProperty(
+        property.titre,
+        `${property.proprietaire.prenom} ${property.proprietaire.nom}`,
+        property.id
       );
-    }).toList();
-  }
-
-  /// Retourne null en cas de succès, ou un message d'erreur.
-  Future<String?> createAvis(String propertyId, {required double note, required String commentaire}) async {
-    final res = await _api.post('/properties/$propertyId/avis', {
-      'note': note,
-      'commentaire': commentaire,
-    }, auth: true);
-    if (res['success'] != true) return res['message'] ?? 'Erreur';
-    return null;
-  }
-
-  // ─── Upload d'image ───────────────────────────────────────────────
-  /// Upload une image et retourne l'URL Cloudinary à utiliser dans createProperty()
-  Future<({String? url, String? error})> uploadImage(File imageFile) async {
-    final res = await _api.uploadFile('/upload/image', imageFile);
-    if (res['success'] != true) {
-      return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
+    } catch (notifyError) {
+      console.error("createProperty (notification admin) :", notifyError);
     }
-    return (url: res['data']['url'] as String?, error: null);
-  }
 
-  /// Upload depuis bytes (web / caméra)
-  Future<({String? url, String? error})> uploadImageBytes(
-    List<int> bytes,
-    String filename,
-  ) async {
-    final res = await _api.uploadBytes('/upload/image', bytes, filename);
-    if (res['success'] != true) {
-      return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
-    }
-    return (url: res['data']['url'] as String?, error: null);
-  }
+    res.status(201).json({ success: true, data: property, message: "Bien créé avec succès" });
 
-  // ─── Parseurs d'enum ─────────────────────────────────────────────
-  PropertyType _parsePropertyType(dynamic value) {
-    switch (value?.toString()) {
-      case 'mobilier': return PropertyType.mobilier;
-      default: return PropertyType.immobilier;
-    }
+    // 🌍 Traduction automatique (EN, ES, PT, DE, IT, AR, ZH, JA, KO, RU) —
+    // volontairement APRÈS la réponse et SANS await : l'appel à Gemini peut
+    // prendre plusieurs secondes, et ne doit jamais retarder la création
+    // perçue par l'utilisateur. Contrairement à AdminEvents.newProperty
+    // ci-dessus, cette fonction ne touche jamais `res` (elle se contente de
+    // mettre à jour la ligne en base une fois prête), donc aucun risque de
+    // ERR_HTTP_HEADERS_SENT même en fire-and-forget après la réponse.
+    void translateAndSavePropertyAsync(
+      property.id,
+      property.titre,
+      property.description,
+      property.caracteristiques
+    );
+  } catch (error) {
+    console.error("createProperty:", error);
+    res.status(500).json({ success: false, message: "Erreur serveur" });
   }
+};
 
-  ListingType _parseListingType(dynamic value) {
-    switch (value?.toString()) {
-      case 'location': return ListingType.location;
-      case 'les_deux': return ListingType.les_deux;
-      default: return ListingType.vente;
-    }
-  }
+// ─── GET ALL (avec filtres) ───────────────────────────────────────────────────
+export const getProperties = async (req: Request, res: Response) => {
+  try {
+    const { type, listingType, categorie, ville, pays, prixMin, prixMax, status } = req.query;
 
-  PropertyCategory _parseCategorie(dynamic value) {
-    switch (value?.toString()) {
-      case 'maison': return PropertyCategory.maison;
-      case 'terrain': return PropertyCategory.terrain;
-      case 'bureau': return PropertyCategory.bureau;
-      case 'entrepot': return PropertyCategory.entrepot;
-      case 'voiture': return PropertyCategory.voiture;
-      case 'moto': return PropertyCategory.moto;
-      case 'camion': return PropertyCategory.camion;
-      case 'equipement': return PropertyCategory.equipement;
-      case 'appartement': return PropertyCategory.appartement;
-      default: return PropertyCategory.autre;
+    const where: any = {};
+
+    // Le public ne doit voir que les biens approuvés (sécurité : pas d'injection de status via query)
+    where.status = "approuve";
+
+    if (type)        where.type = type;
+    if (listingType) where.listingType = listingType;
+    if (categorie)   where.categorie = categorie;
+    if (ville)       where.ville = { contains: String(ville), mode: "insensitive" };
+    if (pays)        where.pays = pays;
+    if (prixMin || prixMax) {
+      where.prix = {};
+      if (prixMin) where.prix.gte = Number(prixMin);
+      if (prixMax) where.prix.lte = Number(prixMax);
     }
+
+    const properties = await prisma.property.findMany({
+      where,
+      include: { proprietaire: { select: proprietaireSelect } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ success: true, data: properties });
+  } catch (error) {
+    console.error("getProperties:", error);
+    res.status(500).json({ success: false, message: "Erreur serveur" });
   }
-}
+};
+
+// ─── GET FEATURED ─────────────────────────────────────────────────────────────
+export const getFeaturedProperties = async (req: Request, res: Response) => {
+  try {
+    const properties = await prisma.property.findMany({
+      where: { isFeatured: true, status: "approuve" },
+      include: { proprietaire: { select: proprietaireSelect } },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: properties });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── GET MES ANNONCES ─────────────────────────────────────────────────────────
+export const getMyProperties = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+    const properties = await prisma.property.findMany({
+      where: { proprietaireId: userId },
+      include: { proprietaire: { select: proprietaireSelect } },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, data: properties });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── GET ONE ──────────────────────────────────────────────────────────────────
+export const getProperty = async (req: Request, res: Response) => {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: String(req.params.id) },
+      include: { proprietaire: { select: proprietaireSelect } },
+    });
+
+    if (!property) {
+      return res.status(404).json({ success: false, message: "Bien introuvable" });
+    }
+
+    res.json({ success: true, data: property });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── UPDATE ───────────────────────────────────────────────────────────────────
+export const updateProperty = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+    const userRole = (req as any).userRole;
+    const id = String(req.params.id);
+
+    const existing = await prisma.property.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Bien introuvable" });
+    }
+
+    // Seul le propriétaire ou un admin peut modifier
+    if (existing.proprietaireId !== userId && userRole !== "admin") {
+      return res.status(403).json({ success: false, message: "Non autorisé" });
+    }
+
+    // Champs modifiables — on exclut les champs sensibles non éditables par l'user
+    const {
+      titre, description, prix, imageUrl, images,
+      type, listingType, categorie, adresse, ville, pays,
+      prixParJour, surface, nombrePieces, annee, caracteristiques, isAvailable,
+    } = req.body;
+
+    const updateData: any = {};
+    if (titre !== undefined)           updateData.titre = titre;
+    if (description !== undefined)     updateData.description = description;
+    if (prix !== undefined)            updateData.prix = Number(prix);
+    if (type !== undefined)            updateData.type = type;
+    if (listingType !== undefined)     updateData.listingType = listingType;
+    if (categorie !== undefined)       updateData.categorie = categorie;
+    if (adresse !== undefined)         updateData.adresse = adresse;
+    if (ville !== undefined)           updateData.ville = ville;
+    if (pays !== undefined)            updateData.pays = pays;
+    if (prixParJour !== undefined)     updateData.prixParJour = prixParJour;
+    if (surface !== undefined)         updateData.surface = surface ? Number(surface) : null;
+    if (nombrePieces !== undefined)    updateData.nombrePieces = nombrePieces ? Number(nombrePieces) : null;
+    if (annee !== undefined)           updateData.annee = annee ? Number(annee) : null;
+    if (caracteristiques !== undefined) updateData.caracteristiques = caracteristiques;
+    if (isAvailable !== undefined)     updateData.isAvailable = isAvailable;
+
+    // Images
+    if (Array.isArray(images))         updateData.images = images;
+    else if (imageUrl)                 updateData.images = [imageUrl];
+
+    const property = await prisma.property.update({
+      where: { id },
+      data: updateData,
+      include: { proprietaire: { select: proprietaireSelect } },
+    });
+
+    res.json({ success: true, data: property, message: "Bien mis à jour" });
+
+    // 🌍 Si le titre, la description ou les caractéristiques ont changé, les
+    // traductions existantes sont maintenant obsolètes — on les régénère en
+    // fire-and-forget (même principe que dans createProperty, voir la note
+    // là-bas : jamais d'await ici, jamais de risque sur `res`).
+    if (titre !== undefined || description !== undefined || caracteristiques !== undefined) {
+      void translateAndSavePropertyAsync(
+        property.id,
+        property.titre,
+        property.description,
+        property.caracteristiques
+      );
+    }
+  } catch (error) {
+    console.error("updateProperty:", error);
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+export const deleteProperty = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+    const userRole = (req as any).userRole;
+    const id = String(req.params.id);
+
+    const existing = await prisma.property.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Bien introuvable" });
+    }
+
+    if (existing.proprietaireId !== userId && userRole !== "admin") {
+      return res.status(403).json({ success: false, message: "Non autorisé" });
+    }
+
+    // On ne supprime jamais silencieusement l'historique financier : si des
+    // transactions existent déjà sur ce bien, on bloque avec un message clair
+    // plutôt que de laisser Prisma remonter une erreur de contrainte (500 opaque).
+    const transactionCount = await prisma.transaction.count({ where: { propertyId: id } });
+    if (transactionCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Impossible de supprimer cette annonce : elle a des transactions associées. Mettez-la en pause à la place.",
+      });
+    }
+
+    await prisma.property.delete({ where: { id } });
+    res.json({ success: true, message: "Bien supprimé" });
+  } catch (error: any) {
+    // Filet de sécurité si une contrainte de clé étrangère bloque quand même
+    // la suppression (ex: nouvelle relation ajoutée plus tard sans Cascade).
+    if (error?.code === "P2003") {
+      return res.status(409).json({
+        success: false,
+        message: "Impossible de supprimer cette annonce car des données y sont encore rattachées.",
+      });
+    }
+    console.error("deleteProperty:", error);
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── INCRÉMENTER VUES ─────────────────────────────────────────────────────────
+// Route publique (pas d'authMiddleware) — un visiteur non connecté doit
+// pouvoir compter comme une vue. shouldCountView() empêche une même IP de
+// gonfler artificiellement le compteur en boucle (voir utils/viewDedupe.ts).
+export const incrementViews = async (req: Request, res: Response) => {
+  try {
+    const propertyId = String(req.params.id);
+    const ip = req.ip ?? "unknown";
+
+    if (!shouldCountView(ip, propertyId)) {
+      // Pas une erreur : on répond simplement que la vue n'a pas été
+      // recomptée, sans faire échouer la requête côté client.
+      return res.json({ success: true, counted: false });
+    }
+
+    await prisma.property.update({
+      where: { id: propertyId },
+      data: { vues: { increment: 1 } },
+    });
+    res.json({ success: true, counted: true });
+  } catch (error: any) {
+    if (error?.code === "P2025") {
+      return res.status(404).json({ success: false, message: "Bien introuvable" });
+    }
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+// ─── FAVORIS ──────────────────────────────────────────────────────────────────
+export const addFavorite = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+    const propertyId = String(req.params.id);
+
+    await prisma.favorite.upsert({
+      where: { userId_propertyId: { userId, propertyId } },
+      update: {},
+      create: { userId, propertyId },
+    });
+
+    res.json({ success: true, message: "Ajouté aux favoris" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+export const removeFavorite = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+    const propertyId = String(req.params.id);
+
+    await prisma.favorite.deleteMany({ where: { userId, propertyId } });
+    res.json({ success: true, message: "Retiré des favoris" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
+
+export const getFavorites = async (req: Request, res: Response) => {
+  try {
+    const userId = String((req as any).userId);
+
+    const favorites = await prisma.favorite.findMany({
+      where: { userId },
+      include: {
+        property: {
+          include: { proprietaire: { select: proprietaireSelect } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const properties = favorites.map((f) => f.property);
+    res.json({ success: true, data: properties });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Erreur serveur" });
+  }
+};
