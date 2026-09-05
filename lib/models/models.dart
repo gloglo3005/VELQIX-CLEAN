@@ -162,10 +162,10 @@ class PropertyModel {
   });
 
   /// Lien de partage vers la page du bien (deep link web)
-  // ⚠️ Corrigé : pointait vers "libimmo.tg", un reliquat de l'ancien nom du
-  // projet avant son renommage en VelQix — lien mort et mauvaise marque
-  // affichés à chaque partage d'annonce.
-  String get shareUrl => 'https://velqix.tg/bien/$id';
+  // ⚠️ Corrigé : pointait vers "velqix.tg", un domaine jamais configuré —
+  // lien mort à chaque partage. Vraie URL Vercel de l'app en attendant un
+  // éventuel domaine personnalisé.
+  String get shareUrl => 'https://velqix.vercel.app/bien/$id';
 
   /// Texte de partage incluant le lien retour
   String get shareText {

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
 import 'screens/admin_dashboard_screen.dart';
+import 'screens/shared_property_screen.dart';
 import 'services/auth_service.dart';
 
 // ── Notifiers globaux accessibles partout ────────────────────────────────────
@@ -75,6 +77,9 @@ Locale countryCodeToLocale(String? code) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // URLs propres sur le web (https://.../bien/xyz au lieu de .../#/bien/xyz)
+  // — indispensable pour que les liens partagés soient cliquables tels quels.
+  usePathUrlStrategy();
   await initializeDateFormatting();
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -147,6 +152,21 @@ class VelQixApp extends StatelessWidget {
                   ? const AdminDashboardScreen()
                   : MainShell(username: AuthService.instance.loggedUsername))
               : const OnboardingScreen(),
+          // Uniquement pour les routes non gérées par `home` (donc web : un
+          // lien partagé ouvert directement, ex. /bien/xyz123) — le flux de
+          // connexion normal (route '/') n'est pas affecté.
+          onGenerateRoute: (settings) {
+            final name = settings.name ?? '';
+            final match = RegExp(r'^/bien/([^/]+)/?$').firstMatch(name);
+            if (match != null) {
+              final propertyId = match.group(1)!;
+              return MaterialPageRoute(
+                builder: (_) => SharedPropertyScreen(propertyId: propertyId),
+                settings: settings,
+              );
+            }
+            return null; // route inconnue → comportement par défaut de Flutter
+          },
         ),
       ),
     );
