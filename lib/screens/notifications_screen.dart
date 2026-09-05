@@ -52,6 +52,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'error': return Icons.cancel_rounded;
       case 'warning': return Icons.warning_rounded;
       case 'message': return Icons.chat_bubble_rounded;
+      case 'follow': return Icons.person_add_alt_1_rounded;
       case 'payment': return Icons.payments_rounded;
       case 'review': return Icons.star_rounded;
       default: return Icons.notifications_rounded;
@@ -64,6 +65,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'error': return AppTheme.error;
       case 'warning': return AppTheme.warning;
       case 'message': return AppTheme.primary;
+      case 'follow': return AppTheme.accent;
       case 'payment': return AppTheme.accent;
       case 'review': return AppTheme.accentLight;
       default: return AppTheme.info;

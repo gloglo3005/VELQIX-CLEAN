@@ -82,6 +82,18 @@ class Conversation {
 final conversationsNotifier = ValueNotifier<List<Conversation>>([]);
 final messagesNotifier      = ValueNotifier<Map<String, List<MessageModel>>>({});
 
+// Émis à chaque follow/unfollow d'un profil — les écrans qui affichent ce
+// profil (property_detail_screen, owner_profile_screen) comparent userId
+// au profil affiché avant de mettre à jour leur compteur local.
+final followersUpdateNotifier =
+    ValueNotifier<({String userId, int followersCount})?>(null);
+
+// Émis à chaque vue comptabilisée sur un bien — poussé uniquement au
+// propriétaire du bien (voir propertyController.ts), donc si ce notifier
+// se déclenche c'est forcément pour l'utilisateur courant.
+final propertyViewsUpdateNotifier =
+    ValueNotifier<({String propertyId, int vues})?>(null);
+
 // ═══════════════════════════════════════════════════════════════════
 // CHAT SERVICE
 // ═══════════════════════════════════════════════════════════════════
@@ -188,6 +200,25 @@ class ChatService {
       if (data is! Map) return;
       final notif = NotificationModel.fromJson(Map<String, dynamic>.from(data));
       NotificationService.instance.addFromSocket(notif);
+    });
+
+    // ── user:followers_updated ──────────────────────────────────────
+    _socket!.on('user:followers_updated', (data) {
+      if (data is! Map) return;
+      final userId = data['userId'] as String?;
+      final count  = data['followersCount'] as int?;
+      if (userId == null || count == null) return;
+      followersUpdateNotifier.value = (userId: userId, followersCount: count);
+    });
+
+    // ── property:views_updated ──────────────────────────────────────
+    // Poussé uniquement au propriétaire du bien (voir propertyController.ts).
+    _socket!.on('property:views_updated', (data) {
+      if (data is! Map) return;
+      final propertyId = data['propertyId'] as String?;
+      final vues       = data['vues'] as int?;
+      if (propertyId == null || vues == null) return;
+      propertyViewsUpdateNotifier.value = (propertyId: propertyId, vues: vues);
     });
   }
 

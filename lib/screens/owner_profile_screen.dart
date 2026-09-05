@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../services/property_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart' show followersUpdateNotifier;
 import '../widgets/widgets.dart';
 import '../main.dart' show localeNotifier;
 
@@ -59,6 +60,20 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     _followersCount = widget.owner.followersCount;
     _followingCount = widget.owner.followingCount;
     _loadProfile();
+    followersUpdateNotifier.addListener(_onFollowersUpdate);
+  }
+
+  @override
+  void dispose() {
+    followersUpdateNotifier.removeListener(_onFollowersUpdate);
+    super.dispose();
+  }
+
+  void _onFollowersUpdate() {
+    final update = followersUpdateNotifier.value;
+    if (update == null) return;
+    if (update.userId != _ownerId) return;
+    if (mounted) setState(() => _followersCount = update.followersCount);
   }
 
   Future<void> _loadProfile() async {

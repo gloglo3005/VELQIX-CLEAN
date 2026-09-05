@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/mock_data.dart';
 import '../services/property_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart' show followersUpdateNotifier, propertyViewsUpdateNotifier;
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../main.dart' show currencyNotifier, localeNotifier;
@@ -43,12 +44,39 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _ownerFollowingCount = 0;
   bool _followBusy = false;
 
+  // Mis à jour en direct via propertyViewsUpdateNotifier (voir _onViewsUpdate).
+  // null tant qu'aucun event n'est arrivé → on affiche widget.property.vues.
+  int? _liveVues;
+
   @override
   void initState() {
     super.initState();
     _loadAvis();
     _registerView();
     _loadOwnerFollowState();
+    followersUpdateNotifier.addListener(_onFollowersUpdate);
+    propertyViewsUpdateNotifier.addListener(_onViewsUpdate);
+  }
+
+  @override
+  void dispose() {
+    followersUpdateNotifier.removeListener(_onFollowersUpdate);
+    propertyViewsUpdateNotifier.removeListener(_onViewsUpdate);
+    super.dispose();
+  }
+
+  void _onFollowersUpdate() {
+    final update = followersUpdateNotifier.value;
+    if (update == null) return;
+    if (update.userId != widget.property.proprietaire.id) return;
+    if (mounted) setState(() => _ownerFollowersCount = update.followersCount);
+  }
+
+  void _onViewsUpdate() {
+    final update = propertyViewsUpdateNotifier.value;
+    if (update == null) return;
+    if (update.propertyId != widget.property.id) return;
+    if (mounted) setState(() => _liveVues = update.vues);
   }
 
   // Incrémente le compteur de vues côté backend (POST /properties/:id/views).
@@ -441,7 +469,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   Row(children: [
                     const Icon(Icons.remove_red_eye_outlined, size: 14, color: AppTheme.textHint),
                     const SizedBox(width: 4),
-                    Text('${p.vues} ${tr("detail_views")}', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text('${_liveVues ?? p.vues} ${tr("detail_views")}', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(width: 12),
                     const Icon(Icons.star_rounded, size: 14, color: AppTheme.accentLight),
                     const SizedBox(width: 3),
