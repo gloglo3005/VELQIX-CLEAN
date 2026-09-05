@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/models.dart';
 import 'api_service.dart';
@@ -382,8 +383,24 @@ class ChatService {
         'POST', Uri.parse('${ApiService.baseUrl}/messages/audio'),
       )
         ..headers['Authorization'] = 'Bearer $token'
-        ..fields['receiverId'] = receiverId
-        ..files.add(await http.MultipartFile.fromPath('audio', localFilePath));
+        ..fields['receiverId'] = receiverId;
+
+      if (kIsWeb) {
+        // Sur le web, localFilePath est en réalité une blob URL (pas un
+        // vrai chemin fichier) — on récupère ses octets via une requête
+        // dessus, et son vrai type MIME via l'en-tête de la réponse (varie
+        // selon le navigateur : webm sous Chrome, ogg sous Firefox, etc.).
+        final blobRes = await http.get(Uri.parse(localFilePath));
+        final mimeType = blobRes.headers['content-type'] ?? 'audio/webm';
+        final subtype = mimeType.split('/').last.split(';').first;
+        request.files.add(http.MultipartFile.fromBytes(
+          'audio', blobRes.bodyBytes,
+          filename: 'voice.$subtype',
+          contentType: MediaType('audio', subtype),
+        ));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath('audio', localFilePath));
+      }
 
       final streamedRes = await request.send();
       final res = await http.Response.fromStream(streamedRes);

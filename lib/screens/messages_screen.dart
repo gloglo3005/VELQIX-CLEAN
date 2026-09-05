@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -557,9 +558,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _startRecording() async {
     if (!await _recorder.hasPermission()) return;
-    final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+
+    String path = '';
+    RecordConfig config;
+    if (kIsWeb) {
+      // Le web n'a pas de vrai système de fichiers : path_provider ne
+      // fonctionne pas ici (record gère tout en mémoire et renverra une
+      // blob URL au stop()). Seul l'encodeur Opus est fiable sur le web —
+      // aac/m4a (utilisé sur mobile) n'y est pas supporté.
+      config = const RecordConfig(encoder: AudioEncoder.opus);
+    } else {
+      final dir = await getTemporaryDirectory();
+      path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      config = const RecordConfig(encoder: AudioEncoder.aacLc);
+    }
+
+    await _recorder.start(config, path: path);
     if (!mounted) return;
     setState(() {
       _isRecording = true;
@@ -1118,7 +1132,9 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     if (url == null) return;
     if (_isPlaying) {
       await _player.pause();
-    } else if (url.startsWith('http')) {
+    } else if (url.startsWith('http') || url.startsWith('blob:')) {
+      // 'blob:' = enregistrement pas encore uploadé, lu directement depuis
+      // la mémoire du navigateur (web) — pas un fichier sur disque.
       await _player.play(UrlSource(url));
     } else {
       await _player.play(DeviceFileSource(url));
