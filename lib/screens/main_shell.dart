@@ -3,11 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../services/chat_service.dart' show conversationsNotifier;
+import '../services/notification_service.dart' show unreadNotifCountNotifier, NotificationService;
 import '../main.dart' show localeNotifier;
 import '../widgets/ai_assistant_widget.dart';
 import 'home_screen.dart';
 import 'explore_screen.dart';
 import 'messages_screen.dart';
+import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'add_listing_screen.dart';
 import 'search_screen.dart';
@@ -33,6 +35,10 @@ class _MainShellState extends State<MainShell> {
       const MessagesScreen(),
       const ProfileScreen(),
     ];
+    // Charger les notifications existantes au démarrage — les nouvelles
+    // arriveront ensuite en temps réel via l'event socket "notification:new"
+    // (déjà écouté par ChatService, connecté ailleurs au login).
+    NotificationService.instance.loadNotifications();
   }
 
   @override
@@ -52,6 +58,48 @@ class _MainShellState extends State<MainShell> {
               children: [
                 IndexedStack(index: _currentIndex, children: _screens),
                 const AiAssistantWidget(),
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  right: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                    ),
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: unreadNotifCountNotifier,
+                      builder: (_, count, __) => Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8)],
+                            ),
+                            child: const Icon(Icons.notifications_outlined, size: 20, color: AppTheme.textPrimary),
+                          ),
+                          if (count > 0)
+                            Positioned(
+                              top: -2, right: -2,
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
+                                child: Center(
+                                  child: Text(
+                                    count > 99 ? '99+' : '$count',
+                                    style: GoogleFonts.poppins(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             floatingActionButton: FloatingActionButton(

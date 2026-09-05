@@ -298,6 +298,83 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }).toList();
   }
 
+  // ─── FAQ codée en dur — pas d'appel API pour ces questions ───────────────
+  // Reprend le contenu déjà écrit dans SYSTEM_PROMPT côté backend (ai.ts),
+  // mais servi directement ici : si ça matche, réponse instantanée et
+  // gratuite. Sinon, on part sur Gemini (function-calling, vraie recherche
+  // en base). Ne couvre QUE les questions sur le fonctionnement de l'app —
+  // pas la recherche de biens, qui doit rester dynamique.
+  static const List<({List<String> keywords, String answer})> _faq = [
+    (
+      keywords: ['publier', 'poster annonce', 'ajouter bien', 'ajouter annonce', 'deposer annonce'],
+      answer: 'Pour publier une annonce : connectez-vous, appuyez sur "+" (Ajouter un bien), '
+          'remplissez le titre, la catégorie, le prix et les photos, puis soumettez. Votre annonce '
+          'est ensuite examinée par l\'équipe avant d\'être visible publiquement. Avec Premium, vos '
+          'annonces sont mises en avant.',
+    ),
+    (
+      keywords: ['premium', 'abonnement'],
+      answer: 'L\'abonnement Premium met vos annonces en tête de liste, permet plus de photos par '
+          'annonce, ajoute un badge "Premium" sur votre profil, donne accès aux statistiques de vues '
+          'et à un support prioritaire. Accessible dans Profil → Premium.',
+    ),
+    (
+      keywords: ['contacter vendeur', 'contacter proprietaire', 'comment contacter', 'joindre le vendeur', 'contacter'],
+      answer: 'Pour contacter un vendeur : ouvrez la page du bien, appuyez sur "Contacter" pour lui '
+          'envoyer un message texte ou vocal (ou appelez si le numéro est affiché). Tous vos messages '
+          'sont dans l\'onglet Messagerie.',
+    ),
+    (
+      keywords: ['favori', 'coup de coeur', 'sauvegarder annonce', 'mettre de cote'],
+      answer: 'Pour ajouter un bien en favori, appuyez sur le cœur sur sa fiche. Retrouvez tous vos '
+          'favoris dans Profil → Favoris — vous pouvez les retirer à tout moment de la même façon.',
+    ),
+    (
+      keywords: ['suivre', 'ne plus suivre', 'abonner a un proprietaire', 'suivre un vendeur'],
+      answer: 'Vous pouvez suivre un propriétaire depuis sa page de profil (bouton "Suivre") pour être '
+          'informé de ses nouvelles annonces. "Ne plus suivre" au même endroit pour arrêter.',
+    ),
+    (
+      keywords: ['avis', 'notation', 'noter un bien', 'commentaire annonce'],
+      answer: 'Les biens peuvent recevoir des avis et une note laissés par d\'autres utilisateurs, '
+          'visibles sur la fiche du bien — utile pour évaluer la fiabilité d\'une annonce ou d\'un '
+          'propriétaire.',
+    ),
+    (
+      keywords: ['securite', 'arnaque', 'plateforme fiable'],
+      answer: 'VelQix sécurise les échanges via : la validation de chaque annonce par l\'équipe de '
+          'modération avant publication, des paiements sécurisés intégrés, un système d\'avis et de '
+          'notation, et le signalement d\'annonces suspectes possible directement depuis leur fiche.',
+    ),
+    (
+      keywords: ['notification', 'alerte', 'badge notif'],
+      answer: 'Vous recevez une notification (avec badge sur la cloche) dès qu\'un nouveau message '
+          'arrive ou qu\'un événement vous concerne. Retrouvez l\'historique complet en appuyant sur '
+          'la cloche, en haut de l\'écran.',
+    ),
+    (
+      keywords: ['mot de passe', 'modifier profil', 'changer email', 'changer telephone', 'gerer mon compte'],
+      answer: 'Dans l\'onglet Profil, vous pouvez modifier votre profil (nom, email, téléphone), '
+          'changer votre mot de passe, et consulter vos annonces et favoris.',
+    ),
+    (
+      keywords: ['support', 'probleme technique', 'whatsapp', 'contacter support', 'aide urgente'],
+      answer: 'Besoin d\'aide ? Allez dans Profil → Support & Aide, envoyez un message via la '
+          'messagerie, ou signalez directement une annonce. Réponse sous 24-48h — pour les urgences, '
+          'contactez-nous via WhatsApp.',
+    ),
+  ];
+
+  /// Cherche une réponse codée en dur pour les questions fréquentes sur le
+  /// fonctionnement de VelQix. Retourne null si rien ne correspond — dans ce
+  /// cas on part sur l'IA (voir _handleQuery).
+  String? _matchFaq(String normalizedQuery) {
+    for (final entry in _faq) {
+      if (_matchAny(normalizedQuery, entry.keywords)) return entry.answer;
+    }
+    return null;
+  }
+
   // ─── Moteur IA — /api/ai/chat ────────────────────────────────────────────
   final List<Map<String, String>> _history = []; // historique de conversation
 
@@ -308,6 +385,19 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
     setState(() => _messages.add(_ChatMessage(type: _MsgType.user, text: q)));
     _scrollToBottom();
+
+    // FAQ codée en dur d'abord — réponse instantanée, aucun appel API
+    final faqAnswer = _matchFaq(_normalize(q));
+    if (faqAnswer != null) {
+      _addAiMessage(faqAnswer);
+      _history.add({'role': 'user', 'content': q});
+      _history.add({'role': 'assistant', 'content': faqAnswer});
+      if (_history.length > 20) {
+        _history.removeRange(0, _history.length - 20);
+      }
+      return;
+    }
+
     setState(() => _isTyping = true);
     _scrollToBottom();
 

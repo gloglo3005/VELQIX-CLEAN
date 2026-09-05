@@ -2,7 +2,7 @@ import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 
@@ -13,16 +13,11 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // ⚠️ Avant : fusionnait des notifs 100% factices (MockDataService) avec
-  // appNotificationsNotifier (qui n'est lui-même qu'une file locale de
-  // toasts déclenchés par des actions dans CETTE session, jamais reçue par
-  // le vrai destinataire sur son propre appareil). Maintenant : chargé
-  // depuis GET /api/notifications, la vraie source persistée côté serveur.
-  //
-  // NOTE : le backend ne pousse pas encore ces notifications en temps réel
-  // via socket (uniquement écrites en base) — donc pas de mise à jour "live"
-  // ici pour l'instant, seulement au chargement et au tirer-pour-rafraîchir.
-  List<Map<String, dynamic>> _notifs = [];
+  // ⚠️ Avant : rechargeait ses propres Map brutes via ApiService, sans lien
+  // avec le reste de l'app (pas de mise à jour temps réel). Maintenant :
+  // branché sur notificationsNotifier (NotificationService), alimenté à la
+  // fois par le chargement initial ici ET par l'event socket "notification:new"
+  // reçu ailleurs dans l'app (cloche, autre écran ouvert, etc.).
   bool _loading = true;
   String? _error;
 
@@ -35,43 +30,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final res = await ApiService.instance.get('/notifications', auth: true);
-      if (res['success'] == true) {
-        final list = (res['data'] as List).cast<Map<String, dynamic>>();
-        if (mounted) setState(() { _notifs = list; _loading = false; });
-      } else {
-        if (mounted) setState(() { _error = res['message'] ?? 'Erreur'; _loading = false; });
-      }
+      await NotificationService.instance.loadNotifications();
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() { _error = 'Impossible de charger les notifications'; _loading = false; });
     }
   }
 
-  Future<void> _markRead(String id) async {
-    final idx = _notifs.indexWhere((n) => n['id'] == id);
-    if (idx == -1) return;
-    setState(() => _notifs[idx] = {..._notifs[idx], 'isRead': true});
-    try {
-      await ApiService.instance.put('/notifications/$id/read', {}, auth: true);
-    } catch (_) {
-      // best-effort — l'utilisateur peut tirer pour rafraîchir si besoin
-    }
-  }
+  Future<void> _markRead(String id) => NotificationService.instance.markOneRead(id);
 
-  Future<void> _markAllRead() async {
-    setState(() => _notifs = _notifs.map((n) => {...n, 'isRead': true}).toList());
-    try {
-      await ApiService.instance.put('/notifications/read-all', {}, auth: true);
-    } catch (_) {}
-  }
+  Future<void> _markAllRead() => NotificationService.instance.markAllRead();
 
-  // Pas d'endpoint de suppression côté backend : on marque lu + on masque
-  // localement plutôt que de prétendre supprimer côté serveur.
   Future<void> _dismiss(String id) async {
-    setState(() => _notifs.removeWhere((n) => n['id'] == id));
-    try {
-      await ApiService.instance.put('/notifications/$id/read', {}, auth: true);
-    } catch (_) {}
+    await NotificationService.instance.markOneRead(id);
+    NotificationService.instance.dismiss(id);
   }
 
   IconData _icon(String type) {
@@ -112,9 +84,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
       valueListenable: localeNotifier,
-      builder: (context, _, __) {
-    final notifs = _notifs;
-    final unreadCount = notifs.where((n) => n['isRead'] == false).length;
+      builder: (context, _, __) => ValueListenableBuilder<List<NotificationModel>>(
+        valueListenable: notificationsNotifier,
+        builder: (context, notifs, __) {
+    final unreadCount = notifs.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -182,8 +155,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (_, i) {
                 final n = notifs[i];
-                final id = n['id']?.toString() ?? '$i';
-                final isUnread = n['isRead'] == false;
+                final id = n.id.isNotEmpty ? n.id : '$i';
+                final isUnread = !n.isRead;
 
                 return Dismissible(
                   key: Key(id),
@@ -216,17 +189,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: _color(n['type'] ?? '').withOpacity(0.12),
+                            color: _color(n.type).withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(_icon(n['type'] ?? ''), size: 20, color: _color(n['type'] ?? '')),
+                          child: Icon(_icon(n.type), size: 20, color: _color(n.type)),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Row(children: [
                               Expanded(
-                                child: Text(n['titre'] ?? '',
+                                child: Text(n.titre,
                                     style: GoogleFonts.poppins(
                                       fontSize: 13,
                                       fontWeight: isUnread ? FontWeight.w700 : FontWeight.w600,
@@ -243,13 +216,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 ),
                             ]),
                             const SizedBox(height: 3),
-                            Text(n['corps'] ?? '',
+                            Text(n.corps,
                                 style: GoogleFonts.poppins(
                                   fontSize: 12, color: AppTheme.textSecondary, height: 1.4,
                                 ),
                                 maxLines: 2, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 4),
-                            Text(_timeAgo(n['createdAt']),
+                            Text(_timeAgo(n.createdAt),
                                 style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
                           ]),
                         ),
@@ -261,7 +234,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             ),
     );
-      }, // builder
-    ); // ValueListenableBuilder
+        }, // builder (notificationsNotifier)
+      ), // ValueListenableBuilder (notificationsNotifier)
+    ); // ValueListenableBuilder (localeNotifier)
   }
 }

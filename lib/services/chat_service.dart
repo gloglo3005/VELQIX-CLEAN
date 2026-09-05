@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/models.dart';
 import 'api_service.dart';
+import 'notification_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 // MODÈLE CONVERSATION
@@ -178,6 +179,15 @@ class ChatService {
       final isOnline = data['isOnline'] as bool? ?? false;
       if (userId == null) return;
       _updateOnlineStatus(userId, isOnline);
+    });
+
+    // ── notification:new ──────────────────────────────────────────
+    // Backend envoie l'objet Notification Prisma tel quel (id, titre,
+    // corps, type, isRead, createdAt, ...) — même format que GET /notifications.
+    _socket!.on('notification:new', (data) {
+      if (data is! Map) return;
+      final notif = NotificationModel.fromJson(Map<String, dynamic>.from(data));
+      NotificationService.instance.addFromSocket(notif);
     });
   }
 
