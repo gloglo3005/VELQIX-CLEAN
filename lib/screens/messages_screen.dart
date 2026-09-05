@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -557,31 +557,49 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _startRecording() async {
-    if (!await _recorder.hasPermission()) return;
+    try {
+      final granted = await _recorder.hasPermission();
+      if (!granted) {
+        debugPrint('❌ _startRecording: permission micro refusée');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Autorisation micro refusée — vérifie les paramètres du site dans ton navigateur (icône 🔒 à côté de l'URL)."),
+          ));
+        }
+        return;
+      }
 
-    String path = '';
-    RecordConfig config;
-    if (kIsWeb) {
-      // Le web n'a pas de vrai système de fichiers : path_provider ne
-      // fonctionne pas ici (record gère tout en mémoire et renverra une
-      // blob URL au stop()). Seul l'encodeur Opus est fiable sur le web —
-      // aac/m4a (utilisé sur mobile) n'y est pas supporté.
-      config = const RecordConfig(encoder: AudioEncoder.opus);
-    } else {
-      final dir = await getTemporaryDirectory();
-      path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      config = const RecordConfig(encoder: AudioEncoder.aacLc);
+      String path = '';
+      RecordConfig config;
+      if (kIsWeb) {
+        // Le web n'a pas de vrai système de fichiers : path_provider ne
+        // fonctionne pas ici (record gère tout en mémoire et renverra une
+        // blob URL au stop()). Seul l'encodeur Opus est fiable sur le web —
+        // aac/m4a (utilisé sur mobile) n'y est pas supporté.
+        config = const RecordConfig(encoder: AudioEncoder.opus);
+      } else {
+        final dir = await getTemporaryDirectory();
+        path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        config = const RecordConfig(encoder: AudioEncoder.aacLc);
+      }
+
+      await _recorder.start(config, path: path);
+      if (!mounted) return;
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+      });
+      _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordSeconds++);
+      });
+    } catch (e, st) {
+      debugPrint('❌ _startRecording: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Impossible de démarrer l'enregistrement : $e")),
+        );
+      }
     }
-
-    await _recorder.start(config, path: path);
-    if (!mounted) return;
-    setState(() {
-      _isRecording = true;
-      _recordSeconds = 0;
-    });
-    _recordTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _recordSeconds++);
-    });
   }
 
   Future<void> _stopRecordingAndSend() async {
