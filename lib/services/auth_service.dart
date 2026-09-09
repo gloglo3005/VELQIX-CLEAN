@@ -27,7 +27,7 @@ const _kCountryCode = 'auth_country_code';
 const _kCountryName = 'auth_country_name';
 
 final _googleSignIn = GoogleSignIn(
-  clientId: '465274402627-7qtn4rava253u4qh0gbr6bv74pu9ieqm.apps.googleusercontent.com',
+  clientId: '330595771551-209on5g1r101munca38unkks8kogbgql.apps.googleusercontent.com',
   scopes: ['email', 'profile'],
 );
 
