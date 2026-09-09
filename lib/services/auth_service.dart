@@ -2,6 +2,7 @@
 // AUTH SERVICE — VelQix
 // ═══════════════════════════════════════════════════════════════════
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -136,7 +137,33 @@ class AuthService {
     // Connecter le socket
     await ChatService.instance.connect(userId: _currentUser!.id);
     return null; }
+  // Instance exposée pour que l'écran de login puisse afficher le bouton
+  // natif Google sur le web (GoogleSignInPlatform.instance.renderButton())
+  // et s'abonner à onCurrentUserChanged.
+  GoogleSignIn get googleSignIn => _googleSignIn;
+
   Future<String?> loginWithGoogle() async {
+    if (kIsWeb) {
+      // ⚠️ Sur le web, l'appel interactif _googleSignIn.signIn() n'est pas
+      // fiable avec l'API Google Identity Services (GIS) utilisée depuis
+      // google_sign_in ^6.x : un clic sur un bouton custom qui appelle
+      // signIn() directement peut être rejeté par Google avec une page
+      // "Accès bloqué : erreur d'autorisation" (authError=...), même quand
+      // les origines JS sont correctement enregistrées. Le flow supporté
+      // sur web est le bouton natif rendu par renderButton(), qui déclenche
+      // onCurrentUserChanged — voir completeGoogleLoginFromAccount() et le
+      // widget du bouton dans l'écran de login.
+      try {
+        final account = await _googleSignIn.signInSilently();
+        if (account == null) {
+          return 'Utilisez le bouton Google ci-dessous pour vous connecter.';
+        }
+        return _completeGoogleLogin(account);
+      } catch (e) {
+        return "Connexion Google impossible : $e";
+      }
+    }
+
     try {
       GoogleSignInAccount? account;
       try { account = await _googleSignIn.signInSilently(); } catch (_) {}
@@ -153,43 +180,52 @@ class AuthService {
       }
       account ??= _googleSignIn.currentUser;
       if (account == null) return 'Connexion Google annulée.';
-
-      final googleAuth = await account.authentication;
-      final idToken    = googleAuth.idToken;
-
-      if (idToken == null) {
-        // Impossible d'obtenir un idToken Google exploitable côté serveur :
-        // on ne peut pas authentifier l'utilisateur, donc on ne simule
-        // surtout pas une connexion réussie (voir historique : l'ancien
-        // fallback local créait un faux compte sans jamais sauvegarder de
-        // token, laissant l'utilisateur "connecté" en apparence mais avec
-        // tous les appels API authentifiés qui échouaient silencieusement).
-        return "Connexion Google impossible : réessayez ou utilisez votre email.";
-      }
-
-      // Backend attend { idToken } — on envoie exactement ça
-      final res = await _api.post('/auth/google', {'idToken': idToken});
-      if (res['success'] == true) {
-        await _api.saveToken(res['data']['accessToken']);
-        if (res['data']['refreshToken'] != null) {
-          await _api.saveRefreshToken(res['data']['refreshToken']);
-        }
-        _currentUser = _userFromJson(res['data']['user']);
-        await _cacheUser(_currentUser!, method: 'google');
-        notifyUserChanged();
-        await ChatService.instance.connect(userId: _currentUser!.id);
-        return null;
-      }
-
-      // Le backend a refusé/échoué : on remonte l'erreur, pas de session
-      // fantôme sans token.
-      return res['message'] ?? "Connexion Google impossible. Réessayez.";
+      return _completeGoogleLogin(account);
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('popup_closed') || msg.contains('user_cancel') ||
           msg.contains('canceled') || msg.contains('annul')) return 'Connexion Google annulée.';
       return "Connexion Google impossible : $e";
     }
+  }
+
+  // Appelée par loginWithGoogle() (mobile + silent web) ET par l'écran de
+  // login sur web, une fois que onCurrentUserChanged a livré un compte via
+  // le bouton natif Google.
+  Future<String?> completeGoogleLoginFromAccount(GoogleSignInAccount account) =>
+      _completeGoogleLogin(account);
+
+  Future<String?> _completeGoogleLogin(GoogleSignInAccount account) async {
+    final googleAuth = await account.authentication;
+    final idToken    = googleAuth.idToken;
+
+    if (idToken == null) {
+      // Impossible d'obtenir un idToken Google exploitable côté serveur :
+      // on ne peut pas authentifier l'utilisateur, donc on ne simule
+      // surtout pas une connexion réussie (voir historique : l'ancien
+      // fallback local créait un faux compte sans jamais sauvegarder de
+      // token, laissant l'utilisateur "connecté" en apparence mais avec
+      // tous les appels API authentifiés qui échouaient silencieusement).
+      return "Connexion Google impossible : réessayez ou utilisez votre email.";
+    }
+
+    // Backend attend { idToken } — on envoie exactement ça
+    final res = await _api.post('/auth/google', {'idToken': idToken});
+    if (res['success'] == true) {
+      await _api.saveToken(res['data']['accessToken']);
+      if (res['data']['refreshToken'] != null) {
+        await _api.saveRefreshToken(res['data']['refreshToken']);
+      }
+      _currentUser = _userFromJson(res['data']['user']);
+      await _cacheUser(_currentUser!, method: 'google');
+      notifyUserChanged();
+      await ChatService.instance.connect(userId: _currentUser!.id);
+      return null;
+    }
+
+    // Le backend a refusé/échoué : on remonte l'erreur, pas de session
+    // fantôme sans token.
+    return res['message'] ?? "Connexion Google impossible. Réessayez.";
   }
 
   // ─── Facebook ────────────────────────────────────────────────────
