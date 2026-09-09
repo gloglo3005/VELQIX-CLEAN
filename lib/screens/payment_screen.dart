@@ -64,6 +64,11 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       final parJour = double.tryParse(numStr) ?? 50000.0;
       return parJour * _nbJours;
     }
+    // Premium : pas de bien associé (widget.property est null) et pas de
+    // montantOverride passé par premium_screen.dart — le vrai montant est de
+    // toute façon décidé par le backend au moment du checkout (voir
+    // _startPremiumCheckout). 0 ici évite juste le crash à l'affichage.
+    if (widget.type == 'premium') return 0;
     return widget.property!.prix;
   }
 
