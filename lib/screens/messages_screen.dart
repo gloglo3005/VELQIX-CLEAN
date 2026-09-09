@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -756,11 +757,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _attachImage(BuildContext context) async {
     final files = await WebFilePicker.pickMultipleImages(maxCount: 1);
-    if (files.isNotEmpty && mounted) {
-      // TODO: uploader l'image via l'API et envoyer l'URL
-      setState(() {});
+    if (files.isEmpty || !mounted) return;
+
+    ChatService.instance.sendImageMessage(
+      receiverId: _otherUserId,
+      dataUri: files.first,
+    ).then((_) {
+      if (mounted) setState(() {});
       _scrollToBottom();
-    }
+    });
+    setState(() {});
+    _scrollToBottom();
   }
 
   @override
@@ -918,7 +925,9 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  msg.isAudio
+                                  msg.isImage
+                                      ? _ImageMessageBubble(message: msg)
+                                      : msg.isAudio
                                       ? _VoiceMessageBubble(message: msg, isMe: isMe)
                                       : Text(msg.text,
                                       style: GoogleFonts.poppins(
@@ -1105,6 +1114,53 @@ class _ChatScreenState extends State<ChatScreen> {
       default:
         return Icon(Icons.done_rounded, size: 13, color: Colors.white.withOpacity(0.7));
     }
+  }
+}
+
+// ─── Bulle de message image (pièce jointe chat) ──────────────────────────────
+class _ImageMessageBubble extends StatelessWidget {
+  final MessageModel message;
+  const _ImageMessageBubble({required this.message});
+
+  ImageProvider _provider(String url) {
+    if (url.startsWith('data:')) {
+      final parts = url.split(',');
+      return MemoryImage(base64Decode(parts.length > 1 ? parts[1] : ''));
+    }
+    return NetworkImage(url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = message.imageUrl;
+    if (url == null) return const SizedBox.shrink();
+    final provider = _provider(url);
+
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        barrierColor: Colors.black87,
+        builder: (_) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(12),
+          child: InteractiveViewer(child: Image(image: provider, fit: BoxFit.contain)),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image(
+          image: provider,
+          width: 180,
+          height: 180,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 180, height: 180,
+            color: AppTheme.background,
+            child: const Icon(Icons.broken_image_rounded, color: AppTheme.textHint),
+          ),
+        ),
+      ),
+    );
   }
 }
 

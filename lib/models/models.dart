@@ -385,7 +385,7 @@ class TransactionModel {
 }
 
 enum MessageStatus { sending, sent, delivered, read, failed }
-enum MessageType { text, audio }
+enum MessageType { text, audio, image }
 
 class MessageModel {
   final String id;
@@ -402,6 +402,9 @@ class MessageModel {
   // optimiste immédiate) puis être remplacé par l'URL Cloudinary distante.
   final String? audioUrl;
   final int? audioDuration; // secondes
+  // Renseigné uniquement quand type == MessageType.image. Idem : peut être
+  // une data URI locale pendant l'upload, puis l'URL Cloudinary distante.
+  final String? imageUrl;
 
   MessageModel({
     required this.id,
@@ -415,6 +418,7 @@ class MessageModel {
     this.type = MessageType.text,
     this.audioUrl,
     this.audioDuration,
+    this.imageUrl,
   });
 
   /// Alias pour le code qui utilise .text
@@ -422,12 +426,14 @@ class MessageModel {
   /// Alias pour le code qui utilise .timestamp
   DateTime get timestamp => sentAt;
   bool get isAudio => type == MessageType.audio;
+  bool get isImage => type == MessageType.image;
 
   MessageModel copyWith({
     String? id,
     MessageStatus? status,
     String? audioUrl,
     int? audioDuration,
+    String? imageUrl,
   }) => MessageModel(
     id: id ?? this.id,
     senderId: senderId,
@@ -440,6 +446,7 @@ class MessageModel {
     type: type,
     audioUrl: audioUrl ?? this.audioUrl,
     audioDuration: audioDuration ?? this.audioDuration,
+    imageUrl: imageUrl ?? this.imageUrl,
   );
 
   factory MessageModel.fromJson(Map<String, dynamic> json) => MessageModel(
@@ -454,9 +461,14 @@ class MessageModel {
             : DateTime.now(),
     isRead:     json['isRead'] ?? false,
     propertyId: json['propertyId'],
-    type:       (json['type'] == 'audio') ? MessageType.audio : MessageType.text,
+    type:       json['type'] == 'audio'
+        ? MessageType.audio
+        : json['type'] == 'image'
+            ? MessageType.image
+            : MessageType.text,
     audioUrl:   json['audioUrl'],
     audioDuration: json['audioDuration'],
+    imageUrl:   json['imageUrl'],
   );
 }
 

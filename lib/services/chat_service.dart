@@ -418,7 +418,63 @@ class ChatService {
     return null;
   }
 
-  // ─── Marquer comme lu ─────────────────────────────────────────────
+  // ─── Envoi d'une pièce jointe image ────────────────────────────────
+  // [dataUri] vient de WebFilePicker (déjà utilisé ailleurs dans l'app,
+  // ex. add_listing_screen.dart) — fonctionne identiquement sur web et
+  // mobile, donc pas besoin de distinguer kIsWeb ici contrairement aux
+  // messages vocaux.
+  Future<MessageModel?> sendImageMessage({
+    required String receiverId,
+    required String dataUri,
+  }) async {
+    final tempId  = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final tempMsg = MessageModel(
+      id: tempId, senderId: _currentUserId ?? '',
+      receiverId: receiverId, content: '📷 Photo',
+      sentAt: DateTime.now(), status: MessageStatus.sending,
+      type: MessageType.image,
+      imageUrl: dataUri, // aperçu local immédiat, remplacé après upload
+    );
+    _addToCache(tempMsg);
+    _bumpConversation(
+      otherUserId: receiverId, lastMessage: '📷 Photo',
+      lastMessageAt: tempMsg.sentAt, incrementUnread: false,
+    );
+
+    try {
+      final parts = dataUri.split(',');
+      if (parts.length != 2) throw Exception('data URI invalide');
+      final bytes = base64Decode(parts[1]);
+      final mimeMatch = RegExp(r'data:image/([a-zA-Z0-9.+-]+);').firstMatch(parts[0]);
+      final subtype = mimeMatch?.group(1) ?? 'jpeg';
+
+      final token = await ApiService.instance.getToken();
+      final request = http.MultipartRequest(
+        'POST', Uri.parse('${ApiService.baseUrl}/messages/image'),
+      )
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['receiverId'] = receiverId
+        ..files.add(http.MultipartFile.fromBytes(
+          'image', bytes,
+          filename: 'photo.$subtype',
+          contentType: MediaType('image', subtype),
+        ));
+
+      final streamedRes = await request.send();
+      final res = await http.Response.fromStream(streamedRes);
+
+      if (res.statusCode == 201) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final confirmed = _msgFromPayload(body['data'] as Map<String, dynamic>);
+        _replaceInCache(receiverId, tempId, confirmed);
+        return confirmed;
+      }
+    } catch (e) {
+      debugPrint('❌ sendImageMessage: $e');
+    }
+    _markFailed(receiverId, tempId);
+    return null;
+  }
   void markAsRead(String senderId) {
     _socket?.emit('message:read', {'senderId': senderId});
     _clearUnread(senderId);
@@ -431,7 +487,7 @@ class ChatService {
 
   // ─── Convertir le payload backend → MessageModel ─────────────────
   // Backend envoie : { id, senderId, receiverId, type, text, audioUrl,
-  // audioDuration, isRead, timestamp }
+  // audioDuration, imageUrl, isRead, timestamp }
   // MessageModel attend : content, sentAt
   MessageModel _msgFromPayload(Map<String, dynamic> p) => MessageModel(
     id:         p['id']         as String? ?? '',
@@ -444,9 +500,14 @@ class ChatService {
             ? DateTime.tryParse(p['sentAt'].toString()) ?? DateTime.now()
             : DateTime.now(),
     status: MessageStatus.sent,
-    type: p['type'] == 'audio' ? MessageType.audio : MessageType.text,
+    type: p['type'] == 'audio'
+        ? MessageType.audio
+        : p['type'] == 'image'
+            ? MessageType.image
+            : MessageType.text,
     audioUrl: p['audioUrl'] as String?,
     audioDuration: p['audioDuration'] as int?,
+    imageUrl: p['imageUrl'] as String?,
   );
 
   // ─── Mettre à jour le statut en ligne ────────────────────────────
