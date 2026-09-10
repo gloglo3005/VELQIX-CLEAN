@@ -47,13 +47,26 @@ class _MessagesScreenState extends State<MessagesScreen> {
     }
   }
 
-  void _startAgoraCall(BuildContext ctx, dynamic user) {
-    final channelName = 'velqix_${user.id}';
+  // Prévient d'abord le destinataire via call:invite (voir callSocket.ts) —
+  // le channelName vient toujours du serveur, jamais généré localement,
+  // sinon l'appelant et l'appelé peuvent finir chacun dans un canal différent.
+  Future<void> _startAgoraCall(BuildContext ctx, dynamic user) async {
+    final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'audio');
+    if (!ctx.mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text("Impossible de joindre ${user.fullName} pour le moment.",
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+      ));
+      return;
+    }
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => AgoraCallScreen(
         remoteUser: user,
-        channelName: channelName,
+        channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }
@@ -104,11 +117,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
     //   return;
     // }
 
+    final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'video');
+    if (!ctx.mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text("Impossible de joindre ${user.fullName} pour le moment.",
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+      ));
+      return;
+    }
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => AgoraVideoCallScreen(
         remoteUser: user,
-        channelName: 'velqix_video_${user.id}',
+        channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }
@@ -630,13 +654,23 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) setState(() => _isRecording = false);
   }
 
-  void _startAgoraCall(BuildContext ctx, dynamic user) {
-    final channelName = 'velqix_${user.id}';
+  Future<void> _startAgoraCall(BuildContext ctx, dynamic user) async {
+    final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'audio');
+    if (!ctx.mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text("Impossible de joindre ${user.fullName} pour le moment.",
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+      ));
+      return;
+    }
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => AgoraCallScreen(
         remoteUser: user,
-        channelName: channelName,
+        channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }
@@ -685,11 +719,22 @@ class _ChatScreenState extends State<ChatScreen> {
     //   return;
     // }
 
+    final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'video');
+    if (!ctx.mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text("Impossible de joindre ${user.fullName} pour le moment.",
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.error,
+      ));
+      return;
+    }
     Navigator.push(ctx, MaterialPageRoute(
       builder: (_) => AgoraVideoCallScreen(
         remoteUser: user,
-        channelName: 'velqix_video_${user.id}',
+        channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }

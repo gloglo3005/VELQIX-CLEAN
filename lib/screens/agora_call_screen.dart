@@ -1,9 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════
-// AGORA CALL SCREEN — Appel VoIP in-app
-// ═══════════════════════════════════════════════════════════════════
-// 🔑 Remplace APP_ID par ton App ID Agora :
-//    https://console.agora.io → Projet → App ID
-// ═══════════════════════════════════════════════════════════════════
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -12,21 +6,24 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
+import '../services/chat_service.dart';
 import '../widgets/widgets.dart';
 
 // ── Config Agora ─────────────────────────────────────────────────────────────
-const String _agoraAppId = '5c00b5a87a274771bb20ef52f0f0fb43'; // 🔑 À remplacer
+const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2'; // 
 
 class AgoraCallScreen extends StatefulWidget {
   final UserModel remoteUser;
   final String channelName; // ex: 'chat_${userId1}_${userId2}'
   final bool isCaller;
+  final String? callId; // si fourni : ferme l'écran si l'autre raccroche/refuse avant connexion
 
   const AgoraCallScreen({
     super.key,
     required this.remoteUser,
     required this.channelName,
     this.isCaller = true,
+    this.callId,
   });
 
   @override
@@ -43,11 +40,25 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
   int  _callDuration  = 0;
   Timer? _timer;
   String _status = 'Appel en cours...';
+  StreamSubscription? _callStatusSub;
 
   @override
   void initState() {
     super.initState();
     _initAgora();
+
+    // Si un callId a été fourni (flow signaling via callSocket.ts) : si
+    // l'appel est rejeté/terminé côté serveur avant que le distant ne
+    // rejoigne le canal Agora, on ferme cet écran au lieu de rester bloqué.
+    if (widget.callId != null) {
+      _callStatusSub = ChatService.instance.onCallStatus.listen((data) {
+        if (data['callId'] == widget.callId &&
+            (data['event'] == 'rejected' || data['event'] == 'ended') &&
+            !_remoteJoined) {
+          _endCall();
+        }
+      });
+    }
   }
 
   Future<void> _initAgora() async {
@@ -115,6 +126,8 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     if (_ending) return;
     _ending = true;
     _timer?.cancel();
+    _callStatusSub?.cancel();
+    if (widget.callId != null) ChatService.instance.endCallSignal(widget.callId!);
     try { await _engine.leaveChannel(); } catch (_) {}
     try { await _engine.release(); } catch (_) {}
     if (mounted) Navigator.of(context).pop();
@@ -133,6 +146,7 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _callStatusSub?.cancel();
     _engine.leaveChannel();
     _engine.release();
     super.dispose();

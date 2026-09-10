@@ -1,9 +1,4 @@
-// ═══════════════════════════════════════════════════════════════════
-// AGORA VIDEO CALL SCREEN
-// 🚫 Facturation 10 FCFA/min DÉSACTIVÉE (25/08/2026) — appels gratuits/illimités
-// pour l'instant (wallet plus utilisé). Voir _startBillingTimer ci-dessous.
-// 🔑 Remplace VOTRE_APP_ID_AGORA par ton App ID Agora
-// ═══════════════════════════════════════════════════════════════════
+
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -15,7 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 // import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : appels vidéo gratuits/illimités
 
-const String _agoraAppId = '5c00b5a87a274771bb20ef52f0f0fb43'; // 🔑 À remplacer
+const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2'; 
 
 class AgoraVideoCallScreen extends StatefulWidget {
   final UserModel remoteUser;

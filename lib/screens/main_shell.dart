@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
-import '../services/chat_service.dart' show conversationsNotifier;
+import '../services/chat_service.dart' show conversationsNotifier, incomingCallNotifier;
 import '../services/notification_service.dart' show unreadNotifCountNotifier, NotificationService;
 import '../main.dart' show localeNotifier;
 import '../widgets/ai_assistant_widget.dart';
@@ -13,6 +13,7 @@ import 'notifications_screen.dart';
 import 'profile_screen.dart';
 import 'add_listing_screen.dart';
 import 'search_screen.dart';
+import 'incoming_call_screen.dart';
 
 class MainShell extends StatefulWidget {
   final String username;
@@ -58,6 +59,24 @@ class _MainShellState extends State<MainShell> {
               children: [
                 IndexedStack(index: _currentIndex, children: _screens),
                 const AiAssistantWidget(),
+                // Appel entrant — reçu peu importe l'écran affiché en ce
+                // moment (voir incomingCallNotifier dans chat_service.dart).
+                ValueListenableBuilder<Map<String, dynamic>?>(
+                  valueListenable: incomingCallNotifier,
+                  builder: (_, incomingCall, __) {
+                    if (incomingCall != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        // Consommé immédiatement pour ne pas repousser cet
+                        // écran une seconde fois au prochain rebuild.
+                        incomingCallNotifier.value = null;
+                        Navigator.of(context, rootNavigator: true).push(MaterialPageRoute(
+                          builder: (_) => IncomingCallScreen(callData: incomingCall),
+                        ));
+                      });
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 8,
                   right: 16,

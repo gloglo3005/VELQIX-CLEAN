@@ -95,6 +95,11 @@ final followersUpdateNotifier =
 final propertyViewsUpdateNotifier =
     ValueNotifier<({String propertyId, int vues})?>(null);
 
+// Appel entrant (audio/vidéo) — écouté globalement par main_shell.dart, peu
+// importe l'écran affiché au moment où l'appel arrive. Contenu : payload
+// "call:incoming" du backend (callId, callerId, type, channelName, caller).
+final incomingCallNotifier = ValueNotifier<Map<String, dynamic>?>(null);
+
 // ═══════════════════════════════════════════════════════════════════
 // CHAT SERVICE
 // ═══════════════════════════════════════════════════════════════════
@@ -111,10 +116,14 @@ class ChatService {
   final _messageController = StreamController<MessageModel>.broadcast();
   final _typingController  = StreamController<Map<String, dynamic>>.broadcast();
   final _readAckController = StreamController<String>.broadcast();
+  // Émis pour call:accepted / call:rejected / call:ended — chaque event a
+  // la forme {event: 'accepted'|'rejected'|'ended', callId, channelName?}
+  final _callStatusController = StreamController<Map<String, dynamic>>.broadcast();
 
-  Stream<MessageModel>         get onMessage => _messageController.stream;
-  Stream<Map<String, dynamic>> get onTyping  => _typingController.stream;
-  Stream<String>               get onReadAck => _readAckController.stream;
+  Stream<MessageModel>         get onMessage    => _messageController.stream;
+  Stream<Map<String, dynamic>> get onTyping     => _typingController.stream;
+  Stream<String>               get onReadAck    => _readAckController.stream;
+  Stream<Map<String, dynamic>> get onCallStatus => _callStatusController.stream;
 
   bool get isConnected => _isConnected;
 
@@ -221,6 +230,71 @@ class ChatService {
       if (propertyId == null || vues == null) return;
       propertyViewsUpdateNotifier.value = (propertyId: propertyId, vues: vues);
     });
+
+    // ── call:incoming ────────────────────────────────────────────────
+    // Payload backend : { callId, callerId, type, channelName, caller }
+    _socket!.on('call:incoming', (data) {
+      if (data is! Map) return;
+      incomingCallNotifier.value = Map<String, dynamic>.from(data);
+    });
+
+    // ── call:accepted / call:rejected / call:ended ────────────────────
+    _socket!.on('call:accepted', (data) {
+      if (data is! Map) return;
+      _callStatusController.add({'event': 'accepted', ...Map<String, dynamic>.from(data)});
+    });
+    _socket!.on('call:rejected', (data) {
+      if (data is! Map) return;
+      _callStatusController.add({'event': 'rejected', ...Map<String, dynamic>.from(data)});
+    });
+    _socket!.on('call:ended', (data) {
+      if (data is! Map) return;
+      _callStatusController.add({'event': 'ended', ...Map<String, dynamic>.from(data)});
+    });
+  }
+
+  // ─── Signaling d'appel (audio/vidéo) ──────────────────────────────
+  // Invite quelqu'un à un appel et attend la confirmation serveur avant de
+  // rejoindre le canal Agora — le channelName vient toujours du backend
+  // (jamais généré localement), pour être sûr que les deux côtés utilisent
+  // exactement la même valeur.
+  Future<Map<String, dynamic>?> inviteCall({
+    required String calleeId,
+    required String type, // 'audio' | 'video'
+  }) async {
+    if (_socket == null || !_isConnected) return null;
+    final completer = Completer<Map<String, dynamic>?>();
+    _socket!.emitWithAck(
+      'call:invite',
+      {'calleeId': calleeId, 'type': type},
+      ack: (response) {
+        if (response is Map && response['success'] == true) {
+          completer.complete(Map<String, dynamic>.from(response['data']));
+        } else {
+          completer.complete(null);
+        }
+      },
+    );
+    return completer.future.timeout(const Duration(seconds: 10), onTimeout: () => null);
+  }
+
+  Future<bool> acceptCall(String callId) async {
+    if (_socket == null || !_isConnected) return false;
+    final completer = Completer<bool>();
+    _socket!.emitWithAck(
+      'call:accept',
+      {'callId': callId},
+      ack: (response) => completer.complete(response is Map && response['success'] == true),
+    );
+    return completer.future.timeout(const Duration(seconds: 10), onTimeout: () => false);
+  }
+
+  void rejectCall(String callId, {String? reason}) {
+    _socket?.emit('call:reject', {'callId': callId, if (reason != null) 'reason': reason});
+  }
+
+  void endCallSignal(String callId) {
+    _socket?.emit('call:end', {'callId': callId});
   }
 
   // ─── Charger les conversations ────────────────────────────────────
@@ -591,5 +665,6 @@ class ChatService {
     _messageController.close();
     _typingController.close();
     _readAckController.close();
+    _callStatusController.close();
   }
 }
