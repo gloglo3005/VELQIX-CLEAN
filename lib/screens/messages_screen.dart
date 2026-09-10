@@ -132,7 +132,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
         remoteUser: user,
         channelName: result['channelName'] as String,
         isCaller: true,
-        callId: result['callId'] as String,
       ),
     ));
   }
@@ -734,7 +733,6 @@ class _ChatScreenState extends State<ChatScreen> {
         remoteUser: user,
         channelName: result['channelName'] as String,
         isCaller: true,
-        callId: result['callId'] as String,
       ),
     ));
   }

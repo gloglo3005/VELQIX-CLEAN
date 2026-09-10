@@ -76,8 +76,15 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     }
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => _type == 'video'
-          ? AgoraVideoCallScreen(remoteUser: _caller, channelName: _channelName, isCaller: false, callId: _callId)
-          : AgoraCallScreen(remoteUser: _caller, channelName: _channelName, isCaller: false, callId: _callId),
+          ?AgoraVideoCallScreen(
+    remoteUser: _caller,
+    channelName: _channelName,
+    isCaller: false)
+: AgoraCallScreen(
+    remoteUser: _caller,
+    channelName: _channelName,
+    isCaller: false,
+    callId: _callId),
     ));
   }
 
