@@ -1,3 +1,5 @@
+
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,14 +16,12 @@ class AgoraVideoCallScreen extends StatefulWidget {
   final UserModel remoteUser;
   final String channelName;
   final bool isCaller; // true = client (payant), false = propriétaire
-  final String callId;
 
   const AgoraVideoCallScreen({
     super.key,
     required this.remoteUser,
     required this.channelName,
     this.isCaller = true,
-    required this.callId,
   });
 
   @override
