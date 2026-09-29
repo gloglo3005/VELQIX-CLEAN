@@ -12,6 +12,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/models.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
+import 'web_file_picker.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 // MODÈLE CONVERSATION
@@ -129,10 +130,13 @@ class ChatService {
 
   // ─── Connexion Socket.io ──────────────────────────────────────────
   Future<void> connect({String? userId}) async {
-    if (_isConnected) return;
+    // Socket déjà créé (connecté ou en cours de connexion) pour ce même
+    // utilisateur : ne pas en ouvrir un second.
+    if (_socket != null && _currentUserId == userId) return;
+    if (_socket != null) disconnect();
     _currentUserId = userId;
 
-    final token = await ApiService.instance.getToken();
+    final token = await ApiService.instance.getValidToken();
     if (token == null) return;
 
     _socket = IO.io(
@@ -141,6 +145,7 @@ class ChatService {
           .setTransports(['websocket'])
           .setAuth({'token': token})
           .disableAutoConnect()
+          .enableForceNew()
           .build(),
     );
 
@@ -154,14 +159,18 @@ class ChatService {
       _isConnected = false;
       debugPrint('🔌 ChatSocket déconnecté');
     });
-    _socket!.onConnectError((e) {
+    _socket!.onConnectError((e) async {
       _isConnected = false;
       debugPrint('❌ ChatSocket erreur connexion : $e');
-    });
-
-    // ── Log debug — à retirer en production ──────────────────────
-    _socket!.onAny((event, data) {
-      debugPrint('🔌 Socket event : $event → $data');
+      // L'access token (15 min) a expiré entre-temps : on le rafraîchit et
+      // on met à jour l'auth du handshake pour les reconnexions suivantes.
+      if (e.toString().contains('TOKEN_EXPIRED')) {
+        final socket = _socket;
+        if (await ApiService.instance.refreshAccessToken() && socket != null && identical(socket, _socket)) {
+          socket.auth = {'token': await ApiService.instance.getToken()};
+          socket.connect();
+        }
+      }
     });
 
     // ── message:receive ──────────────────────────────────────────
@@ -190,7 +199,7 @@ class ChatService {
       if (data is Map && data['readBy'] != null) {
         final readBy = data['readBy'] as String;
         _readAckController.add(readBy);
-        _clearUnread(readBy);
+        _markOutgoingAsRead(readBy);
       }
     });
 
@@ -268,6 +277,7 @@ class ChatService {
       'call:invite',
       {'calleeId': calleeId, 'type': type},
       ack: (response) {
+        if (completer.isCompleted) return;
         if (response is Map && response['success'] == true) {
           completer.complete(Map<String, dynamic>.from(response['data']));
         } else {
@@ -284,7 +294,10 @@ class ChatService {
     _socket!.emitWithAck(
       'call:accept',
       {'callId': callId},
-      ack: (response) => completer.complete(response is Map && response['success'] == true),
+      ack: (response) {
+        if (completer.isCompleted) return;
+        completer.complete(response is Map && response['success'] == true);
+      },
     );
     return completer.future.timeout(const Duration(seconds: 10), onTimeout: () => false);
   }
@@ -297,18 +310,31 @@ class ChatService {
     _socket?.emit('call:end', {'callId': callId});
   }
 
+  /// App ID + token Agora délivrés par le backend pour ce canal
+  /// (GET /api/calls/agora-token). En cas d'échec ou si le serveur n'a pas
+  /// d'App ID configuré, on garde [fallbackAppId] et un token vide.
+  Future<({String appId, String token})> agoraCredentials(
+      String channelName, String fallbackAppId) async {
+    final res = await ApiService.instance.get(
+      '/calls/agora-token?channelName=${Uri.encodeQueryComponent(channelName)}',
+      auth: true,
+    );
+    final data = res['success'] == true ? res['data'] : null;
+    if (data is Map) {
+      final appId = (data['appId'] as String?) ?? '';
+      final token = (data['token'] as String?) ?? '';
+      if (appId.isNotEmpty) return (appId: appId, token: token);
+    }
+    return (appId: fallbackAppId, token: '');
+  }
+
   // ─── Charger les conversations ────────────────────────────────────
   // GET /api/conversations → { success, data: [...] }
   Future<void> loadConversations() async {
     try {
-      final token = await ApiService.instance.getToken();
-      final res = await http.get(
-        Uri.parse('${ApiService.baseUrl}/conversations'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final list = ((body['data'] ?? body) as List)
+      final res = await ApiService.instance.get('/conversations', auth: true);
+      if (res['success'] == true && res['data'] is List) {
+        final list = (res['data'] as List)
             .map((j) => Conversation.fromJson(j as Map<String, dynamic>))
             .toList()
           ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
@@ -321,30 +347,29 @@ class ChatService {
 
   // ─── Charger l'historique des messages ───────────────────────────
   // GET /api/conversations/:userId → { success, data: [...], pagination }
+  // Toujours rechargé depuis le serveur : le cache local ne contient que les
+  // messages reçus/envoyés pendant la session. En cas d'échec, on renvoie
+  // le cache.
   Future<List<MessageModel>> loadMessages(String otherUserId) async {
-    final cached = messagesNotifier.value[otherUserId];
-    if (cached != null && cached.isNotEmpty) return cached;
-
     try {
-      final token = await ApiService.instance.getToken();
-      final res = await http.get(
-        Uri.parse('${ApiService.baseUrl}/conversations/$otherUserId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final list = ((body['data'] ?? body) as List)
+      final res = await ApiService.instance.get('/conversations/$otherUserId', auth: true);
+      if (res['success'] == true && res['data'] is List) {
+        final list = (res['data'] as List)
             .map((j) => _msgFromPayload(j as Map<String, dynamic>))
             .toList();
+        // Conserver les messages locaux pas encore confirmés par le serveur
+        final pending = (messagesNotifier.value[otherUserId] ?? [])
+            .where((m) => m.id.startsWith('temp_'));
+        final merged = [...list, ...pending];
         final current = Map<String, List<MessageModel>>.from(messagesNotifier.value);
-        current[otherUserId] = list;
+        current[otherUserId] = merged;
         messagesNotifier.value = current;
-        return list;
+        return merged;
       }
     } catch (e) {
       debugPrint('❌ loadMessages: $e');
     }
-    return [];
+    return messagesNotifier.value[otherUserId] ?? [];
   }
 
   // ─── Envoi avec optimistic UI + fallback HTTP ─────────────────────
@@ -402,19 +427,14 @@ class ChatService {
     required String tempId,
   }) async {
     try {
-      final token = await ApiService.instance.getToken();
-      final res = await http.post(
-        Uri.parse('${ApiService.baseUrl}/messages'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'receiverId': receiverId, 'text': text}),
+      final res = await ApiService.instance.post(
+        '/messages',
+        {'receiverId': receiverId, 'text': text},
+        auth: true,
       );
 
-      if (res.statusCode == 201) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final confirmed = _msgFromPayload(body['data'] as Map<String, dynamic>);
+      if (res['success'] == true && res['data'] is Map) {
+        final confirmed = _msgFromPayload(Map<String, dynamic>.from(res['data']));
         _replaceInCache(receiverId, tempId, confirmed);
         return confirmed;
       }
@@ -452,7 +472,7 @@ class ChatService {
     );
 
     try {
-      final token = await ApiService.instance.getToken();
+      final token = await ApiService.instance.getValidToken();
       final request = http.MultipartRequest(
         'POST', Uri.parse('${ApiService.baseUrl}/messages/audio'),
       )
@@ -493,10 +513,8 @@ class ChatService {
   }
 
   // ─── Envoi d'une pièce jointe image ────────────────────────────────
-  // [dataUri] vient de WebFilePicker (déjà utilisé ailleurs dans l'app,
-  // ex. add_listing_screen.dart) — fonctionne identiquement sur web et
-  // mobile, donc pas besoin de distinguer kIsWeb ici contrairement aux
-  // messages vocaux.
+  // [dataUri] vient de WebFilePicker : data URI sur le web, chemin de fichier
+  // local sur mobile (WebFilePicker.readBytes gère les deux cas).
   Future<MessageModel?> sendImageMessage({
     required String receiverId,
     required String dataUri,
@@ -516,13 +534,11 @@ class ChatService {
     );
 
     try {
-      final parts = dataUri.split(',');
-      if (parts.length != 2) throw Exception('data URI invalide');
-      final bytes = base64Decode(parts[1]);
-      final mimeMatch = RegExp(r'data:image/([a-zA-Z0-9.+-]+);').firstMatch(parts[0]);
-      final subtype = mimeMatch?.group(1) ?? 'jpeg';
+      final bytes = await WebFilePicker.readBytes(dataUri);
+      if (bytes == null) throw Exception('image illisible');
+      final subtype = WebFilePicker.imageSubtype(dataUri);
 
-      final token = await ApiService.instance.getToken();
+      final token = await ApiService.instance.getValidToken();
       final request = http.MultipartRequest(
         'POST', Uri.parse('${ApiService.baseUrl}/messages/image'),
       )
@@ -560,29 +576,45 @@ class ChatService {
   }
 
   // ─── Convertir le payload backend → MessageModel ─────────────────
-  // Backend envoie : { id, senderId, receiverId, type, text, audioUrl,
-  // audioDuration, imageUrl, isRead, timestamp }
-  // MessageModel attend : content, sentAt
-  MessageModel _msgFromPayload(Map<String, dynamic> p) => MessageModel(
-    id:         p['id']         as String? ?? '',
-    senderId:   p['senderId']   as String? ?? '',
-    receiverId: p['receiverId'] as String? ?? '',
-    content:    p['text']       as String? ?? p['content'] as String? ?? '',
-    sentAt:     p['timestamp'] != null
-        ? DateTime.tryParse(p['timestamp'].toString()) ?? DateTime.now()
-        : p['sentAt'] != null
-            ? DateTime.tryParse(p['sentAt'].toString()) ?? DateTime.now()
-            : DateTime.now(),
-    status: MessageStatus.sent,
-    type: p['type'] == 'audio'
-        ? MessageType.audio
-        : p['type'] == 'image'
-            ? MessageType.image
-            : MessageType.text,
-    audioUrl: p['audioUrl'] as String?,
-    audioDuration: p['audioDuration'] as int?,
-    imageUrl: p['imageUrl'] as String?,
-  );
+  // Socket : { id, senderId, receiverId, type, text, audioUrl, audioDuration,
+  // imageUrl, isRead, timestamp }. Routes HTTP : message Prisma brut, avec
+  // createdAt au lieu de timestamp.
+  MessageModel _msgFromPayload(Map<String, dynamic> p) {
+    final rawDate = p['timestamp'] ?? p['createdAt'] ?? p['sentAt'];
+    return MessageModel(
+      id:         p['id']         as String? ?? '',
+      senderId:   p['senderId']   as String? ?? '',
+      receiverId: p['receiverId'] as String? ?? '',
+      content:    p['text']       as String? ?? p['content'] as String? ?? '',
+      sentAt:     rawDate != null
+          ? DateTime.tryParse(rawDate.toString())?.toLocal() ?? DateTime.now()
+          : DateTime.now(),
+      status: (p['isRead'] == true) ? MessageStatus.read : MessageStatus.sent,
+      type: p['type'] == 'audio'
+          ? MessageType.audio
+          : p['type'] == 'image'
+              ? MessageType.image
+              : MessageType.text,
+      isRead: p['isRead'] as bool? ?? false,
+      audioUrl: p['audioUrl'] as String?,
+      audioDuration: (p['audioDuration'] as num?)?.toInt(),
+      imageUrl: p['imageUrl'] as String?,
+    );
+  }
+
+  // ─── Accusé de lecture : mes messages envoyés à [readBy] sont lus ──
+  void _markOutgoingAsRead(String readBy) {
+    final list = messagesNotifier.value[readBy];
+    if (list == null || list.isEmpty) return;
+    final current = Map<String, List<MessageModel>>.from(messagesNotifier.value);
+    current[readBy] = list
+        .map((m) => m.senderId == _currentUserId && m.status != MessageStatus.read
+                && m.status != MessageStatus.sending && m.status != MessageStatus.failed
+            ? m.copyWith(status: MessageStatus.read)
+            : m)
+        .toList();
+    messagesNotifier.value = current;
+  }
 
   // ─── Mettre à jour le statut en ligne ────────────────────────────
   void _updateOnlineStatus(String userId, bool isOnline) {
@@ -603,7 +635,11 @@ class ChatService {
   }) {
     final list = List<Conversation>.from(conversationsNotifier.value);
     final idx  = list.indexWhere((c) => c.otherUserId == otherUserId);
-    if (idx == -1) return;
+    if (idx == -1) {
+      // Nouveau correspondant : la liste serveur contient déjà ce message
+      loadConversations();
+      return;
+    }
     final updated = list[idx].copyWith(
       lastMessage:   lastMessage,
       lastMessageAt: lastMessageAt,
@@ -658,6 +694,11 @@ class ChatService {
     _socket?.dispose();
     _socket = null;
     _isConnected = false;
+    _currentUserId = null;
+    // Ne pas laisser les conversations du compte précédent au suivant
+    conversationsNotifier.value = [];
+    messagesNotifier.value = {};
+    incomingCallNotifier.value = null;
   }
 
   void dispose() {

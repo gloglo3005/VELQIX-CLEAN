@@ -406,7 +406,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     if (_history.length > 20) _history.removeAt(0); // garder les 20 derniers
 
     try {
-      final token = await ApiService.instance.getToken();
+      final token = await ApiService.instance.getValidToken();
       final response = await http.post(
         Uri.parse('${ApiService.baseUrl}/ai/chat'),
         headers: {

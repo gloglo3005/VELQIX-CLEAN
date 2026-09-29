@@ -3,8 +3,7 @@ import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de biens factices
-import '../services/auth_service.dart';
+import '../services/property_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'property_detail_screen.dart';
@@ -30,6 +29,14 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
     _tabController = TabController(length: 3, vsync: this);
     // ✅ Écoute les approbations admin en temps réel
     publishedPropertiesNotifier.addListener(_onPublished);
+    _loadProperties();
+  }
+
+  List<PropertyModel> _serverProps = [];
+
+  Future<void> _loadProperties() async {
+    final list = await PropertyService.instance.getProperties();
+    if (mounted) setState(() => _serverProps = list);
   }
 
   @override
@@ -39,14 +46,12 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  void _onPublished() {
-    if (mounted) setState(() {});
-  }
+  void _onPublished() => _loadProperties();
 
   List<PropertyModel> get _filtered {
     // ⚠️ Avant : combinait des biens factices (MockDataService) avec les
     // vrais biens approuvés, en permanence, pour tous les utilisateurs.
-    final all = publishedPropertiesNotifier.value.cast<PropertyModel>();
+    final all = _serverProps;
     var list = all.where((p) {
       final matchSearch = _search.isEmpty ||
           p.titre.toLowerCase().contains(_search.toLowerCase()) ||
@@ -54,8 +59,10 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
           p.categorieLabel.toLowerCase().contains(_search.toLowerCase());
       final matchAvailable = !_onlyAvailable || p.isAvailable;
       final matchPrice = p.prix >= _priceRange.start && p.prix <= _priceRange.end;
+      final pays = p.adresse.pays.toLowerCase();
       final matchCountry = _filterCountryCode == null ||
-          p.adresse.pays.toLowerCase() == (_filterCountryName ?? '').toLowerCase();
+          pays == _filterCountryCode!.toLowerCase() ||
+          pays == (_filterCountryName ?? '').toLowerCase();
       bool matchTab = true;
       if (_tabController.index == 1) matchTab = p.type == PropertyType.immobilier;
       if (_tabController.index == 2) matchTab = p.type == PropertyType.mobilier;

@@ -13,69 +13,8 @@ class PropertyService {
 
   final _api = ApiService.instance;
 
-  // ─── Convertir JSON backend → PropertyModel Flutter ──────────────
-  PropertyModel _fromJson(Map<String, dynamic> json) {
-    final prop = json['proprietaire'] as Map<String, dynamic>?;
-
-    return PropertyModel(
-      id: json['id'] ?? '',
-      titre: json['titre'] ?? '',
-      description: json['description'] ?? '',
-      prix: (json['prix'] ?? 0).toDouble(),
-      prixParJour: json['prixParJour'],
-      // Enums : convertir string → enum
-      type: _parsePropertyType(json['type']),
-      listingType: _parseListingType(json['listingType']),
-      categorie: _parseCategorie(json['categorie']),
-      // Images : le backend stocke une seule imageUrl, Flutter attend une liste
-      images: json['images'] != null
-          ? List<String>.from(json['images'])
-          : (json['imageUrl'] != null ? [json['imageUrl'] as String] : []),
-      adresse: AddressModel(
-        rue: json['adresse'] ?? '',
-        ville: json['ville'] ?? '',
-        pays: json['pays'] ?? 'TG',
-      ),
-      proprietaire: prop != null
-          ? UserModel(
-              id: prop['id'] ?? '',
-              nom: prop['nom'] ?? '',
-              prenom: prop['prenom'] ?? '',
-              email: prop['email'] ?? '',
-              telephone: prop['telephone'] ?? '',
-              avatarUrl: prop['avatarUrl'],
-              isVerified: prop['isVerified'] ?? false,
-              isPremium: prop['isPremium'] ?? false,
-              rating: (prop['rating'] ?? 0.0).toDouble(),
-              totalAvis: prop['totalAvis'] ?? 0,
-              createdAt: prop['createdAt'] != null
-                  ? DateTime.tryParse(prop['createdAt']) ?? DateTime.now()
-                  : DateTime.now(),
-              role: prop['role'] ?? 'client',
-            )
-          : UserModel(
-              id: json['proprietaireId'] ?? '',
-              nom: '', prenom: '', email: '',
-              telephone: '', rating: 0, totalAvis: 0,
-              createdAt: DateTime.now(),
-            ),
-      caracteristiques: json['caracteristiques'] != null
-          ? List<String>.from(json['caracteristiques'])
-          : [],
-      rating: (json['rating'] ?? 0.0).toDouble(),
-      totalAvis: json['totalAvis'] ?? 0,
-      isAvailable: json['isAvailable'] ?? true,
-      isFeatured: json['isFeatured'] ?? false,
-      status: json['status'] ?? 'en_attente',
-      vues: json['vues'] ?? 0,
-      surface: json['surface']?.toString(),
-      nombrePieces: json['nombrePieces'],
-      annee: json['annee'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
-          : DateTime.now(),
-    );
-  }
+  // Un seul parseur pour toute l'app : PropertyModel.fromJson
+  PropertyModel _fromJson(Map<String, dynamic> json) => PropertyModel.fromJson(json);
 
   // ─── GET — Liste des biens ────────────────────────────────────────
   Future<List<PropertyModel>> getProperties({
@@ -143,7 +82,7 @@ class PropertyService {
     String categorie = 'appartement',
     String? adresse,
     String? ville,
-    String pays = 'TG',
+    String pays = 'Togo',
     String? prixParJour,
     double? surface,
     int? nombrePieces,
@@ -192,12 +131,14 @@ class PropertyService {
   }
 
   // ─── Favoris ─────────────────────────────────────────────────────
-  Future<void> addFavorite(String propertyId) async {
-    await _api.post('/properties/$propertyId/favorite', {}, auth: true);
+  Future<bool> addFavorite(String propertyId) async {
+    final res = await _api.post('/properties/$propertyId/favorite', {}, auth: true);
+    return res['success'] == true;
   }
 
-  Future<void> removeFavorite(String propertyId) async {
-    await _api.delete('/properties/$propertyId/favorite', auth: true);
+  Future<bool> removeFavorite(String propertyId) async {
+    final res = await _api.delete('/properties/$propertyId/favorite', auth: true);
+    return res['success'] == true;
   }
 
   Future<List<PropertyModel>> getFavorites() async {
@@ -221,12 +162,22 @@ class PropertyService {
     return UserModel.fromJson(res['data'] as Map<String, dynamic>);
   }
 
-  Future<void> followUser(String userId) async {
-    await _api.post('/users/$userId/follow', {}, auth: true);
+  /// Annonces approuvées d'un utilisateur (GET /api/users/:id/properties)
+  Future<List<PropertyModel>> getUserProperties(String userId) async {
+    final res = await _api.get('/users/$userId/properties');
+    if (res['success'] != true) return [];
+    final list = res['data'] as List<dynamic>;
+    return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();
   }
 
-  Future<void> unfollowUser(String userId) async {
-    await _api.delete('/users/$userId/follow', auth: true);
+  Future<bool> followUser(String userId) async {
+    final res = await _api.post('/users/$userId/follow', {}, auth: true);
+    return res['success'] == true;
+  }
+
+  Future<bool> unfollowUser(String userId) async {
+    final res = await _api.delete('/users/$userId/follow', auth: true);
+    return res['success'] == true;
   }
 
   // ─── Avis ────────────────────────────────────────────────────────
@@ -291,36 +242,5 @@ class PropertyService {
       return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
     }
     return (url: res['data']['url'] as String?, error: null);
-  }
-
-  // ─── Parseurs d'enum ─────────────────────────────────────────────
-  PropertyType _parsePropertyType(dynamic value) {
-    switch (value?.toString()) {
-      case 'mobilier': return PropertyType.mobilier;
-      default: return PropertyType.immobilier;
-    }
-  }
-
-  ListingType _parseListingType(dynamic value) {
-    switch (value?.toString()) {
-      case 'location': return ListingType.location;
-      case 'les_deux': return ListingType.les_deux;
-      default: return ListingType.vente;
-    }
-  }
-
-  PropertyCategory _parseCategorie(dynamic value) {
-    switch (value?.toString()) {
-      case 'maison': return PropertyCategory.maison;
-      case 'terrain': return PropertyCategory.terrain;
-      case 'bureau': return PropertyCategory.bureau;
-      case 'entrepot': return PropertyCategory.entrepot;
-      case 'voiture': return PropertyCategory.voiture;
-      case 'moto': return PropertyCategory.moto;
-      case 'camion': return PropertyCategory.camion;
-      case 'equipement': return PropertyCategory.equipement;
-      case 'appartement': return PropertyCategory.appartement;
-      default: return PropertyCategory.autre;
-    }
   }
 }

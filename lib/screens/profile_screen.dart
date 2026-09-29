@@ -1,14 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/auth_service.dart';
 import '../services/property_service.dart'; // upload de la photo de profil (Cloudinary)
 import '../services/web_file_picker.dart';   // sélection de la photo, compatible Web/Mobile
 import '../widgets/smart_image.dart';        // aperçu local avant upload (data:/blob:)
-// import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
-// import 'wallet_screen.dart';               // 🚫 DÉSACTIVÉ (25/08/2026)
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../widgets/widgets.dart';
@@ -16,8 +12,6 @@ import 'legal_screen.dart';
 import 'auth_screens.dart';
 import 'my_listings_screen.dart';
 import 'favorites_screen.dart';
-// import 'transactions_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
-// import 'kyc_screen.dart';          // 🚫 DÉSACTIVÉ (25/08/2026)
 import 'premium_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'notifications_screen.dart';
@@ -35,10 +29,21 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
 
+  int _myListingsCount = 0;
+
   @override
   void initState() {
     super.initState();
     userStateNotifier.addListener(_onUserChanged);
+    _loadMyListingsCount();
+  }
+
+  Future<void> _loadMyListingsCount() async {
+    if (!AuthService.instance.isLoggedIn) return;
+    final list = await PropertyService.instance.getMyProperties();
+    if (mounted) {
+      setState(() => _myListingsCount = list.where((p) => p.status == 'approuve').length);
+    }
   }
 
   @override
@@ -364,7 +369,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = user.fullName.trim().isNotEmpty
         ? user.fullName
         : AuthService.instance.loggedUsername;
-    // final transactions = MockDataService.myTransactions; // 🚫 DÉSACTIVÉ (25/08/2026) : section "Mes transactions" retirée ci-dessous
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -419,8 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(displayName, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
-                              // ✅ Badge bleu dès que isPremium
-                              if (user.isPremium) ...[
+                              if (user.isVerified) ...[
                                 const SizedBox(width: 6),
                                 const Icon(Icons.verified_rounded, size: 18, color: Colors.lightBlueAccent),
                               ],
@@ -465,7 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _StatPill(label: 'Annonces', value: '${publishedProperties.cast<PropertyModel>().where((p) => p.proprietaire.id == user.id).length}'),
+                              _StatPill(label: 'Annonces', value: '$_myListingsCount'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
                               _StatPill(label: 'Note', value: '${user.rating} ⭐'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
@@ -473,32 +476,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // ── Solde portefeuille ── 🚫 DÉSACTIVÉ (25/08/2026) : wallet plus utilisé
-                          // FutureBuilder<double>(
-                          //   future: WalletService.instance.getBalance(),
-                          //   builder: (_, snap) {
-                          //     final balance = snap.data ?? 0.0;
-                          //     return GestureDetector(
-                          //       onTap: () => _navigateTo(const WalletScreen()),
-                          //       child: Container(
-                          //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          //         decoration: BoxDecoration(
-                          //           color: Colors.white.withOpacity(0.12),
-                          //           borderRadius: BorderRadius.circular(20),
-                          //           border: Border.all(color: Colors.white.withOpacity(0.2)),
-                          //         ),
-                          //         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          //           const Icon(Icons.account_balance_wallet_rounded, size: 16, color: Colors.white70),
-                          //           const SizedBox(width: 6),
-                          //           Text('Solde : ${balance.toStringAsFixed(0)} FCFA',
-                          //               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-                          //           const SizedBox(width: 6),
-                          //           const Icon(Icons.add_circle_outline_rounded, size: 14, color: Colors.white70),
-                          //         ]),
-                          //       ),
-                          //     );
-                          //   },
-                          // ),
                         ],
                       ),
                     ),
@@ -507,18 +484,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: 16),
 
-                // Mes transactions 🚫 DÉSACTIVÉ (25/08/2026) : plus de transaction directe, section retirée
-                // Padding(
-                //   padding: const EdgeInsets.symmetric(horizontal: 20),
-                //   child: Column(
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       SectionHeader(title: tr('profile_transactions'), actionLabel: 'Tout voir', onAction: () {}),
-                //       const SizedBox(height: 12),
-                //       ...transactions.map((t) => _TransactionCard(t: t)),
-                //     ],
-                //   ),
-                // ),
 
                 const SizedBox(height: 20),
 
@@ -532,43 +497,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 12),
                       _MenuGroup(items: [
                         _MenuItem(icon: Icons.person_outline_rounded, label: tr('profile_edit'), onTap: () => _showEditProfileModal(user)),
-                        // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause
-                        // _MenuItem(
-                        //   icon: Icons.verified_user_outlined,
-                        //   label: tr('profile_kyc'),
-                        //   // ✅ Badge "Premium requis" si pas premium, "Requis" si pas encore vérifié
-                        //   badge: !user.isPremium ? 'Premium requis' : (!user.isVerified ? 'Requis' : null),
-                        //   badgeColor: !user.isPremium ? AppTheme.accent : AppTheme.warning,
-                        //   onTap: () {
-                        //     if (!user.isPremium) {
-                        //       // ✅ Pas premium → va sur Premium, rafraîchit au retour
-                        //       _navigateTo(const PremiumScreen());
-                        //       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        //         content: Text(tr('prof_upgrade_kyc'),
-                        //             style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
-                        //         backgroundColor: AppTheme.accent,
-                        //         behavior: SnackBarBehavior.floating,
-                        //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        //         duration: const Duration(seconds: 3),
-                        //       ));
-                        //     } else {
-                        //       // ✅ Est premium → accès KYC, rafraîchit au retour
-                        //       _navigateTo(const KycScreen());
-                        //     }
-                        //   },
-                        // ),
                         _MenuItem(icon: Icons.home_outlined, label: tr('profile_listings'), onTap: () => _navigateTo(const MyListingsScreen())),
                         _MenuItem(icon: Icons.favorite_outline_rounded, label: tr('profile_favorites'), onTap: () => _navigateTo(const FavoritesScreen())),
                         _MenuItem(icon: Icons.notifications_outlined, label: tr('profile_notifs'), onTap: () => _navigateTo(const NotificationsScreen())),
                       ]),
                       const SizedBox(height: 16),
-                      // 🚫 DÉSACTIVÉ (25/08/2026) : transactions directes + wallet plus utilisés
-                      // Text(tr('profile_payment'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
-                      // const SizedBox(height: 12),
-                      // _MenuGroup(items: [
-                      //   _MenuItem(icon: Icons.receipt_long_outlined, label: tr('profile_transactions'), onTap: () => _navigateTo(const TransactionsScreen())),
-                      //   _MenuItem(icon: Icons.account_balance_wallet_rounded, label: 'Mon portefeuille', onTap: () => _navigateTo(const WalletScreen())),
-                      // ]),
                       const SizedBox(height: 16),
                       Text(tr('profile_support'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
                       const SizedBox(height: 12),
@@ -762,57 +695,6 @@ class _StatPill extends StatelessWidget {
   ]);
 }
 
-class _TransactionCard extends StatelessWidget {
-  final dynamic t;
-  const _TransactionCard({required this.t});
-
-  Color get _statusColor {
-    switch (t.statut) {
-      case 'confirme': return AppTheme.success;
-      case 'en_attente': return AppTheme.warning;
-      case 'annule': return AppTheme.error;
-      default: return AppTheme.textSecondary;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-      child: Row(children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(t.property.firstImage, width: 52, height: 52, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(width: 52, height: 52, color: AppTheme.divider)),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.property.titre, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text('${t.type == 'location' ? 'Location' : 'Achat'} · ${t.methode.replaceAll('_', ' ')}', style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(formatFcfa(t.montant), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: _statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-              child: Text(t.statutLabel, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: _statusColor)),
-            ),
-          ],
-        ),
-      ]),
-    );
-  }
-}
-
 class _MenuGroup extends StatelessWidget {
   final List<_MenuItem> items;
   const _MenuGroup({required this.items});
@@ -958,10 +840,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   /// que add_listing_screen.dart pour les photos de biens).
   Future<String?> _uploadAvatarDataUri(String dataUri) async {
     try {
-      final parts = dataUri.split(',');
-      if (parts.length != 2) return null; // pas une data URI valide (ex: blob:)
-      final bytes = base64Decode(parts[1]);
-      final result = await PropertyService.instance.uploadImageBytes(bytes, 'avatar.jpg');
+      // data URI sur le web, chemin de fichier local sur mobile
+      final bytes = await WebFilePicker.readBytes(dataUri);
+      if (bytes == null) return null;
+      final ext = WebFilePicker.imageSubtype(dataUri);
+      final result = await PropertyService.instance
+          .uploadImageBytes(bytes, 'avatar.${ext == 'jpeg' ? 'jpg' : ext}');
       return result.url;
     } catch (e) {
       debugPrint('Erreur upload photo de profil : $e');
@@ -1202,8 +1086,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   _PwdField(ctrl: _newPwdCtrl, label: 'Nouveau mot de passe',
                       show: _showNewPwd,
                       onToggle: () => setState(() => _showNewPwd = !_showNewPwd),
-                      validator: (v) => (v == null || v.length < 6)
-                          ? 'Minimum 6 caractères' : null),
+                      validator: (v) => (v == null || v.length < 8)
+                          ? 'Minimum 8 caractères' : null),
                   const SizedBox(height: 12),
                   _PwdField(ctrl: _confirmPwdCtrl, label: 'Confirmer le mot de passe',
                       show: _showConfirmPwd,

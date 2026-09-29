@@ -47,13 +47,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       _favorites.removeWhere((f) => f.id == p.id);
       globalFavorites.remove(p.id);
     });
-    try {
-      await PropertyService.instance.removeFavorite(p.id);
-    } catch (_) {
-      // Échec réseau : on ne recharge pas depuis le serveur pour rester simple,
-      // l'utilisateur peut tirer pour rafraîchir si besoin.
-    }
+    final ok = await PropertyService.instance.removeFavorite(p.id);
     if (!mounted) return;
+    if (!ok) {
+      setState(() {
+        if (!_favorites.any((f) => f.id == p.id)) _favorites.add(p);
+        globalFavorites.add(p.id);
+      });
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(tr('fav_removed'),
           style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
@@ -68,7 +70,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             _favorites.add(p);
             globalFavorites.add(p.id);
           });
-          try { await PropertyService.instance.addFavorite(p.id); } catch (_) {}
+          final ok = await PropertyService.instance.addFavorite(p.id);
+          if (!ok && mounted) {
+            setState(() {
+              _favorites.removeWhere((f) => f.id == p.id);
+              globalFavorites.remove(p.id);
+            });
+          }
         },
       ),
     ));

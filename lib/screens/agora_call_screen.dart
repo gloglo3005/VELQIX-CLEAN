@@ -66,8 +66,9 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     await [Permission.microphone].request();
 
     // 2. Créer le moteur Agora
+    final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
     _engine = createAgoraRtcEngine();
-    await _engine.initialize(RtcEngineContext(appId: _agoraAppId));
+    await _engine.initialize(RtcEngineContext(appId: creds.appId));
 
     // 3. Audio seulement (pas de vidéo)
     await _engine.setChannelProfile(
@@ -98,9 +99,9 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
       },
     ));
 
-    // 5. Rejoindre le canal (token null = mode test sans token)
+    // 5. Rejoindre le canal (token vide = projet Agora sans certificat)
     await _engine.joinChannel(
-      token: '',
+      token: creds.token,
       channelId: widget.channelName,
       uid: 0,
       options: const ChannelMediaOptions(

@@ -218,7 +218,8 @@ class PropertyModel {
     switch ((json['listingType'] ?? '').toString().toLowerCase()) {
       case 'vente':    listingType = ListingType.vente; break;
       case 'les_deux': listingType = ListingType.les_deux; break;
-      default:         listingType = ListingType.location;
+      case 'location': listingType = ListingType.location; break;
+      default:         listingType = ListingType.vente; // défaut Prisma
     }
 
     PropertyCategory categorie;
@@ -276,7 +277,7 @@ class PropertyModel {
       listingType:     listingType,
       categorie:       categorie,
       prix:            (json['prix'] ?? 0).toDouble(),
-      prixParJour:     json['prixParJour'],
+      prixParJour:     json['prixParJour']?.toString(),
       images:          (json['images'] as List?)?.cast<String>() ?? [],
       adresse:         adresse,
       proprietaire:    proprietaire,
@@ -289,9 +290,10 @@ class PropertyModel {
                            ? DateTime.parse(json['createdAt'])
                            : DateTime.now(),
       vues:            json['vues'] ?? 0,
-      surface:         json['surface'],
-      nombrePieces:    json['nombrePieces'],
-      annee:           json['annee'],
+      // surface est un Float côté Prisma (nombre en JSON)
+      surface:         _formatSurface(json['surface']),
+      nombrePieces:    (json['nombrePieces'] as num?)?.toInt(),
+      annee:           (json['annee'] as num?)?.toInt(),
       status:          json['status'] ?? 'approuve',
       // ⚠️ Corrigé : ces 3 champs existaient dans le modèle et étaient
       // utilisés par getLocalizedTitre/getLocalizedDescription/
@@ -312,6 +314,12 @@ class PropertyModel {
           ? DateTime.tryParse(json['updatedAt'])
           : null,
     );
+  }
+
+  static String? _formatSurface(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is num) return raw % 1 == 0 ? raw.toInt().toString() : raw.toString();
+    return raw.toString();
   }
 
   /// Returns localized title (falls back to French)
@@ -344,44 +352,6 @@ class AddressModel {
 
   String get full => '$rue, $ville, $pays';
   String get short => '$ville, $pays';
-}
-
-class TransactionModel {
-  final String id;
-  final PropertyModel property;
-  final UserModel client;
-  final String type; // 'achat', 'location'
-  final double montant;
-  final String statut; // 'en_attente', 'confirme', 'annule', 'termine'
-  final DateTime dateDebut;
-  final DateTime? dateFin;
-  final String methode; // 'mobile_money', 'carte', 'paypal'
-  final String? paymentRef;
-  final DateTime createdAt;
-
-  TransactionModel({
-    required this.id,
-    required this.property,
-    required this.client,
-    required this.type,
-    required this.montant,
-    required this.statut,
-    required this.dateDebut,
-    this.dateFin,
-    required this.methode,
-    this.paymentRef,
-    required this.createdAt,
-  });
-
-  String get statutLabel {
-    const labels = {
-      'en_attente': 'En attente',
-      'confirme': 'Confirmé',
-      'annule': 'Annulé',
-      'termine': 'Terminé',
-    };
-    return labels[statut] ?? statut;
-  }
 }
 
 enum MessageStatus { sending, sent, delivered, read, failed }
@@ -454,11 +424,9 @@ class MessageModel {
     senderId:   json['senderId'] ?? '',
     receiverId: json['receiverId'] ?? '',
     content:    json['text'] ?? json['content'] ?? '',
-    sentAt:     json['timestamp'] != null
-        ? DateTime.tryParse(json['timestamp']) ?? DateTime.now()
-        : json['sentAt'] != null
-            ? DateTime.tryParse(json['sentAt']) ?? DateTime.now()
-            : DateTime.now(),
+    sentAt:     DateTime.tryParse(
+          (json['timestamp'] ?? json['createdAt'] ?? json['sentAt'] ?? '').toString(),
+        )?.toLocal() ?? DateTime.now(),
     isRead:     json['isRead'] ?? false,
     propertyId: json['propertyId'],
     type:       json['type'] == 'audio'

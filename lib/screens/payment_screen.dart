@@ -1,101 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
-import '../services/app_translations.dart';
-import '../services/transaction_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════
-// PAYMENT SCREEN — Intégration FedaPay (sandbox)
+// PAYMENT SCREEN — Abonnement Premium via FedaPay
 // ═══════════════════════════════════════════════════════════════════
+
+/// Prix affiché à titre indicatif : le montant réellement facturé est
+/// décidé par le backend (PREMIUM_PRICE_FCFA, 2000 par défaut).
+const double kPremiumPriceFcfa = 2000;
+const int kPremiumDurationDays = 30;
 
 class PaymentScreen extends StatefulWidget {
-  final PropertyModel? property; // null pour le type 'premium' (pas de bien associé)
-  final String type; // 'location' | 'achat' | 'premium'
-  final double? montantOverride; // affichage indicatif seulement pour le premium —
-  // le montant réellement facturé est toujours décidé par le backend (voir _startFedaPay)
-  final String? descriptionOverride;
-
-  const PaymentScreen({
-    super.key,
-    this.property,
-    required this.type,
-    this.montantOverride,
-    this.descriptionOverride,
-  });
+  final String type; // 'premium' uniquement
+  const PaymentScreen({super.key, this.type = 'premium'});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
 class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserver {
-  // ── Formulaire ─────────────────────────────────────────────────────────────
-  DateTime _dateDebut = DateTime.now().add(const Duration(days: 1));
-  DateTime? _dateFin;
-  final _phoneCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-
-  // ── État ───────────────────────────────────────────────────────────────────
   bool _processing = false;
   String? _errorMsg;
 
-  // ── Confirmation Premium (post-redirection FedaPay) ─────────────────────────
   // Le statut Premium ne vient JAMAIS d'une valeur locale : on interroge
   // toujours le backend (via AuthService.refreshUser → GET /auth/me), qui ne
   // reflète isPremium que si le webhook FedaPay a confirmé le paiement.
   bool _awaitingConfirmation = false;
   bool _checkingStatus = false;
 
-  // ── Calculs ────────────────────────────────────────────────────────────────
-  int get _nbJours => _dateFin != null
-      ? _dateFin!.difference(_dateDebut).inDays.clamp(1, 9999)
-      : 1;
-
-  double get _baseAmount {
-    if (widget.montantOverride != null) return widget.montantOverride!;
-    if (widget.type == 'location') {
-      // Utiliser prixParJour si dispo, sinon prix fixe
-      final rawJour = widget.property!.prixParJour ?? '';
-      final numStr  = rawJour.replaceAll(RegExp(r'[^\d]'), '');
-      final parJour = double.tryParse(numStr) ?? 50000.0;
-      return parJour * _nbJours;
-    }
-    // Premium : pas de bien associé (widget.property est null) et pas de
-    // montantOverride passé par premium_screen.dart — le vrai montant est de
-    // toute façon décidé par le backend au moment du checkout (voir
-    // _startPremiumCheckout). 0 ici évite juste le crash à l'affichage.
-    if (widget.type == 'premium') return 0;
-    return widget.property!.prix;
-  }
-
-  double get _fraisService => _baseAmount * 0.02;
-  double get _total        => _baseAmount + _fraisService;
-
-  // ── Pré-remplir l'email de l'utilisateur connecté ─────────────────────────
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final user = AuthService.instance.currentUserOrEmpty;
-    if (user.email.isNotEmpty) _emailCtrl.text = user.email;
-    if ((user.telephone ?? '').isNotEmpty) _phoneCtrl.text = user.telephone!;
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _phoneCtrl.dispose();
-    _emailCtrl.dispose();
     super.dispose();
   }
 
   // L'utilisateur revient dans l'appli après être passé par le navigateur
-  // pour payer (checkout hébergé FedaPay) → on revérifie son vrai statut
-  // côté serveur, sans jamais le supposer côté client.
+  // pour payer (checkout hébergé FedaPay) → on revérifie son vrai statut.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _awaitingConfirmation) {
@@ -103,71 +54,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     }
   }
 
-  // ── Paiement ───────────────────────────────────────────────────────────────
-  Future<void> _startFedaPay() async {
-    if (widget.type == 'premium') {
-      await _startPremiumCheckout();
-      return;
-    }
-
-    // ⚠️ Flux location/achat : la route /api/transactions correspondante est
-    // désactivée côté backend depuis le 25/08/2026 (voir index.ts — seul
-    // /api/premium reste actif). Ce chemin ne créera donc rien de réel tant
-    // qu'elle n'est pas réactivée côté serveur.
-    final phone = _phoneCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
-
-    if (phone.isEmpty) {
-      setState(() => _errorMsg = 'Veuillez saisir votre numéro de téléphone.');
-      return;
-    }
-    if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorMsg = 'Veuillez saisir un email valide.');
-      return;
-    }
-    if (widget.type == 'location' && _dateFin == null) {
-      setState(() => _errorMsg = 'Veuillez choisir une date de fin de location.');
-      return;
-    }
-    if (widget.type == 'location' && _dateFin != null && !_dateFin!.isAfter(_dateDebut)) {
-      setState(() => _errorMsg = 'La date de fin doit être après la date de début.');
-      return;
-    }
-
-    setState(() { _processing = true; _errorMsg = null; });
-
-    await Future.delayed(const Duration(seconds: 2));
-    final fakePaymentRef = 'fp_${DateTime.now().millisecondsSinceEpoch}';
-
-    if (!mounted) return;
-
-    final result = await TransactionService.instance.createTransaction(
-      propertyId: widget.property!.id,
-      montant: _total,
-      type: widget.type == 'location' ? 'location' : 'achat',
-      moyenPaiement: 'mobile_money',
-      dateDebut: widget.type == 'location' ? _dateDebut : null,
-      dateFin: widget.type == 'location' ? _dateFin : null,
-      paymentRef: fakePaymentRef,
-    );
-
-    if (!mounted) return;
-    setState(() => _processing = false);
-
-    if (result.error != null) {
-      setState(() => _errorMsg = result.error);
-      return;
-    }
-    _showSuccess();
-  }
-
-  // ── Premium : vrai checkout FedaPay ──────────────────────────────────────
-  // Étape 1 — On demande au backend de créer la transaction FedaPay (lui
-  //   seul connaît le prix réel, voir PREMIUM_PRICE_FCFA côté serveur).
-  // Étape 2 — On ouvre l'URL de paiement hébergé dans le navigateur.
-  // Étape 3 — On ne débloque JAMAIS le badge Premium depuis le client : on
-  //   attend que le webhook FedaPay confirme le paiement côté serveur, puis
-  //   on rafraîchit le vrai profil utilisateur (GET /auth/me) pour lire isPremium.
   Future<void> _startPremiumCheckout() async {
     setState(() { _processing = true; _errorMsg = null; });
 
@@ -238,91 +124,44 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    final p     = widget.property;
-    final isPremium = widget.type == 'premium';
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: CustomAppBar(
-        title: isPremium
-            ? 'Passer Premium'
-            : widget.type == 'location'
-                ? tr('pay_reservation')
-                : tr('pay_achat'),
-      ),
+      appBar: const CustomAppBar(title: 'Passer Premium'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _PremiumSummaryCard(),
 
-            // ── Résumé bien / offre ───────────────────────────────────────
-            // p n'est non-null que pour les types location/achat — garanti par
-            // les points d'appel de cet écran.
-            if (!isPremium) _PropertySummaryCard(property: p!),
-            if (isPremium)  _PremiumSummaryCard(),
-
-            // ── Dates (location seulement) ────────────────────────────────
-            if (widget.type == 'location') ...[
-              const SizedBox(height: 20),
-              Text(tr('pay_dates'),
-                  style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: _DatePicker(
-                  label: 'Début', date: _dateDebut,
-                  onPick: (d) => setState(() => _dateDebut = d),
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: _DatePicker(
-                  label: 'Fin', date: _dateFin,
-                  onPick: (d) => setState(() => _dateFin = d),
-                )),
-              ]),
-            ],
-
-            // ── Infos paiement (téléphone + email) ───────────────────────
             const SizedBox(height: 24),
-            _SectionTitle(icon: Icons.phone_rounded, label: 'Infos de paiement'),
+            const _SectionTitle(icon: Icons.payments_rounded, label: 'Paiement'),
             const SizedBox(height: 12),
+            const _FedaPayBadge(),
 
-            // Badge FedaPay
-            _FedaPayBadge(),
-            const SizedBox(height: 16),
-
-            AppTextField(
-              label: tr('pay_phone'),
-              hint: '+228 90 00 00 00',
-              controller: _phoneCtrl,
-              prefixIcon: Icons.phone_rounded,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            AppTextField(
-              label: 'Email',
-              hint: 'vous@exemple.com',
-              controller: _emailCtrl,
-              prefixIcon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-            ),
-
-            // ── Moyens de paiement acceptés ────────────────────────────
             const SizedBox(height: 20),
-            _SectionTitle(icon: Icons.payments_rounded, label: 'Moyens acceptés via FedaPay'),
+            const _SectionTitle(icon: Icons.phone_android_rounded, label: 'Moyens acceptés via FedaPay'),
             const SizedBox(height: 12),
-            _AcceptedMethodsRow(),
+            const _AcceptedMethodsRow(),
 
-            // ── Récapitulatif montant ──────────────────────────────────
             const SizedBox(height: 24),
-            _AmountSummary(
-              type: widget.type,
-              nbJours: _nbJours,
-              baseAmount: _baseAmount,
-              frais: _fraisService,
-              total: _total,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [
+                  AppTheme.primary.withOpacity(0.05),
+                  AppTheme.primaryLight.withOpacity(0.08),
+                ]),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+              ),
+              child: Column(children: [
+                const _Row(label: 'Durée', value: '$kPremiumDurationDays jours'),
+                const Divider(height: 20),
+                _Row(label: 'Total à payer', value: formatFcfa(kPremiumPriceFcfa), bold: true),
+              ]),
             ),
 
-            // ── Erreur ────────────────────────────────────────────────
             if (_errorMsg != null) ...[
               const SizedBox(height: 14),
               Container(
@@ -333,7 +172,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                   border: Border.all(color: AppTheme.error.withOpacity(0.3)),
                 ),
                 child: Row(children: [
-                  Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 18),
+                  const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 18),
                   const SizedBox(width: 10),
                   Expanded(child: Text(_errorMsg!,
                       style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.error))),
@@ -341,7 +180,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
               ),
             ],
 
-            // ── En attente de confirmation (retour du checkout FedaPay) ──
             if (_awaitingConfirmation) ...[
               const SizedBox(height: 14),
               Container(
@@ -382,12 +220,11 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
             const SizedBox(height: 24),
 
-            // ── Bouton paiement ────────────────────────────────────────
             PrimaryButton(
-              label: isPremium ? 'Continuer vers FedaPay' : 'Payer ${formatFcfa(_total)} via FedaPay',
+              label: 'Continuer vers FedaPay',
               icon: Icons.lock_rounded,
               isLoading: _processing,
-              onPressed: _startFedaPay,
+              onPressed: _startPremiumCheckout,
             ),
 
             const SizedBox(height: 12),
@@ -422,27 +259,22 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
             ),
             const SizedBox(height: 20),
             Text(
-              widget.type == 'location'
-                  ? tr('pay_resa_confirmed')
-                  : widget.type == 'premium'
-                      ? '🎉 Bienvenue en Premium !'
-                      : tr('pay_success'),
+              '🎉 Bienvenue en Premium !',
               style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Un reçu vous a été envoyé par email.\nMerci pour votre confiance !',
+              'Votre abonnement est actif.\nMerci pour votre confiance !',
               style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             PrimaryButton(
-              label: tr('pay_back_home'),
+              label: 'Continuer',
               onPressed: () {
                 Navigator.pop(context); // ferme dialog
                 Navigator.pop(context); // ferme PaymentScreen
-                if (widget.type != 'premium') Navigator.pop(context); // ferme detail
               },
             ),
           ]),
@@ -455,44 +287,6 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 // ═══════════════════════════════════════════════════════════════════
 // WIDGETS LOCAUX
 // ═══════════════════════════════════════════════════════════════════
-
-class _PropertySummaryCard extends StatelessWidget {
-  final PropertyModel property;
-  const _PropertySummaryCard({required this.property});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = property;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Row(children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(p.firstImage, width: 70, height: 70, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(width: 70, height: 70, color: AppTheme.divider,
-                  child: const Icon(Icons.home_rounded, color: AppTheme.textHint))),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(p.titre,
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 3),
-          Text(p.adresse.short,
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-          const SizedBox(height: 3),
-          Text(formatFcfa(p.prix),
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-        ])),
-      ]),
-    );
-  }
-}
 
 class _PremiumSummaryCard extends StatelessWidget {
   const _PremiumSummaryCard();
@@ -592,44 +386,6 @@ class _AcceptedMethodsRow extends StatelessWidget {
   }
 }
 
-class _AmountSummary extends StatelessWidget {
-  final String type;
-  final int nbJours;
-  final double baseAmount;
-  final double frais;
-  final double total;
-
-  const _AmountSummary({
-    required this.type, required this.nbJours, required this.baseAmount,
-    required this.frais, required this.total,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [
-          AppTheme.primary.withOpacity(0.05),
-          AppTheme.primaryLight.withOpacity(0.08),
-        ]),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-      ),
-      child: Column(children: [
-        if (type == 'location') ...[
-          _Row(label: 'Durée',      value: '$nbJours jour${nbJours > 1 ? 's' : ''}'),
-          _Row(label: 'Prix/jour',  value: formatFcfa(baseAmount / nbJours)),
-        ],
-        _Row(label: 'Sous-total',               value: formatFcfa(baseAmount)),
-        _Row(label: 'Frais de service (2 %)',   value: formatFcfa(frais)),
-        const Divider(height: 20),
-        _Row(label: 'Total à payer', value: formatFcfa(total), bold: true),
-      ]),
-    );
-  }
-}
-
 class _Row extends StatelessWidget {
   final String label, value;
   final bool bold;
@@ -668,56 +424,5 @@ class _SectionTitle extends StatelessWidget {
       const SizedBox(width: 8),
       Text(label, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
     ]);
-  }
-}
-
-// ── Date Picker ────────────────────────────────────────────────────
-class _DatePicker extends StatelessWidget {
-  final String label;
-  final DateTime? date;
-  final Function(DateTime) onPick;
-  const _DatePicker({required this.label, this.date, required this.onPick});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: date ?? DateTime.now().add(const Duration(days: 1)),
-          firstDate: DateTime.now(),
-          lastDate: DateTime.now().add(const Duration(days: 365)),
-          builder: (_, child) => Theme(
-            data: Theme.of(context).copyWith(
-                colorScheme: const ColorScheme.light(primary: AppTheme.primary)),
-            child: child!,
-          ),
-        );
-        if (picked != null) onPick(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              date != null ? '${date!.day}/${date!.month}/${date!.year}' : 'Choisir',
-              style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: date != null ? AppTheme.textPrimary : AppTheme.textHint),
-            ),
-          ]),
-        ]),
-      ),
-    );
   }
 }

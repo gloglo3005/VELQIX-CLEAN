@@ -1,9 +1,5 @@
 import '../services/app_translations.dart';
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../theme/app_theme.dart';
@@ -951,18 +947,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    setState(() => _loading = false);
 
     // Pour les comptes entreprise : générer nom/prénom/username depuis le nom d'entreprise
     final isBusiness = _accountType == 'business';
     final nomFinal    = isBusiness ? _nomEntrepriseCtrl.text.trim() : _nomCtrl.text.trim();
     final prenomFinal = isBusiness ? '' : _prenomCtrl.text.trim();
-    
 
-    // Sauvegarder le compte avec persistance
-    await AuthService.instance.register(
+    final error = await AuthService.instance.register(
       password: _passCtrl.text,
       nom: nomFinal,
       prenom: prenomFinal,
@@ -974,6 +965,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       nomEntreprise: isBusiness ? _nomEntrepriseCtrl.text.trim() : null,
       typeActivite: isBusiness ? _selectedTypeActivite : null,
     );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      return;
+    }
 
     // ✅ Appliquer la langue selon le pays choisi à l'inscription
     localeNotifier.value = countryCodeToLocale(_selectedCountryCode);
@@ -1413,84 +1416,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // Génère un code à 6 chiffres
-  String _generateCode() {
-    final rng = Random.secure();
-    return (100000 + rng.nextInt(900000)).toString();
-  }
-
   Future<void> _sendReset() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    // Vérifier si l'email correspond au compte enregistré
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail    = prefs.getString('auth_email') ?? '';
-    final savedUsername = prefs.getString('auth_username') ?? '';
-    final inputEmail    = _emailCtrl.text.trim().toLowerCase();
-    final emailMatch    = savedEmail.toLowerCase() == inputEmail ||
-        '\$savedUsername@innorent.tg' == inputEmail;
+    final error = await AuthService.instance
+        .requestPasswordReset(_emailCtrl.text.trim().toLowerCase());
 
-    if (!emailMatch) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Aucun compte trouvé avec cet email.',
-            style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
+    if (!mounted) return;
+    if (error == null) {
+      setState(() { _loading = false; _sent = true; });
       return;
     }
-
-    // Générer et sauvegarder le code + expiration
-    final code    = _generateCode();
-    final expires = DateTime.now().add(const Duration(minutes: 10));
-    await prefs.setString('reset_code',    code);
-    await prefs.setString('reset_email',   inputEmail);
-    await prefs.setString('reset_expires', expires.toIso8601String());
-
-    // Envoyer l'email via EmailJS REST API
-    try {
-      final response = await http.post(
-        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'service_id':  'service_bg6qla9',
-          'template_id': 'template_vmbant4',
-          'user_id':     'gzB6UeYFQi7ql05f4',
-          'template_params': {
-            'to_email': inputEmail,
-            'code':     code,
-          },
-        }),
-      );
-
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        setState(() { _loading = false; _sent = true; });
-      } else {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur envoi email. Réessayez.',
-              style: GoogleFonts.poppins(color: Colors.white)),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur réseau. Vérifiez votre connexion.',
-            style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-    }
+    setState(() => _loading = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error, style: GoogleFonts.poppins(color: Colors.white)),
+      backgroundColor: AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
   }
 
   void _goToVerify() {
@@ -1540,7 +1484,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Text('Mot de passe oublié ?', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
           const SizedBox(height: 8),
           Text(
-            'Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.',
+            'Entrez votre adresse email et nous vous enverrons un code pour réinitialiser votre mot de passe.',
             style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.6),
           ),
           const SizedBox(height: 32),
@@ -1574,7 +1518,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       children: [
                         const Icon(Icons.send_rounded, size: 18, color: Colors.white),
                         const SizedBox(width: 8),
-                        Text('Envoyer le lien', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                        Text('Envoyer le code', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
                       ],
                     ),
             ),
@@ -1621,14 +1565,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           text: TextSpan(
             style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary, height: 1.6),
             children: [
-              const TextSpan(text: 'Un lien de réinitialisation a été envoyé à\n'),
+              const TextSpan(text: 'Si un compte existe, un code de réinitialisation a été envoyé à\n'),
               TextSpan(text: _emailCtrl.text.trim(), style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.primary, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
         const SizedBox(height: 12),
         Text(
-          'Vérifiez votre boîte mail (et vos spams si besoin). Le lien expire dans 30 minutes.',
+          'Vérifiez votre boîte mail (et vos spams si besoin). Le code expire dans 10 minutes.',
           style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint, height: 1.5),
           textAlign: TextAlign.center,
         ),
@@ -1685,35 +1629,25 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
       setState(() => _error = 'Entrez les 6 chiffres du code.');
       return;
     }
+    if (_loading) return;
     setState(() { _loading = true; _error = null; });
 
-    final prefs = await SharedPreferences.getInstance();
-    final savedCode    = prefs.getString('reset_code') ?? '';
-    final savedEmail   = prefs.getString('reset_email') ?? '';
-    final expiresStr   = prefs.getString('reset_expires') ?? '';
-    final expires      = DateTime.tryParse(expiresStr);
+    final code = _enteredCode;
+    final error = await AuthService.instance.verifyResetCode(
+      email: widget.email.trim().toLowerCase(),
+      code: code,
+    );
 
     if (!mounted) return;
-
-    if (expires == null || DateTime.now().isAfter(expires)) {
-      setState(() { _loading = false; _error = 'Ce code a expiré. Recommencez.'; });
-      return;
-    }
-
-    if (savedEmail != widget.email.toLowerCase()) {
-      setState(() { _loading = false; _error = 'Email incorrect.'; });
-      return;
-    }
-
-    if (_enteredCode != savedCode) {
-      setState(() { _loading = false; _error = 'Code incorrect. Vérifiez votre email.'; });
+    if (error != null) {
+      setState(() { _loading = false; _error = error; });
       return;
     }
 
     // Code valide → aller à la réinitialisation
     setState(() => _loading = false);
     Navigator.pushReplacement(context,
-      MaterialPageRoute(builder: (_) => ResetPasswordScreen(email: widget.email)));
+      MaterialPageRoute(builder: (_) => ResetPasswordScreen(email: widget.email, code: code)));
   }
 
   void _onDigit(String val, int idx) {
@@ -1853,7 +1787,8 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
 // ─── Reset Password Screen ────────────────────────────────────────────────────
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
-  const ResetPasswordScreen({super.key, required this.email});
+  final String? code;
+  const ResetPasswordScreen({super.key, required this.email, this.code});
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
@@ -1870,6 +1805,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   String? _codeError;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.code != null) _codeCtrl.text = widget.code!;
+  }
+
+  @override
   void dispose() {
     _codeCtrl.dispose();
     _newPwdCtrl.dispose();
@@ -1882,35 +1823,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    final prefs   = await SharedPreferences.getInstance();
-    final saved   = prefs.getString('reset_code')    ?? '';
-    final email   = prefs.getString('reset_email')   ?? '';
-    final expires = prefs.getString('reset_expires') ?? '';
+    final error = await AuthService.instance.resetPassword(
+      email: widget.email.trim().toLowerCase(),
+      code: _codeCtrl.text.trim(),
+      newPassword: _newPwdCtrl.text,
+    );
 
-    // Vérifier expiration
-    final expiresDt = DateTime.tryParse(expires);
-    if (expiresDt == null || DateTime.now().isAfter(expiresDt)) {
-      if (!mounted) return;
-      setState(() { _loading = false; _codeError = 'Ce code a expiré. Recommencez.'; });
-      return;
-    }
-
-    // Vérifier code
-    if (_codeCtrl.text.trim() != saved || email != widget.email.toLowerCase()) {
-      if (!mounted) return;
-      setState(() { _loading = false; _codeError = 'Code incorrect. Vérifiez votre email.'; });
-      return;
-    }
-
-    // Mettre à jour le mot de passe
-    await prefs.setString('auth_password', _newPwdCtrl.text.trim());
-    // Nettoyer le code utilisé
-    await prefs.remove('reset_code');
-    await prefs.remove('reset_email');
-    await prefs.remove('reset_expires');
-
-    await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
+    if (error != null) {
+      setState(() { _loading = false; _codeError = error; });
+      return;
+    }
     setState(() { _loading = false; _done = true; });
   }
 
@@ -2018,7 +1941,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Champ requis';
-              if (v.trim().length < 6) return 'Minimum 6 caractères';
+              if (v.length < 8) return 'Minimum 8 caractères';
               return null;
             },
           ),
@@ -2049,7 +1972,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Champ requis';
-              if (v.trim() != _newPwdCtrl.text.trim()) return 'Les mots de passe ne correspondent pas';
+              if (v != _newPwdCtrl.text) return 'Les mots de passe ne correspondent pas';
               return null;
             },
           ),

@@ -12,7 +12,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'api_service.dart';
-import '../widgets/widgets.dart' show pendingPropertiesNotifier, kycPendingNotifier, KycEntry;
+import '../widgets/widgets.dart' show pendingPropertiesNotifier;
 import '../models/models.dart';
 
 // ── Notification temps réel affichée dans l'UI (classe PUBLIQUE) ─────────────
@@ -95,7 +95,7 @@ class AdminSocketService {
   void _handleNotification(Map<String, dynamic> data) {
     final type    = data['type']    as String? ?? '';
     final title   = data['title']   as String? ?? '';
-    final message = data['message'] as String? ?? '';
+    final message = (data['message'] as String? ?? '').replaceAll(RegExp(r'<[^>]*>'), '');
     final payload = data['data'] != null
         ? Map<String, dynamic>.from(data['data'] as Map)
         : <String, dynamic>{};
@@ -108,19 +108,12 @@ class AdminSocketService {
       case 'NEW_PROPERTY':
         _handleNewProperty(payload);
         break;
-      case 'NEW_KYC':
-        _handleNewKyc(payload);
-        break;
       case 'PROPERTY_APPROVED':
       case 'PROPERTY_REJECTED':
         // Source de vérité serveur : on retire l'annonce de la liste "en attente"
         // même si la réponse HTTP de l'action de CET admin a timeout côté client
         // (ex: cold start Render) — le socket confirme que le serveur a bien traité la demande.
         _removePendingProperty(payload['propertyId'] as String?);
-        break;
-      case 'KYC_APPROVED':
-      case 'KYC_REJECTED':
-        _removePendingKyc(payload['userId'] as String?);
         break;
       default:
         break;
@@ -134,14 +127,21 @@ class AdminSocketService {
         .toList();
   }
 
-  void _removePendingKyc(String? userId) {
-    if (userId == null) return;
-    kycPendingNotifier.value =
-        kycPendingNotifier.value.where((e) => e.userId != userId).toList();
-  }
-
-  void _handleNewProperty(Map<String, dynamic> payload) {
+  Future<void> _handleNewProperty(Map<String, dynamic> payload) async {
     final propertyId   = payload['propertyId']   as String? ?? '';
+    if (propertyId.isEmpty) return;
+
+    final res = await ApiService.instance.get('/properties/$propertyId', auth: true);
+    if (res['success'] == true && res['data'] is Map) {
+      final full = PropertyModel.fromJson(Map<String, dynamic>.from(res['data'] as Map));
+      final exists = pendingPropertiesNotifier.value
+          .any((p) => (p as PropertyModel).id == propertyId);
+      if (!exists) {
+        pendingPropertiesNotifier.value = [full, ...pendingPropertiesNotifier.value];
+      }
+      return;
+    }
+
     final titre        = payload['titre']         as String? ?? 'Nouvelle annonce';
     final proprietaire = payload['proprietaire']  as String? ?? '';
 
@@ -193,30 +193,4 @@ class AdminSocketService {
     ];
   }
 
-  void _handleNewKyc(Map<String, dynamic> payload) {
-    final userId  = payload['userId']    as String? ?? '';
-    final docId   = payload['docId']     as String? ?? payload['kycId'] as String? ?? '';
-    final email   = payload['userEmail'] as String? ?? '';
-    final docType = payload['docType']   as String? ?? 'Document';
-
-    final alreadyIn = kycPendingNotifier.value.any((e) => e.userId == userId);
-    if (alreadyIn) return;
-
-    final nameParts = email.split('@').first.split('.');
-    final newEntry = KycEntry(
-      userId:      userId,
-      docId:       docId,
-      nom:         nameParts.length > 1 ? nameParts.last  : email,
-      prenom:      nameParts.isNotEmpty ? nameParts.first : email,
-      docType:     docType,
-      numDoc:      '—',
-      soumisLabel: 'À l\'instant',
-      soumisAt:    DateTime.now(),
-    );
-
-    kycPendingNotifier.value = [
-      newEntry,
-      ...kycPendingNotifier.value,
-    ];
-  }
 }

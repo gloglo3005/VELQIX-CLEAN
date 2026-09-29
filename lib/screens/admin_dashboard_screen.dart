@@ -1,15 +1,14 @@
 // lib/screens/admin_dashboard_screen.dart
 // ✅ Diff vs original : intégration AdminSocketService + bandeau live notif
-// Toutes les sections métier (annonces, KYC, litiges) sont INCHANGÉES.
+// Sections métier : annonces, litiges.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/admin_socket_service.dart'; // NEW
 import '../services/api_service.dart'; // NEW : vraies routes /api/admin/*
 import '../theme/app_theme.dart';
-import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, pushNotification, followedOwnersNotifier, notifyFollowersOfOwner, PropertyCard, PrimaryButton, StatCard, UserAvatar, kycPendingNotifier, KycEntry;
+import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, StatCard, UserAvatar;
 import '../models/models.dart';
 import 'auth_screens.dart';
 
@@ -46,7 +45,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         ApiService.instance.get('/admin/users?limit=100', auth: true),
         ApiService.instance.get('/admin/stats', auth: true),
         ApiService.instance.get('/admin/properties/pending', auth: true),
-        // ApiService.instance.get('/admin/kyc/pending', auth: true), // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause côté backend — l'onglet KYC reste affiché mais restera vide (voir plus bas)
       ]);
 
       final usersRes = results[0];
@@ -71,28 +69,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             .toList();
       }
 
-      // 🚫 DÉSACTIVÉ (25/08/2026) : KYC en pause — kycPendingNotifier reste vide,
-      // l'onglet KYC affiche donc naturellement son état "aucune demande".
-      // if (kycRes['success'] == true) {
-      //   kycPendingNotifier.value = (kycRes['data'] as List).map((j) {
-      //     final doc = j as Map<String, dynamic>;
-      //     final user = doc['user'] as Map<String, dynamic>? ?? {};
-      //     return KycEntry(
-      //       userId: user['id'] ?? '',
-      //       // NEW : on garde l'id du document KYC séparément de l'userId,
-      //       // il est indispensable pour appeler PUT /admin/kyc/:id/approve|reject
-      //       docId: doc['id'] ?? '',
-      //       nom: user['nom'] ?? '',
-      //       prenom: user['prenom'] ?? '',
-      //       docType: doc['docType'] ?? doc['type'] ?? 'Document',
-      //       numDoc: doc['numDoc'] ?? '—',
-      //       soumisLabel: doc['createdAt'] != null ? 'Soumis' : '',
-      //       soumisAt: doc['createdAt'] != null
-      //           ? DateTime.tryParse(doc['createdAt']) ?? DateTime.now()
-      //           : DateTime.now(),
-      //     );
-      //   }).toList();
-      // }
     } catch (e) {
       _dashboardError = 'Impossible de charger les données admin : $e';
     } finally {
@@ -103,9 +79,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
 
-    // ── NEW : Charger les vraies données (users/stats/annonces/KYC) ─────────
+    // ── NEW : Charger les vraies données (users/stats/annonces) ─────────
     _loadDashboardData();
 
     // ── NEW : Connexion Socket.io ────────────────────────────────────────────
@@ -118,7 +94,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Future<void> _connectAdminSocket() async {
-    final token = await ApiService.instance.getToken();
+    final token = await ApiService.instance.getValidToken();
     if (token != null && token.isNotEmpty) {
       AdminSocketService.instance.connect(token: token);
     }
@@ -137,7 +113,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final notif = adminLiveNotifNotifier.value;
     if (notif == null || !mounted) return;
 
-    final isAlert = notif.type == 'NEW_PROPERTY' || notif.type == 'NEW_KYC';
+    final isAlert = notif.type == 'NEW_PROPERTY';
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -173,9 +149,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             TextButton(
               onPressed: () {
                 ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                _tabController.animateTo(
-                  notif.type == 'NEW_PROPERTY' ? 1 : 2, // Annonces=1, KYC=2
-                );
+                _tabController.animateTo(1);
               },
               child: Text('Voir', style: GoogleFonts.poppins(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w700)),
             ),
@@ -258,11 +232,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           unselectedLabelColor: Colors.white54,
           indicatorColor: AppTheme.accent,
           indicatorWeight: 3,
-          // ── NEW : Badge sur l'onglet Annonces et KYC ─────────────────────
+          // ── NEW : Badge sur l'onglet Annonces ─────────────────────
           tabs: [
             const Tab(text: 'Tableau de bord'),
             Tab(child: _TabWithBadge(label: 'Annonces', notifier: pendingPropertiesNotifier)),
-            Tab(child: _TabWithBadge(label: 'KYC', notifier: kycPendingNotifier)),
             const Tab(text: 'Litiges'),
           ],
         ),
@@ -274,9 +247,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           builder: (context, published, __) => TabBarView(
             controller: _tabController,
             children: [
-              _buildDashboard(users.length, properties + (published as List).length),
+              _buildDashboard(users.length, properties),
               _buildAnnoncesValidation(),
-              _buildKycValidation(),
               _buildLitiges(),
             ],
           ),
@@ -388,33 +360,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ...pendingList.map((prop) => _AdminRealAnnonceCard(property: prop, key: ValueKey(prop.id))),
             ],
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildKycValidation() {
-    return ValueListenableBuilder(
-      valueListenable: kycPendingNotifier,
-      builder: (context, kycList, _) {
-        if (kycList.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(40),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.verified_user_rounded, size: 56, color: AppTheme.textHint),
-                const SizedBox(height: 16),
-                Text('Aucune demande KYC en attente',
-                    style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
-                    textAlign: TextAlign.center),
-              ]),
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: kycList.length,
-          itemBuilder: (context, i) => _KycCard(entry: kycList[i]),
         );
       },
     );
@@ -581,18 +526,6 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
       ...publishedPropertiesNotifier.value,
       approvedProperty,
     ];
-    notifyFollowersOfOwner(
-      ownerId: p.proprietaire.id,
-      ownerName: p.proprietaire.fullName,
-      propertyTitre: p.titre,
-      propertyId: p.id,
-    );
-    pushNotification(
-      titre: '🎉 Annonce approuvée !',
-      message: '"${p.titre}" a été validée et publiée sur VelQix.',
-      type: 'success',
-      propertyId: p.id,
-    );
     if (mounted) setState(() => _status = 'approved');
   }
 
@@ -615,12 +548,6 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
 
     pendingPropertiesNotifier.value =
         pendingPropertiesNotifier.value.where((e) => (e as PropertyModel).id != p.id).toList();
-    pushNotification(
-      titre: '⚠️ Annonce non approuvée',
-      message: '"${p.titre}" n\'a pas été validée. Veuillez corriger votre annonce et la soumettre à nouveau.',
-      type: 'error',
-      propertyId: p.id,
-    );
     if (mounted) setState(() => _status = 'rejected');
   }
 
@@ -753,123 +680,6 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
             )),
           ]),
         ),
-      ]),
-    );
-  }
-}
-
-class _KycCard extends StatefulWidget {
-  final KycEntry entry;
-  const _KycCard({required this.entry});
-  @override
-  State<_KycCard> createState() => _KycCardState();
-}
-
-class _KycCardState extends State<_KycCard> {
-  String _status = 'pending';
-  bool _submitting = false;
-
-  Future<void> _approve() async {
-    if (_submitting) return;
-    setState(() => _submitting = true);
-
-    final res = await ApiService.instance.put(
-      '/admin/kyc/${widget.entry.docId}/approve', {}, auth: true,
-    );
-
-    if (!mounted) return;
-    setState(() => _submitting = false);
-
-    if (res['success'] != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['message'] ?? 'Erreur lors de l\'approbation du KYC')),
-      );
-      return;
-    }
-
-    kycPendingNotifier.value =
-        kycPendingNotifier.value.where((e) => e.userId != widget.entry.userId).toList();
-    if (mounted) setState(() => _status = 'approved');
-  }
-
-  Future<void> _reject() async {
-    if (_submitting) return;
-    setState(() => _submitting = true);
-
-    final res = await ApiService.instance.put(
-      '/admin/kyc/${widget.entry.docId}/reject', {}, auth: true,
-    );
-
-    if (!mounted) return;
-    setState(() => _submitting = false);
-
-    if (res['success'] != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['message'] ?? 'Erreur lors du rejet du KYC')),
-      );
-      return;
-    }
-
-    kycPendingNotifier.value =
-        kycPendingNotifier.value.where((e) => e.userId != widget.entry.userId).toList();
-    if (mounted) setState(() => _status = 'rejected');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final e = widget.entry;
-    if (_status != 'pending') {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _status == 'approved' ? AppTheme.success.withOpacity(0.05) : AppTheme.error.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _status == 'approved' ? AppTheme.success.withOpacity(0.3) : AppTheme.error.withOpacity(0.3)),
-        ),
-        child: Row(children: [
-          Icon(_status == 'approved' ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: _status == 'approved' ? AppTheme.success : AppTheme.error),
-          const SizedBox(width: 10),
-          Expanded(child: Text(
-            '${e.prenom} ${e.nom} – ${_status == "approved" ? "KYC approuvé" : "KYC rejeté"}',
-            style: GoogleFonts.poppins(fontSize: 13, color: _status == 'approved' ? AppTheme.success : AppTheme.error),
-          )),
-        ]),
-      );
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: const BoxDecoration(color: Color(0xFFE8F0FE), shape: BoxShape.circle),
-          child: const Icon(Icons.person_search_rounded, color: AppTheme.primary, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${e.prenom} ${e.nom}', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
-          Text('Document : ${e.docType} · N° ${e.numDoc}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-          Text('Soumis ${e.soumisLabel}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
-        ])),
-        Row(children: [
-          GestureDetector(
-            onTap: _approve,
-            child: Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.success.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.check_rounded, color: AppTheme.success, size: 18)),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _reject,
-            child: Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.error.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.close_rounded, color: AppTheme.error, size: 18)),
-          ),
-        ]),
       ]),
     );
   }

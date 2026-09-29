@@ -10,6 +10,7 @@ import '../models/models.dart';
 import '../widgets/widgets.dart';
 import 'api_service.dart';
 import 'chat_service.dart';
+import 'property_service.dart';
 
 const _kLoggedIn    = 'auth_logged_in';
 const _kUserId      = 'auth_user_id';
@@ -31,8 +32,22 @@ final _googleSignIn = GoogleSignIn(
   scopes: ['email', 'profile'],
 );
 
+const _kAccountType   = 'auth_account_type';
+const _kNomEntreprise = 'auth_nom_entreprise';
+const _kTypeActivite  = 'auth_type_activite';
+
+// Erreurs backend qui signifient que la session n'est plus valide (par
+// opposition à une panne réseau ou serveur, où l'on garde la session locale).
+const _kSessionErrors = {
+  'SESSION_EXPIRED', 'ACCOUNT_BANNED', 'USER_NOT_FOUND', 'INVALID_TOKEN', 'MISSING_TOKEN',
+};
+
 class AuthService {
-  AuthService._();
+  AuthService._() {
+    ApiService.instance.sessionExpiredNotifier.addListener(() {
+      if (_currentUser != null) logout();
+    });
+  }
   static final AuthService instance = AuthService._();
 
   final _api = ApiService.instance;
@@ -63,18 +78,25 @@ class AuthService {
       await _cacheUser(_currentUser!, method: prefs.getString(_kAuthMethod) ?? 'email');
       notifyUserChanged();
       // Connecter le socket maintenant que l'utilisateur est authentifié
-      await ChatService.instance.connect(userId: _currentUser!.id);
+      await _onAuthenticated();
       return true;
     }
 
-    // SESSION_EXPIRED → le ApiService a déjà tenté le refresh
-    if (res['error'] == 'SESSION_EXPIRED') {
+    // Session réellement invalide → déconnexion
+    if (_kSessionErrors.contains(res['error'])) {
       await logout();
       return false;
     }
 
-    await logout();
-    return false;
+    // Panne réseau / serveur (ex. démarrage à froid de Render) : on garde la
+    // session en cache plutôt que de déconnecter l'utilisateur.
+    if (await _api.getToken() == null) {
+      await logout();
+      return false;
+    }
+    notifyUserChanged();
+    await _onAuthenticated();
+    return true;
   }
 
   // ─── Register ────────────────────────────────────────────────────
@@ -110,7 +132,7 @@ class AuthService {
     await _cacheUser(_currentUser!, method: 'email');
     notifyUserChanged();
     // Connecter le socket
-    await ChatService.instance.connect(userId: _currentUser!.id);
+    await _onAuthenticated();
     return null;
   }
 
@@ -135,7 +157,7 @@ class AuthService {
     await _cacheUser(_currentUser!, method: 'email');
     notifyUserChanged();
     // Connecter le socket
-    await ChatService.instance.connect(userId: _currentUser!.id);
+    await _onAuthenticated();
     return null; }
   // Instance exposée pour que l'écran de login puisse afficher le bouton
   // natif Google sur le web (GoogleSignInPlatform.instance.renderButton())
@@ -219,7 +241,7 @@ class AuthService {
       _currentUser = _userFromJson(res['data']['user']);
       await _cacheUser(_currentUser!, method: 'google');
       notifyUserChanged();
-      await ChatService.instance.connect(userId: _currentUser!.id);
+      await _onAuthenticated();
       return null;
     }
 
@@ -249,7 +271,7 @@ class AuthService {
         _currentUser = _userFromJson(res['data']['user']);
         await _cacheUser(_currentUser!, method: 'facebook');
         notifyUserChanged();
-        await ChatService.instance.connect(userId: _currentUser!.id);
+        await _onAuthenticated();
         return null;
       }
 
@@ -287,6 +309,29 @@ class AuthService {
     }, auth: true);
     if (res['success'] != true) return res['message'] ?? 'Erreur';
     return null;
+  }
+
+  // ─── Mot de passe oublié (code envoyé par email par le backend) ───
+  // Chaque méthode renvoie null en cas de succès, sinon le message d'erreur.
+  Future<String?> requestPasswordReset(String email) async {
+    final res = await _api.post('/auth/forgot-password', {'email': email});
+    return res['success'] == true ? null : (res['message'] ?? 'Erreur lors de l\'envoi du code.');
+  }
+
+  Future<String?> verifyResetCode({required String email, required String code}) async {
+    final res = await _api.post('/auth/verify-reset-code', {'email': email, 'code': code});
+    return res['success'] == true ? null : (res['message'] ?? 'Code invalide ou expiré.');
+  }
+
+  Future<String?> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final res = await _api.post('/auth/reset-password', {
+      'email': email, 'code': code, 'newPassword': newPassword,
+    });
+    return res['success'] == true ? null : (res['message'] ?? 'Erreur lors de la réinitialisation.');
   }
 
   // ─── Mise à jour du profil (persiste réellement côté serveur) ──────
@@ -368,11 +413,30 @@ class AuthService {
   Future<void> logout() async {
     try { if (await _googleSignIn.isSignedIn()) await _googleSignIn.signOut(); } catch (_) {}
     ChatService.instance.disconnect();
+    // Révoquer le refresh token côté serveur (sinon il reste valide 7 jours)
+    final refreshToken = await _api.getRefreshToken();
+    if (refreshToken != null) {
+      _api.post('/auth/logout', {'refreshToken': refreshToken});
+    }
     await _api.clearToken();
     _currentUser = null;
+    globalFavorites.clear();
+    followedOwnersNotifier.value = {};
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kLoggedIn, false);
     notifyUserChanged();
+  }
+
+  /// Socket + synchronisation des favoris une fois la session établie.
+  Future<void> _onAuthenticated() async {
+    await ChatService.instance.connect(userId: _currentUser!.id);
+    PropertyService.instance.getFavorites().then((favs) {
+      if (favs.isEmpty && globalFavorites.isEmpty) return;
+      globalFavorites
+        ..clear()
+        ..addAll(favs.map((p) => p.id));
+      notifyUserChanged();
+    }).catchError((_) {});
   }
 
   // ─── Cache local ─────────────────────────────────────────────────
@@ -383,7 +447,7 @@ class AuthService {
     await prefs.setString(_kNom, u.nom);
     await prefs.setString(_kPrenom, u.prenom);
     await prefs.setString(_kEmail, u.email);
-    await prefs.setString(_kTelephone, u.telephone ?? '');
+    await prefs.setString(_kTelephone, u.telephone);
     if (u.avatarUrl != null) await prefs.setString(_kAvatarUrl, u.avatarUrl!);
     await prefs.setBool(_kIsPremium, u.isPremium);
     await prefs.setBool(_kIsVerified, u.isVerified);
@@ -392,6 +456,17 @@ class AuthService {
     await prefs.setString(_kAuthMethod, method);
     if (u.countryCode != null) await prefs.setString(_kCountryCode, u.countryCode!);
     if (u.countryName != null) await prefs.setString(_kCountryName, u.countryName!);
+    await prefs.setString(_kAccountType, u.accountType);
+    if (u.nomEntreprise != null) {
+      await prefs.setString(_kNomEntreprise, u.nomEntreprise!);
+    } else {
+      await prefs.remove(_kNomEntreprise);
+    }
+    if (u.typeActivite != null) {
+      await prefs.setString(_kTypeActivite, u.typeActivite!);
+    } else {
+      await prefs.remove(_kTypeActivite);
+    }
   }
 
   UserModel? _userFromPrefs(SharedPreferences prefs) {
@@ -409,6 +484,9 @@ class AuthService {
       role: prefs.getString(_kRole) ?? 'client',
       countryCode: prefs.getString(_kCountryCode),
       countryName: prefs.getString(_kCountryName),
+      accountType: prefs.getString(_kAccountType) ?? 'personal',
+      nomEntreprise: prefs.getString(_kNomEntreprise),
+      typeActivite: prefs.getString(_kTypeActivite),
     );
   }
 

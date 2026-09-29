@@ -49,7 +49,7 @@ class _SearchScreenState extends State<SearchScreen>
     final q = value.trim();
     if (q == _lastQuery) return;
     if (q.length < 2) {
-      setState(() { _users = []; _properties = []; _hasSearched = false; });
+      setState(() { _users = []; _properties = []; _hasSearched = false; _lastQuery = ''; });
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 400), () => _search(q));
@@ -86,79 +86,7 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   // ─── Reconstruction PropertyModel depuis JSON API ─────────────────────────────
-  PropertyModel _propertyFromJson(Map<String, dynamic> p) {
-    // Propriétaire (inclus via Prisma include)
-    final propData   = p['proprietaire'] as Map<String, dynamic>? ?? {};
-    final proprietaire = UserModel(
-      id:        propData['id']       ?? '',
-      nom:       propData['nom']      ?? '',
-      prenom:    propData['prenom']   ?? '',
-      email:     propData['email']    ?? '',
-      telephone: propData['telephone'] ?? '',
-      avatarUrl: propData['avatarUrl'],
-      createdAt: DateTime.tryParse(propData['createdAt'] ?? '') ?? DateTime.now(),
-      role:      propData['role']     ?? 'client',
-    );
-
-    // Type / ListingType / Catégorie
-    PropertyType type;
-    switch ((p['type'] ?? '').toString().toLowerCase()) {
-      case 'mobilier': type = PropertyType.mobilier; break;
-      default:         type = PropertyType.immobilier;
-    }
-
-    ListingType listingType;
-    switch ((p['listingType'] ?? '').toString().toLowerCase()) {
-      case 'vente':    listingType = ListingType.vente;    break;
-      case 'les_deux': listingType = ListingType.les_deux; break;
-      default:         listingType = ListingType.location;
-    }
-
-    PropertyCategory categorie;
-    switch ((p['categorie'] ?? '').toString().toLowerCase()) {
-      case 'maison':      categorie = PropertyCategory.maison;      break;
-      case 'appartement': categorie = PropertyCategory.appartement; break;
-      case 'terrain':     categorie = PropertyCategory.terrain;     break;
-      case 'bureau':      categorie = PropertyCategory.bureau;      break;
-      case 'entrepot':    categorie = PropertyCategory.entrepot;    break;
-      case 'voiture':     categorie = PropertyCategory.voiture;     break;
-      case 'moto':        categorie = PropertyCategory.moto;        break;
-      case 'camion':      categorie = PropertyCategory.camion;      break;
-      case 'equipement':  categorie = PropertyCategory.equipement;  break;
-      default:            categorie = PropertyCategory.autre;
-    }
-
-    return PropertyModel(
-      id:              p['id']          ?? '',
-      titre:           p['titre']       ?? '',
-      description:     p['description'] ?? '',
-      type:            type,
-      listingType:     listingType,
-      categorie:       categorie,
-      prix:            (p['prix'] ?? 0).toDouble(),
-      prixParJour:     p['prixParJour'],
-      images:          (p['images'] as List?)?.cast<String>() ?? [],
-      adresse: AddressModel(
-        rue:       p['adresse'] ?? '',
-        ville:     p['ville']   ?? '',
-        pays:      p['pays']    ?? 'Togo',
-        latitude:  (p['latitude']  as num?)?.toDouble(),
-        longitude: (p['longitude'] as num?)?.toDouble(),
-      ),
-      proprietaire:    proprietaire,
-      caracteristiques:(p['caracteristiques'] as List?)?.cast<String>() ?? [],
-      rating:          (p['rating']    ?? 0).toDouble(),
-      totalAvis:       (p['totalAvis'] ?? 0) as int,
-      isAvailable:     p['isAvailable'] ?? true,
-      isFeatured:      p['isFeatured']  ?? false,
-      vues:            (p['vues']       ?? 0) as int,
-      surface:         p['surface'],
-      nombrePieces:    p['nombrePieces'] as int?,
-      annee:           p['annee']        as int?,
-      status:          p['status']       ?? 'approuve',
-      createdAt: DateTime.tryParse(p['createdAt'] ?? '') ?? DateTime.now(),
-    );
-  }
+  PropertyModel _propertyFromJson(Map<String, dynamic> p) => PropertyModel.fromJson(p);
 
   // ─── Build ────────────────────────────────────────────────────────────────────
   @override

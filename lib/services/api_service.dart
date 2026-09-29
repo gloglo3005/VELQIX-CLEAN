@@ -4,7 +4,7 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,7 +69,44 @@ class ApiService {
   }
 
   // ── Refresh automatique du token ─────────────────────────────────
-  Future<bool> _tryRefresh() async {
+  // Le backend fait tourner les refresh tokens : deux refresh simultanés
+  // avec le même token feraient échouer le second. On mutualise donc la
+  // requête en cours.
+  Future<bool>? _refreshInFlight;
+
+  Future<bool> _tryRefresh() {
+    return _refreshInFlight ??= _doRefresh().whenComplete(() => _refreshInFlight = null);
+  }
+
+  /// Rafraîchit l'access token (appelé par ChatService sur TOKEN_EXPIRED).
+  Future<bool> refreshAccessToken() => _tryRefresh();
+
+  /// Access token garanti non expiré (rafraîchi si besoin), pour les appels
+  /// qui ne passent pas par get/post/put/delete (multipart, http direct, socket).
+  Future<String?> getValidToken() async {
+    final token = await getToken();
+    if (token == null) return null;
+    final exp = _jwtExpiry(token);
+    if (exp != null && exp.isBefore(DateTime.now().add(const Duration(seconds: 30)))) {
+      if (await _tryRefresh()) return getToken();
+    }
+    return token;
+  }
+
+  DateTime? _jwtExpiry(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      final exp = payload['exp'];
+      if (exp is! num) return null;
+      return DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _doRefresh() async {
     try {
       final refreshToken = await getRefreshToken();
       if (refreshToken == null) return false;
@@ -90,10 +127,24 @@ class ApiService {
         }
         return true;
       }
+      // Refus explicite du serveur (session expirée, compte banni…)
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        await _expireSession();
+      }
       return false;
     } catch (_) {
+      // Erreur réseau : on garde la session, un prochain appel réessaiera
       return false;
     }
+  }
+
+  /// Incrémenté quand la session est définitivement perdue (refresh refusé) :
+  /// AuthService l'écoute pour vider l'utilisateur courant.
+  final sessionExpiredNotifier = ValueNotifier<int>(0);
+
+  Future<void> _expireSession() async {
+    await clearToken();
+    sessionExpiredNotifier.value++;
   }
 
   // ── Parse + gestion TOKEN_EXPIRED ────────────────────────────────
@@ -109,9 +160,10 @@ class ApiService {
           final retryRes = await retry();
           return _parse(retryRes);
         }
-        // Refresh échoué → déconnexion
-        await clearToken();
         return {'success': false, 'message': 'Session expirée', 'error': 'SESSION_EXPIRED'};
+      }
+      if (res.statusCode == 403 && data['error'] == 'ACCOUNT_BANNED') {
+        await _expireSession();
       }
       return _parse(res);
     } catch (_) {
@@ -233,7 +285,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> uploadFile(String path, File file) async {
     try {
-      final token   = await getToken();
+      final token   = await getValidToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
       request.files.add(await http.MultipartFile.fromPath(
@@ -257,7 +309,7 @@ class ApiService {
     String filename,
   ) async {
     try {
-      final token   = await getToken();
+      final token   = await getValidToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
       request.files.add(http.MultipartFile.fromBytes(

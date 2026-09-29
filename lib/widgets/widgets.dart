@@ -327,21 +327,6 @@ void pushNotification({
   appNotificationsNotifier.value = [notif, ...appNotificationsNotifier.value];
 }
 
-// KYC en attente de validation admin
-class KycEntry {
-  final String userId;
-  final String docId; // NEW : id du document KYC, requis par PUT /admin/kyc/:docId/approve|reject
-  final String nom;
-  final String prenom;
-  final String docType;
-  final String numDoc;
-  final String soumisLabel;
-  final DateTime soumisAt;
-  KycEntry({required this.userId, required this.docId, required this.nom, required this.prenom,
-    required this.docType, required this.numDoc, required this.soumisLabel, required this.soumisAt});
-}
-final ValueNotifier<List<KycEntry>> kycPendingNotifier = ValueNotifier([]);
-
 // Notifier pour forcer rebuild du profil quand user change (Premium/KYC)
 final ValueNotifier<int> userStateNotifier = ValueNotifier(0);
 
@@ -357,8 +342,7 @@ final ValueNotifier<Map<String, Set<String>>> userFollowingMapNotifier = ValueNo
 // ⚠️ Avant : followOwner/unfollowOwner ne touchaient que les ValueNotifier
 // ci-dessus (Set/Map en mémoire), sans aucun appel réseau — l'abonnement ne
 // survivait pas à un redémarrage et n'était visible par personne d'autre.
-// Maintenant : mise à jour optimiste des notifiers (l'UI locale, dont
-// notifyFollowersOfOwner, continue de marcher comme avant) + vrai appel
+// Maintenant : mise à jour optimiste des notifiers + vrai appel
 // POST/DELETE /api/users/:id/follow, avec rollback silencieux si ça échoue.
 
 void _applyFollowLocally(String ownerId, String currentUserId, {required bool following}) {
@@ -380,40 +364,19 @@ void _applyFollowLocally(String ownerId, String currentUserId, {required bool fo
 }
 
 /// Abonner l'utilisateur courant à un propriétaire
-Future<void> followOwner(String ownerId, String currentUserId) async {
+Future<bool> followOwner(String ownerId, String currentUserId) async {
   _applyFollowLocally(ownerId, currentUserId, following: true);
-  try {
-    await PropertyService.instance.followUser(ownerId);
-  } catch (_) {
-    _applyFollowLocally(ownerId, currentUserId, following: false);
-  }
+  final ok = await PropertyService.instance.followUser(ownerId);
+  if (!ok) _applyFollowLocally(ownerId, currentUserId, following: false);
+  return ok;
 }
 
 /// Se désabonner
-Future<void> unfollowOwner(String ownerId, String currentUserId) async {
+Future<bool> unfollowOwner(String ownerId, String currentUserId) async {
   _applyFollowLocally(ownerId, currentUserId, following: false);
-  try {
-    await PropertyService.instance.unfollowUser(ownerId);
-  } catch (_) {
-    _applyFollowLocally(ownerId, currentUserId, following: true);
-  }
-}
-
-/// Notifier tous les abonnés d'un propriétaire quand il publie une annonce
-void notifyFollowersOfOwner({
-  required String ownerId,
-  required String ownerName,
-  required String propertyTitre,
-  required String propertyId,
-}) {
-  final followers = followersMapNotifier.value[ownerId] ?? {};
-  if (followers.isEmpty) return;
-  pushNotification(
-    titre: '🔔 Nouvelle annonce de $ownerName',
-    message: '"$propertyTitre" vient d\'être publiée. Découvrez-la maintenant !',
-    type: 'info',
-    propertyId: propertyId,
-  );
+  final ok = await PropertyService.instance.unfollowUser(ownerId);
+  if (!ok) _applyFollowLocally(ownerId, currentUserId, following: true);
+  return ok;
 }
 
 void notifyUserChanged() => userStateNotifier.value++;
@@ -446,13 +409,12 @@ class _FavoriteButtonState extends State<FavoriteButton> {
     });
 
     try {
-      if (wasFav) {
-        await PropertyService.instance.removeFavorite(widget.propertyId);
-      } else {
-        await PropertyService.instance.addFavorite(widget.propertyId);
-      }
+      final ok = wasFav
+          ? await PropertyService.instance.removeFavorite(widget.propertyId)
+          : await PropertyService.instance.addFavorite(widget.propertyId);
+      if (!ok) throw Exception('favorite');
     } catch (_) {
-      // Rollback en cas d'échec réseau
+      // Rollback si l'appel a échoué
       if (mounted) {
         setState(() {
           if (wasFav) {
@@ -552,7 +514,7 @@ class _ShareSheet extends StatelessWidget {
     showModalBottomSheet(
       context: ctx,
       backgroundColor: Colors.transparent,
-      builder: (_) => _MoreShareSheet(shareText: shareText),
+      builder: (_) => _MoreShareSheet(shareText: shareText, shareUrl: property.shareUrl),
     );
   }
 
@@ -623,13 +585,15 @@ class _ShareSheet extends StatelessWidget {
 // ─── Feuille "Plus" (Telegram, Instagram, Facebook, Twitter/X) ────────────────
 class _MoreShareSheet extends StatelessWidget {
   final String shareText;
-  const _MoreShareSheet({required this.shareText});
+  final String shareUrl;
+  const _MoreShareSheet({required this.shareText, required this.shareUrl});
 
   void _launch(String url) => _openUrl(url);
 
   @override
   Widget build(BuildContext context) {
     final encoded = Uri.encodeComponent(shareText);
+    final url = Uri.encodeComponent(shareUrl);
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -650,7 +614,7 @@ class _MoreShareSheet extends StatelessWidget {
               _ShareOptionCustom(
                 bgColor: const Color(0xFF0088CC),
                 label: 'Telegram',
-                onTap: () => _launch('https://t.me/share/url?url=https://libimmo.com&text=$encoded'),
+                onTap: () => _launch('https://t.me/share/url?url=$url&text=$encoded'),
                 child: const Icon(Icons.send_rounded, color: Colors.white, size: 22),
               ),
               _ShareOptionCustom(
@@ -662,7 +626,7 @@ class _MoreShareSheet extends StatelessWidget {
               _ShareOptionCustom(
                 bgColor: const Color(0xFF1877F2),
                 label: 'Facebook',
-                onTap: () => _launch('https://www.facebook.com/sharer/sharer.php?u=https://libimmo.com&quote=$encoded'),
+                onTap: () => _launch('https://www.facebook.com/sharer/sharer.php?u=$url&quote=$encoded'),
                 child: const Text('f', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, fontFamily: 'Georgia', height: 1.1)),
               ),
               _ShareOptionCustom(

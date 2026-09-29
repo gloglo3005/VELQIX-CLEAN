@@ -11,10 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'agora_call_screen.dart';
 import 'agora_video_call_screen.dart';
-// import 'wallet_screen.dart';           // 🚫 DÉSACTIVÉ (25/08/2026)
-// import '../services/wallet_service.dart'; // 🚫 DÉSACTIVÉ (25/08/2026)
 import '../models/models.dart';
-// import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../theme/app_theme.dart';
 import '../services/web_file_picker.dart';
 import '../services/chat_service.dart';
@@ -72,51 +69,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
   }
 
   Future<void> _startVideoCall(BuildContext ctx, dynamic user) async {
-    // 🚫 DÉSACTIVÉ (25/08/2026) : wallet plus utilisé, les appels vidéo sont
-    // gratuits/illimités pour l'instant — plus de vérification de solde.
-    // final canCall = await WalletService.instance.canStartVideoCall();
-    // if (!mounted) return;
-    //
-    // if (!canCall) {
-    //   showDialog(
-    //     context: ctx,
-    //     builder: (_) => AlertDialog(
-    //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    //       title: Text('Solde insuffisant',
-    //           style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-    //       content: Column(mainAxisSize: MainAxisSize.min, children: [
-    //         const Icon(Icons.account_balance_wallet_rounded,
-    //             size: 50, color: AppTheme.accent),
-    //         const SizedBox(height: 12),
-    //         Text(
-    //           "Vous avez besoin d'au moins 10 FCFA pour lancer un appel vidéo (10 FCFA/min).",
-    //           style: GoogleFonts.poppins(fontSize: 13,
-    //               color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary),
-    //           textAlign: TextAlign.center,
-    //         ),
-    //       ]),
-    //       actions: [
-    //         TextButton(
-    //           onPressed: () => Navigator.pop(ctx),
-    //           child: Text('Annuler',
-    //               style: GoogleFonts.poppins(
-    //                   color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
-    //         ),
-    //         ElevatedButton(
-    //           style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-    //           onPressed: () {
-    //             Navigator.pop(ctx);
-    //             Navigator.push(ctx, MaterialPageRoute(builder: (_) => const WalletScreen()));
-    //           },
-    //           child: Text('Recharger',
-    //               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-    //         ),
-    //       ],
-    //     ),
-    //   );
-    //   return;
-    // }
-
     final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'video');
     if (!ctx.mounted) return;
     if (result == null) {
@@ -132,6 +84,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         remoteUser: user,
         channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }
@@ -675,49 +628,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _startVideoCall(BuildContext ctx, dynamic user) async {
-    // 🚫 DÉSACTIVÉ (25/08/2026) : wallet plus utilisé, appels gratuits/illimités
-    // final canCall = await WalletService.instance.canStartVideoCall();
-    // if (!mounted) return;
-    //
-    // if (!canCall) {
-    //   showDialog(
-    //     context: ctx,
-    //     builder: (_) => AlertDialog(
-    //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    //       title: Text('Solde insuffisant',
-    //           style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-    //       content: Column(mainAxisSize: MainAxisSize.min, children: [
-    //         const Icon(Icons.account_balance_wallet_rounded, size: 50, color: AppTheme.accent),
-    //         const SizedBox(height: 12),
-    //         Text(
-    //           "Vous avez besoin d'au moins 10 FCFA pour lancer un appel vidéo (10 FCFA/min).",
-    //           style: GoogleFonts.poppins(fontSize: 13,
-    //               color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary),
-    //           textAlign: TextAlign.center,
-    //         ),
-    //       ]),
-    //       actions: [
-    //         TextButton(
-    //           onPressed: () => Navigator.pop(ctx),
-    //           child: Text('Annuler',
-    //               style: GoogleFonts.poppins(
-    //                   color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
-    //         ),
-    //         ElevatedButton(
-    //           style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-    //           onPressed: () {
-    //             Navigator.pop(ctx);
-    //             Navigator.push(ctx, MaterialPageRoute(builder: (_) => const WalletScreen()));
-    //           },
-    //           child: Text('Recharger',
-    //               style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-    //         ),
-    //       ],
-    //     ),
-    //   );
-    //   return;
-    // }
-
     final result = await ChatService.instance.inviteCall(calleeId: user.id, type: 'video');
     if (!ctx.mounted) return;
     if (result == null) {
@@ -733,6 +643,7 @@ class _ChatScreenState extends State<ChatScreen> {
         remoteUser: user,
         channelName: result['channelName'] as String,
         isCaller: true,
+        callId: result['callId'] as String,
       ),
     ));
   }

@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/app_translations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart'; // NEW : appel réel au backend
 import '../services/property_service.dart'; // NEW : upload d'images en multipart
@@ -75,8 +73,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
       if (files.isNotEmpty && mounted) {
         setState(() { _selectedPhotos.addAll(files); _showPhotoError = false; });
       }
-    } catch (_) {
-      if (mounted) setState(() { _selectedPhotos.add('photo_${_selectedPhotos.length + 1}.jpg'); _showPhotoError = false; });
+    } catch (e) {
+      debugPrint('Erreur sélection photos : $e');
     }
     if (mounted) setState(() => _pickingPhotos = false);
   }
@@ -209,15 +207,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
   /// les envoyer telles quelles dans le JSON de /properties (trop volumineux,
   /// provoque une erreur 413 côté serveur). On les upload d'abord en
   /// multipart via /upload/image, et on récupère une URL Cloudinary courte.
+  /// Sur mobile, la photo est un chemin de fichier local : même traitement.
   Future<String?> _uploadDataUri(String dataUri, int index) async {
     try {
-      final parts = dataUri.split(',');
-      if (parts.length != 2) return null; // pas une data URI valide
-
-      final bytes = base64Decode(parts[1]);
+      final bytes = await WebFilePicker.readBytes(dataUri);
+      if (bytes == null) return null;
+      final ext = WebFilePicker.imageSubtype(dataUri);
       final result = await PropertyService.instance.uploadImageBytes(
         bytes,
-        'photo_$index.jpg',
+        'photo_$index.${ext == 'jpeg' ? 'jpg' : ext}',
       );
       return result.url;
     } catch (e) {
@@ -240,15 +238,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
     final List<String> uploadedImages = [];
     for (var i = 0; i < _selectedPhotos.length; i++) {
       final photo = _selectedPhotos[i];
-      if (photo.startsWith('data:')) {
+      if (photo.startsWith('http://') || photo.startsWith('https://')) {
+        uploadedImages.add(photo);
+      } else {
         final url = await _uploadDataUri(photo, i);
         if (url != null) uploadedImages.add(url);
-      } else {
-        // Cas de secours : déjà une URL distante (http/https)
-        uploadedImages.add(photo);
       }
     }
 
+    if (!mounted) return;
     if (_selectedPhotos.isNotEmpty && uploadedImages.isEmpty) {
       setState(() => _loading = false);
       if (mounted) {

@@ -24,21 +24,13 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
   // ── Getters dynamiques ────────────────────────────────────────────────────
   String get _ownerId => widget.owner.id;
 
-  /// Annonces publiées de ce propriétaire
-  int get _annoncesCount {
-    return publishedPropertiesNotifier.value
-        .whereType<PropertyModel>()
-        .where((p) => p.proprietaire.id == _ownerId)
-        .length;
-  }
+  /// Annonces publiées de ce propriétaire (chargées depuis le backend)
+  List<PropertyModel> _ownerListings = [];
+
+  int get _annoncesCount => _ownerListings.length;
 
   /// Total des vues de toutes ses annonces
-  int get _views {
-    return publishedPropertiesNotifier.value
-        .whereType<PropertyModel>()
-        .where((p) => p.proprietaire.id == _ownerId)
-        .fold<int>(0, (sum, p) => sum + p.vues);
-  }
+  int get _views => _ownerListings.fold<int>(0, (sum, p) => sum + p.vues);
 
   // ⚠️ Avant : _isFollowing / followers / following venaient de ValueNotifier
   // locaux (followedOwnersNotifier, followersMapNotifier...), jamais envoyés
@@ -60,6 +52,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     _followersCount = widget.owner.followersCount;
     _followingCount = widget.owner.followingCount;
     _loadProfile();
+    _loadListings();
     followersUpdateNotifier.addListener(_onFollowersUpdate);
   }
 
@@ -90,6 +83,11 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     }
   }
 
+  Future<void> _loadListings() async {
+    final list = await PropertyService.instance.getUserProperties(_ownerId);
+    if (mounted) setState(() => _ownerListings = list);
+  }
+
   Future<void> _toggleFollow() async {
     if (_followBusy) return;
     final currentUserId = AuthService.instance.currentUser?.id;
@@ -108,10 +106,11 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
     });
 
     try {
-      if (wasFollowing) {
-        await PropertyService.instance.unfollowUser(_ownerId);
-      } else {
-        await PropertyService.instance.followUser(_ownerId);
+      final ok = wasFollowing
+          ? await PropertyService.instance.unfollowUser(_ownerId)
+          : await PropertyService.instance.followUser(_ownerId);
+      if (!ok) throw Exception('follow');
+      if (!wasFollowing) {
         final ownerName = widget.owner.nomEntreprise?.isNotEmpty == true
             ? widget.owner.nomEntreprise!
             : '${widget.owner.prenom} ${widget.owner.nom}'.trim();
@@ -141,7 +140,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
       return "Il y a ${y} an${y > 1 ? 's' : ''}";
     } else if (diff.inDays >= 30) {
       final m = (diff.inDays / 30).floor();
-      return 'Il y a \$m mois';
+      return 'Il y a $m mois';
     } else if (diff.inDays > 0) {
       return "Il y a ${diff.inDays} jour${diff.inDays > 1 ? 's' : ''}";
     } else {
@@ -151,10 +150,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ownerListings = publishedPropertiesNotifier.value
-        .cast<PropertyModel>()
-        .where((p) => p.proprietaire.id == widget.owner.id)
-        .toList();
+    final ownerListings = _ownerListings;
 
     return ValueListenableBuilder(
       valueListenable: localeNotifier,

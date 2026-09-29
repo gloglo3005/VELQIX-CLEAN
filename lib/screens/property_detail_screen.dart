@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../models/models.dart';
-import '../services/mock_data.dart';
 import '../services/property_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart' show followersUpdateNotifier, propertyViewsUpdateNotifier;
@@ -26,7 +25,8 @@ class PropertyDetailScreen extends StatefulWidget {
 
 class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _imgIndex = 0;
-  bool _isFav = false;
+  bool get _isFav => globalFavorites.contains(widget.property.id);
+  bool _favBusy = false;
   bool _showFullDesc = false;
 
   // ⚠️ Avant : les avis venaient de MockDataService.avis (100% factice).
@@ -43,6 +43,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _ownerFollowersCount = 0;
   int _ownerFollowingCount = 0;
   bool _followBusy = false;
+  List<PropertyModel> _ownerListings = [];
 
   // Mis à jour en direct via propertyViewsUpdateNotifier (voir _onViewsUpdate).
   // null tant qu'aucun event n'est arrivé → on affiche widget.property.vues.
@@ -89,6 +90,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   Future<void> _loadOwnerFollowState() async {
     final ownerId = widget.property.proprietaire.id;
+    PropertyService.instance.getUserProperties(ownerId).then((list) {
+      if (mounted) setState(() => _ownerListings = list);
+    });
     final fresh = await PropertyService.instance.fetchUserProfile(
       ownerId,
       auth: AuthService.instance.isLoggedIn,
@@ -133,10 +137,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     followedOwnersNotifier.value = followed;
 
     try {
-      if (wasFollowing) {
-        await PropertyService.instance.unfollowUser(ownerId);
-      } else {
-        await PropertyService.instance.followUser(ownerId);
+      final ok = wasFollowing
+          ? await PropertyService.instance.unfollowUser(ownerId)
+          : await PropertyService.instance.followUser(ownerId);
+      if (!ok) throw Exception('follow');
+      if (!wasFollowing) {
         pushNotification(
           titre: '✅ Vous suivez ${widget.property.proprietaire.fullName}',
           message: 'Vous serez notifié dès qu\'il publie une nouvelle annonce.',
@@ -159,6 +164,27 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
+  Future<void> _toggleFav() async {
+    if (_favBusy) return;
+    if (!AuthService.instance.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connecte-toi pour ajouter aux favoris.')),
+      );
+      return;
+    }
+    final id = widget.property.id;
+    final wasFav = _isFav;
+    setState(() {
+      _favBusy = true;
+      wasFav ? globalFavorites.remove(id) : globalFavorites.add(id);
+    });
+    final ok = wasFav
+        ? await PropertyService.instance.removeFavorite(id)
+        : await PropertyService.instance.addFavorite(id);
+    if (!ok) wasFav ? globalFavorites.add(id) : globalFavorites.remove(id);
+    if (mounted) setState(() => _favBusy = false);
+  }
+
   Future<void> _loadAvis() async {
     try {
       final list = await PropertyService.instance.getAvis(widget.property.id);
@@ -179,13 +205,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   void _showShareSheet(BuildContext ctx, PropertyModel p) {
     final lang = localeNotifier.value.languageCode;
-    final alreadyPending = pendingPropertiesNotifier.value
-        .any((e) => (e as PropertyModel).id == p.id);
-    final alreadyPublished = publishedPropertiesNotifier.value
-        .any((e) => (e as PropertyModel).id == p.id);
-    // 🚫 isMockData retiré (25/08/2026) : plus de biens factices, donc cette
-    // condition était toujours fausse — le banneau "soumettre à l'admin"
-    // s'affiche désormais simplement dès qu'un bien n'est ni en attente ni publié.
+    final alreadyPending = p.status == 'en_attente';
+    final alreadyPublished = p.status == 'approuve';
 
     void _doWhatsApp() async {
       final encoded = Uri.encodeComponent(p.shareText);
@@ -241,7 +262,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             _StatusBanner(color: AppTheme.warning, icon: Icons.hourglass_top_rounded,
                 text: 'En attente de validation par l\'admin…')
           else
-            _SubmitToAdminBanner(property: p, ctx: ctx),
+            _StatusBanner(color: AppTheme.error, icon: Icons.block_rounded,
+                text: 'Ce bien n\'est pas visible publiquement.'),
 
           const SizedBox(height: 16),
 
@@ -354,7 +376,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             ),
             actions: [
               GestureDetector(
-                onTap: () => setState(() => _isFav = !_isFav),
+                onTap: _toggleFav,
                 child: Container(
                   margin: const EdgeInsets.all(10),
                   padding: const EdgeInsets.all(8),
@@ -557,15 +579,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
                           // ── Stats ligne ──────────────────────────────────────
                           Builder(builder: (_) {
-                            final ownerId = p.proprietaire.id;
-                            final annonces = publishedPropertiesNotifier.value
-                                .whereType<PropertyModel>()
-                                .where((a) => a.proprietaire.id == ownerId)
-                                .length;
-                            final vues = publishedPropertiesNotifier.value
-                                .whereType<PropertyModel>()
-                                .where((a) => a.proprietaire.id == ownerId)
-                                .fold<int>(0, (s, a) => s + a.vues);
+                            final annonces = _ownerListings.length;
+                            final vues = _ownerListings.fold<int>(0, (s, a) => s + a.vues);
                             return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                               _OwnerStat(label: 'Abonnés',   value: '$_ownerFollowersCount'),
                               _OwnerStatDivider(),
@@ -857,94 +872,6 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-// ─── Bannière "Soumettre à l'admin pour validation" ───────────────────────────
-class _SubmitToAdminBanner extends StatefulWidget {
-  final PropertyModel property;
-  final BuildContext ctx;
-  const _SubmitToAdminBanner({required this.property, required this.ctx});
-
-  @override
-  State<_SubmitToAdminBanner> createState() => _SubmitToAdminBannerState();
-}
-
-class _SubmitToAdminBannerState extends State<_SubmitToAdminBanner> {
-  bool _submitted = false;
-
-  void _submit() {
-    // Ajouter à la file d'attente admin
-    final alreadyPending = pendingPropertiesNotifier.value
-        .any((e) => (e as PropertyModel).id == widget.property.id);
-    if (!alreadyPending) {
-      pendingPropertiesNotifier.value = [
-        ...pendingPropertiesNotifier.value,
-        widget.property,
-      ];
-    }
-    setState(() => _submitted = true);
-
-    // Fermer la bottom sheet et afficher confirmation
-    Navigator.pop(widget.ctx);
-    ScaffoldMessenger.of(widget.ctx).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-        const SizedBox(width: 8),
-        Expanded(child: Text(tr('detail_submitted'))),
-      ]),
-      backgroundColor: AppTheme.success,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      duration: const Duration(seconds: 3),
-    ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_submitted) {
-      return _StatusBanner(
-          color: AppTheme.warning,
-          icon: Icons.hourglass_top_rounded,
-          text: 'Soumis — en attente de validation admin');
-    }
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primary.withOpacity(0.08), AppTheme.primaryLight.withOpacity(0.05)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.25)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.admin_panel_settings_rounded, color: AppTheme.primary, size: 20),
-          const SizedBox(width: 8),
-          Text(tr('detail_submit_admin'),
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-        ]),
-        const SizedBox(height: 6),
-        Text(tr('detail_submit_desc'),
-            style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _submit,
-            icon: const Icon(Icons.send_rounded, size: 16),
-            label: Text(tr('detail_send_admin'), style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              elevation: 0,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-}
 
 class _AvisCard extends StatelessWidget {
   final AvisModel avis;

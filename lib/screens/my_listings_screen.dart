@@ -392,63 +392,16 @@ class _ListingManageCardState extends State<_ListingManageCard> {
   }
 }
 
-// ─── Carte d'annonce en attente avec statut et bouton soumettre ───────────────
-class _PendingPropertyCard extends StatefulWidget {
+// ─── Carte d'annonce en attente avec son statut serveur ──────────────────────
+class _PendingPropertyCard extends StatelessWidget {
   final PropertyModel property;
   const _PendingPropertyCard({required this.property});
 
   @override
-  State<_PendingPropertyCard> createState() => _PendingPropertyCardState();
-}
-
-class _PendingPropertyCardState extends State<_PendingPropertyCard> {
-  bool _submitting = false;
-
-  bool get _isInPending => pendingPropertiesNotifier.value
-      .any((e) => (e as PropertyModel).id == widget.property.id);
-
-  bool get _isPublished => publishedPropertiesNotifier.value
-      .any((e) => (e as PropertyModel).id == widget.property.id);
-
-  void _submitToAdmin() {
-    if (_isInPending || _isPublished) return;
-    setState(() => _submitting = true);
-    Future.delayed(const Duration(milliseconds: 600), () {
-      pendingPropertiesNotifier.value = [
-        ...pendingPropertiesNotifier.value,
-        widget.property,
-      ];
-      if (mounted) setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(children: [
-          Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-          SizedBox(width: 8),
-          Expanded(child: Text(tr('mylist_submitted'))),
-        ]),
-        backgroundColor: AppTheme.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 3),
-      ));
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // ✅ Se reconstruit automatiquement quand l'admin approuve ou rejette
-    return ValueListenableBuilder(
-      valueListenable: publishedPropertiesNotifier,
-      builder: (context, _, __) => ValueListenableBuilder(
-        valueListenable: pendingPropertiesNotifier,
-        builder: (context, __, ___) => _buildCard(context),
-      ),
-    );
-  }
-
-  Widget _buildCard(BuildContext context) {
-    final p = widget.property;
-    final inPending = _isInPending;
-    final published = _isPublished;
+    final p = property;
+    final inPending = p.status == 'en_attente';
+    final published = p.status == 'approuve';
 
     // Couleur et icône selon le statut
     Color borderColor;
@@ -525,33 +478,6 @@ class _PendingPropertyCardState extends State<_PendingPropertyCard> {
             ])),
           ]),
         ),
-        // Bouton soumettre si pas encore soumis
-        if (!inPending && !published) ...[
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _submitting ? null : _submitToAdmin,
-                icon: _submitting
-                    ? const SizedBox(width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.send_rounded, size: 16),
-                label: Text(
-                    _submitting ? 'Envoi en cours…' : 'Soumettre à l\'admin',
-                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ),
-        ],
       ]),
     );
   }

@@ -79,7 +79,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
           ?AgoraVideoCallScreen(
     remoteUser: _caller,
     channelName: _channelName,
-    isCaller: false)
+    isCaller: false,
+    callId: _callId)
 : AgoraCallScreen(
     remoteUser: _caller,
     channelName: _channelName,
