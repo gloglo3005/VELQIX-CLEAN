@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/app_translations.dart';
 import '../services/chat_service.dart' show conversationsNotifier, incomingCallNotifier;
-import '../services/notification_service.dart' show unreadNotifCountNotifier, NotificationService;
+import '../services/notification_service.dart' show unreadNotifCountNotifier, NotificationService, latestNotificationNotifier;
 import '../main.dart' show localeNotifier;
 import '../widgets/ai_assistant_widget.dart';
 import 'home_screen.dart';
@@ -26,6 +27,7 @@ class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens;
+  VoidCallback? _notificationListener;
 
   @override
   void initState() {
@@ -40,6 +42,31 @@ class _MainShellState extends State<MainShell> {
     // arriveront ensuite en temps réel via l'event socket "notification:new"
     // (déjà écouté par ChatService, connecté ailleurs au login).
     NotificationService.instance.loadNotifications();
+    _notificationListener = () {
+      final notif = latestNotificationNotifier.value;
+      if (!mounted || notif == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${notif.titre}: ${notif.corps}'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        latestNotificationNotifier.value = null;
+      });
+    };
+    latestNotificationNotifier.addListener(_notificationListener!);
+  }
+
+  @override
+  void dispose() {
+    if (_notificationListener != null) {
+      latestNotificationNotifier.removeListener(_notificationListener!);
+    }
+    super.dispose();
   }
 
   @override

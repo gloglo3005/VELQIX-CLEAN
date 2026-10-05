@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_screens.dart';
@@ -9,6 +10,7 @@ import 'screens/main_shell.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/shared_property_screen.dart';
 import 'services/auth_service.dart';
+import 'services/push_notification_service.dart';
 
 // ── Notifiers globaux accessibles partout ────────────────────────────────────
 final themeModeNotifier  = ValueNotifier<ThemeMode>(ThemeMode.light);
@@ -77,6 +79,11 @@ Locale countryCodeToLocale(String? code) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Handler FCM pour les messages reçus lorsque l'application est en arrière-plan.
+  // FirebaseMessaging reste optionnel tant que la configuration native Firebase
+  // n'est pas installée dans le projet complet.
+  // ignore: undefined_identifier
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   // URLs propres sur le web (https://.../bien/xyz au lieu de .../#/bien/xyz)
   // — indispensable pour que les liens partagés soient cliquables tels quels.
   usePathUrlStrategy();
@@ -89,6 +96,9 @@ void main() async {
   ));
 
   final alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
+  if (alreadyLoggedIn) {
+    await PushNotificationService.instance.initialize();
+  }
 
   // Appliquer la locale du pays enregistré au démarrage
   if (alreadyLoggedIn) {

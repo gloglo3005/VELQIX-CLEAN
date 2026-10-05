@@ -82,6 +82,46 @@ class Conversation {
 
 // ── Notifiers globaux écoutés par l'UI ───────────────────────────────────────
 final conversationsNotifier = ValueNotifier<List<Conversation>>([]);
+final onlineStatusNotifier = ValueNotifier<Map<String, bool>>({});
+
+class CallHistoryModel {
+  final String id;
+  final String callerId;
+  final String calleeId;
+  final String type;
+  final String status;
+  final DateTime createdAt;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
+
+  const CallHistoryModel({
+    required this.id,
+    required this.callerId,
+    required this.calleeId,
+    required this.type,
+    required this.status,
+    required this.createdAt,
+    this.startedAt,
+    this.endedAt,
+  });
+
+  factory CallHistoryModel.fromJson(Map<String, dynamic> j) => CallHistoryModel(
+    id: j['id']?.toString() ?? '',
+    callerId: j['callerId']?.toString() ?? '',
+    calleeId: j['calleeId']?.toString() ?? '',
+    type: j['type']?.toString() ?? 'audio',
+    status: j['status']?.toString() ?? 'ended',
+    createdAt: DateTime.tryParse(j['createdAt']?.toString() ?? '')?.toLocal() ?? DateTime.now(),
+    startedAt: DateTime.tryParse(j['startedAt']?.toString() ?? '')?.toLocal(),
+    endedAt: DateTime.tryParse(j['endedAt']?.toString() ?? '')?.toLocal(),
+  );
+
+  bool get isMissed => status == 'missed';
+  bool get isRejected => status == 'rejected';
+  bool get isVideo => type == 'video';
+}
+
+final callHistoryNotifier = ValueNotifier<Map<String, List<CallHistoryModel>>>({});
 final messagesNotifier      = ValueNotifier<Map<String, List<MessageModel>>>({});
 
 // Émis à chaque follow/unfollow d'un profil — les écrans qui affichent ce
@@ -127,6 +167,7 @@ class ChatService {
   Stream<Map<String, dynamic>> get onCallStatus => _callStatusController.stream;
 
   bool get isConnected => _isConnected;
+  String? get currentUserId => _currentUserId;
 
   // ─── Connexion Socket.io ──────────────────────────────────────────
   Future<void> connect({String? userId}) async {
@@ -210,6 +251,9 @@ class ChatService {
       final isOnline = data['isOnline'] as bool? ?? false;
       if (userId == null) return;
       _updateOnlineStatus(userId, isOnline);
+      final online = Map<String, bool>.from(onlineStatusNotifier.value);
+      online[userId] = isOnline;
+      onlineStatusNotifier.value = online;
     });
 
     // ── notification:new ──────────────────────────────────────────
@@ -254,11 +298,23 @@ class ChatService {
     });
     _socket!.on('call:rejected', (data) {
       if (data is! Map) return;
-      _callStatusController.add({'event': 'rejected', ...Map<String, dynamic>.from(data)});
+      final payload = Map<String, dynamic>.from(data);
+      _callStatusController.add({'event': 'rejected', ...payload});
+      final callerId = payload['callerId']?.toString();
+      final calleeId = payload['calleeId']?.toString();
+      final otherId = callerId == _currentUserId ? calleeId : callerId;
+      if (otherId != null && otherId.isNotEmpty) loadCallHistory(otherId);
     });
     _socket!.on('call:ended', (data) {
       if (data is! Map) return;
-      _callStatusController.add({'event': 'ended', ...Map<String, dynamic>.from(data)});
+      final payload = Map<String, dynamic>.from(data);
+      _callStatusController.add({'event': 'ended', ...payload});
+      final callerId = payload['callerId']?.toString();
+      final calleeId = payload['calleeId']?.toString();
+      final otherId = callerId == _currentUserId ? calleeId : callerId;
+      if (otherId != null && otherId.isNotEmpty) {
+        loadCallHistory(otherId);
+      }
     });
   }
 
@@ -339,6 +395,11 @@ class ChatService {
             .toList()
           ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
         conversationsNotifier.value = list;
+        final online = Map<String, bool>.from(onlineStatusNotifier.value);
+        for (final c in list) {
+          online[c.otherUserId] = c.isOnline;
+        }
+        onlineStatusNotifier.value = online;
       }
     } catch (e) {
       debugPrint('❌ loadConversations: $e');
@@ -370,6 +431,26 @@ class ChatService {
       debugPrint('❌ loadMessages: $e');
     }
     return messagesNotifier.value[otherUserId] ?? [];
+  }
+
+  Future<List<CallHistoryModel>> loadCallHistory(String otherUserId) async {
+    if (otherUserId.isEmpty) return const [];
+    try {
+      final res = await ApiService.instance.get('/calls/history/$otherUserId', auth: true);
+      if (res['success'] == true && res['data'] is List) {
+        final list = (res['data'] as List)
+            .whereType<Map>()
+            .map((j) => CallHistoryModel.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        final current = Map<String, List<CallHistoryModel>>.from(callHistoryNotifier.value);
+        current[otherUserId] = list;
+        callHistoryNotifier.value = current;
+        return list;
+      }
+    } catch (e) {
+      debugPrint('❌ loadCallHistory: $e');
+    }
+    return callHistoryNotifier.value[otherUserId] ?? const [];
   }
 
   // ─── Envoi avec optimistic UI + fallback HTTP ─────────────────────
@@ -698,6 +779,8 @@ class ChatService {
     // Ne pas laisser les conversations du compte précédent au suivant
     conversationsNotifier.value = [];
     messagesNotifier.value = {};
+    callHistoryNotifier.value = {};
+    onlineStatusNotifier.value = {};
     incomingCallNotifier.value = null;
   }
 

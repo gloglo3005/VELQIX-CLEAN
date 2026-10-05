@@ -49,6 +49,9 @@ class NotificationModel {
 // "notification:new" (voir chat_service.dart).
 final notificationsNotifier    = ValueNotifier<List<NotificationModel>>([]);
 final unreadNotifCountNotifier = ValueNotifier<int>(0);
+// Notification arrivée en temps réel. MainShell peut l'afficher sous forme
+// de bannière/SnackBar même si l'utilisateur n'est pas sur l'écran Notifications.
+final latestNotificationNotifier = ValueNotifier<NotificationModel?>(null);
 
 class NotificationService {
   NotificationService._();
@@ -107,5 +110,6 @@ class NotificationService {
   void addFromSocket(NotificationModel notif) {
     notificationsNotifier.value = [notif, ...notificationsNotifier.value];
     unreadNotifCountNotifier.value++;
+    latestNotificationNotifier.value = notif;
   }
 }
