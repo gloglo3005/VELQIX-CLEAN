@@ -1,7 +1,3 @@
-// ═══════════════════════════════════════════════════════════════════
-// PROPERTY SERVICE — VelQix
-// Remplace mock_data.dart — connecté au backend Node.js/Express
-// ═══════════════════════════════════════════════════════════════════
 
 import 'dart:io';
 import '../models/models.dart';

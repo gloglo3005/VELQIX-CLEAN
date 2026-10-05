@@ -1,184 +1,346 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'theme/app_theme.dart';
-import 'screens/auth_screens.dart';
-import 'screens/main_shell.dart';
-import 'screens/admin_dashboard_screen.dart';
-import 'screens/shared_property_screen.dart';
+
 import 'services/auth_service.dart';
 import 'services/push_notification_service.dart';
+import 'services/notification_service.dart';
+import 'theme/app_theme.dart';
+import 'utils/translations.dart';
 
-// ── Notifiers globaux accessibles partout ────────────────────────────────────
-final themeModeNotifier  = ValueNotifier<ThemeMode>(ThemeMode.light);
-final localeNotifier     = ValueNotifier<Locale>(const Locale('fr'));
+/// ===============================================================
+/// GLOBAL APP SETTINGS
+/// ===============================================================
 
-/// Code de devise actif : 'XOF' | 'EUR' | 'USD' | 'GHS' | ...
-final currencyNotifier   = ValueNotifier<String>('XOF');
+final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
 
-/// Données d'une devise : symbole, nom, taux vs XOF
+final localeNotifier = ValueNotifier<Locale>(
+  const Locale('fr'),
+);
+
+final currencyNotifier = ValueNotifier<String>('XOF');
+
+/// ===============================================================
+/// CURRENCIES
+/// ===============================================================
+
 class CurrencyInfo {
   final String code;
   final String symbol;
   final String name;
-  final double rateFromXof; // 1 XOF = X devise
-  const CurrencyInfo({required this.code, required this.symbol, required this.name, required this.rateFromXof});
+
+  const CurrencyInfo({
+    required this.code,
+    required this.symbol,
+    required this.name,
+  });
 }
 
 const List<CurrencyInfo> supportedCurrencies = [
-  CurrencyInfo(code: 'XOF', symbol: 'FCFA', name: 'Franc CFA (BCEAO)', rateFromXof: 1.0),
-  CurrencyInfo(code: 'EUR', symbol: '€',    name: 'Euro',               rateFromXof: 0.001524),
-  CurrencyInfo(code: 'USD', symbol: '\$',   name: 'Dollar US',          rateFromXof: 0.001651),
-  CurrencyInfo(code: 'GHS', symbol: '₵',    name: 'Cedi ghanéen',       rateFromXof: 0.02410),
-  CurrencyInfo(code: 'NGN', symbol: '₦',    name: 'Naira nigérian',     rateFromXof: 2.5612),
+  CurrencyInfo(
+    code: 'XOF',
+    symbol: 'FCFA',
+    name: 'Franc CFA BCEAO',
+  ),
+  CurrencyInfo(
+    code: 'EUR',
+    symbol: '€',
+    name: 'Euro',
+  ),
+  CurrencyInfo(
+    code: 'USD',
+    symbol: '\$',
+    name: 'Dollar américain',
+  ),
+  CurrencyInfo(
+    code: 'GBP',
+    symbol: '£',
+    name: 'Livre sterling',
+  ),
 ];
 
-CurrencyInfo get activeCurrency =>
-    supportedCurrencies.firstWhere((c) => c.code == currencyNotifier.value,
-        orElse: () => supportedCurrencies.first);
-
-/// Mapping code pays ISO → locale Flutter
-Locale countryCodeToLocale(String? code) {
-  final map = {
-    'GH': Locale('en'),      // Ghana → anglais
-    'US': Locale('en'),
-    'GB': Locale('en'),
-    'NG': Locale('en'),      // Nigeria
-    'ZA': Locale('en'),      // Afrique du Sud
-    'ES': Locale('es'),      // Espagne
-    'MX': Locale('es'),
-    'CO': Locale('es'),
-    'PT': Locale('pt'),      // Portugal
-    'BR': Locale('pt'),
-    'DE': Locale('de'),      // Allemagne
-    'IT': Locale('it'),      // Italie
-    'FR': Locale('fr'),      // France
-    'BE': Locale('fr'),
-    'CH': Locale('fr'),
-    'SN': Locale('fr'),      // Sénégal
-    'CI': Locale('fr'),      // Côte d'Ivoire
-    'TG': Locale('fr'),      // Togo
-    'BJ': Locale('fr'),      // Bénin
-    'CM': Locale('fr'),      // Cameroun
-    'ML': Locale('fr'),      // Mali
-    'BF': Locale('fr'),      // Burkina Faso
-    'MA': Locale('ar'),      // Maroc → arabe
-    'DZ': Locale('ar'),      // Algérie
-    'TN': Locale('ar'),      // Tunisie
-    'SA': Locale('ar'),      // Arabie Saoudite
-    'CN': Locale('zh'),
-    'JP': Locale('ja'),
-    'KR': Locale('ko'),
-    'RU': Locale('ru'),
-  };
-  return map[code?.toUpperCase()] ?? const Locale('fr');
+CurrencyInfo get activeCurrency {
+  return supportedCurrencies.firstWhere(
+    (currency) => currency.code == currencyNotifier.value,
+    orElse: () => supportedCurrencies.first,
+  );
 }
 
-void main() async {
+/// ===============================================================
+/// COUNTRY CODE -> LOCALE
+/// ===============================================================
+
+Locale countryCodeToLocale(String? countryCode) {
+  if (countryCode == null || countryCode.trim().isEmpty) {
+    return const Locale('fr');
+  }
+
+  switch (countryCode.toUpperCase()) {
+    case 'US':
+    case 'GB':
+    case 'CA':
+      return const Locale('en');
+
+    case 'FR':
+    case 'TG':
+    case 'BJ':
+    case 'CI':
+    case 'SN':
+    case 'ML':
+    case 'BF':
+    case 'NE':
+    case 'GN':
+      return const Locale('fr');
+
+    default:
+      return const Locale('fr');
+  }
+}
+
+/// ===============================================================
+/// FIREBASE BACKGROUND MESSAGE HANDLER
+/// ===============================================================
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(
+  RemoteMessage message,
+) async {
+  // Le handler s'exécute dans un isolate séparé.
+  //
+  // On initialise Firebase uniquement sur les plateformes natives.
+  // Sur le Web, FirebaseMessaging est géré différemment.
+  if (kIsWeb) {
+    return;
+  }
+
+  try {
+    // Pour le moment, on ne fait pas de traitement UI ici.
+    //
+    // Si le message contient un bloc "notification", Firebase/Android
+    // peut afficher automatiquement la notification lorsque l'application
+    // est en arrière-plan.
+    //
+    // Le traitement de l'appel sera effectué lorsque l'utilisateur ouvre
+    // la notification via onMessageOpenedApp.
+  } catch (e) {
+    debugPrint(
+      'Erreur dans firebaseMessagingBackgroundHandler: $e',
+    );
+  }
+}
+
+/// ===============================================================
+/// MAIN
+/// ===============================================================
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Handler FCM pour les messages reçus lorsque l'application est en arrière-plan.
-  // FirebaseMessaging reste optionnel tant que la configuration native Firebase
-  // n'est pas installée dans le projet complet.
-  // ignore: undefined_identifier
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  // URLs propres sur le web (https://.../bien/xyz au lieu de .../#/bien/xyz)
-  // — indispensable pour que les liens partagés soient cliquables tels quels.
+
+  /// -------------------------------------------------------------
+  /// URL STRATEGY
+  /// -------------------------------------------------------------
+  ///
+  /// Permet d'avoir des URLs propres sur Flutter Web :
+  /// /login
+  /// /properties
+  /// etc.
+  ///
   usePathUrlStrategy();
+
+  /// -------------------------------------------------------------
+  /// FIREBASE BACKGROUND HANDLER
+  /// -------------------------------------------------------------
+  ///
+  /// On ne l'enregistre pas sur le Web.
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(
+      firebaseMessagingBackgroundHandler,
+    );
+  }
+
+  /// -------------------------------------------------------------
+  /// DATE FORMATTING
+  /// -------------------------------------------------------------
   await initializeDateFormatting();
 
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-  ));
+  /// -------------------------------------------------------------
+  /// SCREEN ORIENTATION
+  /// -------------------------------------------------------------
+  ///
+  /// VELQIX est actuellement verrouillé en mode portrait.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
 
-  final alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
-  if (alreadyLoggedIn) {
-    await PushNotificationService.instance.initialize();
+  /// -------------------------------------------------------------
+  /// SYSTEM UI
+  /// -------------------------------------------------------------
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  /// -------------------------------------------------------------
+  /// AUTO LOGIN
+  /// -------------------------------------------------------------
+  bool alreadyLoggedIn = false;
+
+  try {
+    alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
+  } catch (e) {
+    debugPrint(
+      'Erreur pendant le auto-login: $e',
+    );
+
+    alreadyLoggedIn = false;
   }
 
-  // Appliquer la locale du pays enregistré au démarrage
+  /// -------------------------------------------------------------
+  /// USER SETTINGS
+  /// -------------------------------------------------------------
+  ///
+  /// Si l'utilisateur est connecté, on récupère sa langue/pays.
   if (alreadyLoggedIn) {
-   final code = AuthService.instance.currentUserOrEmpty.countryCode;
-    localeNotifier.value = countryCodeToLocale(code);
+    try {
+      final user = AuthService.instance.currentUserOrEmpty;
+
+      localeNotifier.value = countryCodeToLocale(
+        user.countryCode,
+      );
+    } catch (e) {
+      debugPrint(
+        'Erreur lors du chargement de la locale utilisateur: $e',
+      );
+
+      localeNotifier.value = const Locale('fr');
+    }
   }
 
-  runApp(VelQixApp(alreadyLoggedIn: alreadyLoggedIn));
+  /// -------------------------------------------------------------
+  /// LOCAL NOTIFICATIONS
+  /// -------------------------------------------------------------
+  ///
+  /// Cette partie est indépendante de Firebase.
+  ///
+  /// Elle permet notamment d'afficher une notification locale
+  /// lorsqu'un événement arrive via Socket.IO ou FCM en foreground.
+  try {
+    await NotificationService.instance
+        .initializeLocalNotifications();
+  } catch (e) {
+    debugPrint(
+      'Erreur initialisation notifications locales: $e',
+    );
+  }
+
+  /// -------------------------------------------------------------
+  /// PUSH NOTIFICATIONS / FCM
+  /// -------------------------------------------------------------
+  ///
+  /// FCM est initialisé uniquement si l'utilisateur est connecté.
+  ///
+  /// Sur Flutter Web, PushNotificationService.initialize()
+  /// ignore volontairement FCM pour le moment.
+  if (alreadyLoggedIn) {
+    try {
+      await PushNotificationService.instance.initialize();
+    } catch (e) {
+      debugPrint(
+        'Erreur initialisation Push Notifications: $e',
+      );
+    }
+  }
+
+  /// -------------------------------------------------------------
+  /// RUN APP
+  /// -------------------------------------------------------------
+  runApp(
+    VelQixApp(
+      alreadyLoggedIn: alreadyLoggedIn,
+    ),
+  );
 }
+
+/// ===============================================================
+/// VELQIX APP
+/// ===============================================================
 
 class VelQixApp extends StatelessWidget {
   final bool alreadyLoggedIn;
-  const VelQixApp({super.key, required this.alreadyLoggedIn});
+
+  const VelQixApp({
+    super.key,
+    required this.alreadyLoggedIn,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeModeNotifier,
-      builder: (_, mode, __) => ValueListenableBuilder<Locale>(
-        valueListenable: localeNotifier,
-        builder: (_, locale, __) => MaterialApp(
-          title: 'VelQix',
-          debugShowCheckedModeBanner: false,
-          theme:      AppTheme.lightTheme,
-          darkTheme:  AppTheme.darkTheme,
-          themeMode:  mode,
-          locale:     locale,
-          supportedLocales: const [
-            Locale('fr'), Locale('en'), Locale('es'), Locale('pt'),
-            Locale('de'), Locale('it'), Locale('ar'), Locale('zh'),
-            Locale('ja'), Locale('ko'), Locale('ru'),
-          ],
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          builder: (context, child) {
-            final isDark = mode == ThemeMode.dark ||
-                (mode == ThemeMode.system &&
-                    MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-            if (!isDark) return child ?? const SizedBox.shrink();
-            return Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0xFF1A1F2E), // fond sombre haut
-                    Color(0xFF1A1F2E), // fond sombre milieu
-                    Color(0xFF1E2433), // fond sombre bas
-                  ],
-                  stops: [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: child ?? const SizedBox.shrink(),
+      builder: (
+        context,
+        themeMode,
+        child,
+      ) {
+        return ValueListenableBuilder<Locale>(
+          valueListenable: localeNotifier,
+          builder: (
+            context,
+            locale,
+            child,
+          ) {
+            return MaterialApp(
+              title: 'VELQIX',
+
+              debugShowCheckedModeBanner: false,
+
+              /// ---------------------------------------------------
+              /// THEME
+              /// ---------------------------------------------------
+              theme: AppTheme.lightTheme,
+
+              darkTheme: AppTheme.darkTheme,
+
+              themeMode: themeMode,
+
+              /// ---------------------------------------------------
+              /// LOCALE
+              /// ---------------------------------------------------
+              locale: locale,
+
+              supportedLocales: const [
+                Locale('fr'),
+                Locale('en'),
+              ],
+
+              /// ---------------------------------------------------
+              /// LOCALIZATIONS
+              /// ---------------------------------------------------
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                DefaultMaterialLocalizations.delegate,
+                DefaultWidgetsLocalizations.delegate,
+                DefaultCupertinoLocalizations.delegate,
+              ],
+
+              /// ---------------------------------------------------
+              /// INITIAL ROUTE / HOME
+              /// ---------------------------------------------------
+              home: alreadyLoggedIn
+                  ? const MainShell()
+                  : const LoginScreen(),
             );
           },
-          home: alreadyLoggedIn
-              ? (AuthService.instance.currentUserOrEmpty.role == 'admin'
-                  ? const AdminDashboardScreen()
-                  : MainShell(username: AuthService.instance.loggedUsername))
-              : const OnboardingScreen(),
-          // Uniquement pour les routes non gérées par `home` (donc web : un
-          // lien partagé ouvert directement, ex. /bien/xyz123) — le flux de
-          // connexion normal (route '/') n'est pas affecté.
-          onGenerateRoute: (settings) {
-            final name = settings.name ?? '';
-            final match = RegExp(r'^/bien/([^/]+)/?$').firstMatch(name);
-            if (match != null) {
-              final propertyId = match.group(1)!;
-              return MaterialPageRoute(
-                builder: (_) => SharedPropertyScreen(propertyId: propertyId),
-                settings: settings,
-              );
-            }
-            return null; // route inconnue → comportement par défaut de Flutter
-          },
-        ),
-      ),
+        );
+      },
     );
   }
 }
