@@ -373,62 +373,6 @@ class _NewConversationSheetState extends State<_NewConversationSheet> {
   }
 }
 
-class _TimelineEntry {
-  final MessageModel? message;
-  final CallHistoryModel? call;
-  final DateTime at;
-  _TimelineEntry.message(this.message) : call = null, at = message!.sentAt;
-  _TimelineEntry.call(this.call) : message = null, at = call!.createdAt;
-}
-
-class _CallTimelineBubble extends StatelessWidget {
-  final CallHistoryModel call;
-  final String? currentUserId;
-  final String Function(DateTime) formatTime;
-  const _CallTimelineBubble({required this.call, required this.currentUserId, required this.formatTime});
-
-  @override
-  Widget build(BuildContext context) {
-    final outgoing = call.callerId == currentUserId;
-    final missed = call.isMissed;
-    final rejected = call.isRejected;
-    final icon = call.isVideo ? Icons.videocam_rounded : Icons.call_rounded;
-    final color = missed ? AppTheme.error : AppTheme.primary;
-    final label = missed ? (outgoing ? 'Appel sans réponse' : 'Appel manqué')
-        : rejected ? 'Appel refusé'
-        : (call.isVideo ? 'Appel vidéo' : 'Appel audio');
-    String duration = '';
-    if (call.startedAt != null && call.endedAt != null) {
-      final seconds = call.endedAt!.difference(call.startedAt!).inSeconds.clamp(0, 86400);
-      duration = '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.surface.withOpacity(0.75) : AppTheme.background,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withOpacity(0.18)),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 19, color: color),
-            const SizedBox(width: 8),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-              Row(children: [
-                Text(formatTime(call.createdAt), style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.textHint)),
-                if (duration.isNotEmpty) ...[const SizedBox(width: 7), Text(duration, style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.textSecondary))],
-              ]),
-            ]),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
 class ChatScreen extends StatefulWidget {
   final dynamic user;
   final String? propertyTitre;
@@ -815,10 +759,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.primary,
                         fontStyle: FontStyle.italic))
               else
-                ValueListenableBuilder<Map<String, bool>>(
-                  valueListenable: onlineStatusNotifier,
-                  builder: (_, onlineMap, __) {
-                    final online = onlineMap[_otherUserId] ?? false;
+                ValueListenableBuilder<List<Conversation>>(
+                  valueListenable: conversationsNotifier,
+                  builder: (_, conversations, __) {
+                    final conv = conversations.where((c) => c.otherUserId == _otherUserId).firstOrNull;
+                    final online = conv?.isOnline ?? false;
                     return Row(children: [
                       Container(width: 7, height: 7,
                           decoration: BoxDecoration(
@@ -826,10 +771,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               shape: BoxShape.circle)),
                       const SizedBox(width: 4),
                       Text(online ? tr('msg_online') : 'Hors ligne',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: online ? AppTheme.success : AppTheme.textSecondary,
-                          )),
+                          style: GoogleFonts.poppins(fontSize: 11, color: online ? AppTheme.success : AppTheme.textHint)),
                     ]);
                   },
                 ),
@@ -893,17 +835,16 @@ class _ChatScreenState extends State<ChatScreen> {
             child: ValueListenableBuilder<Map<String, List<MessageModel>>>(
               valueListenable: messagesNotifier,
               builder: (context, allMessages, _) {
-                final messages = allMessages[_otherUserId] ?? [];
-                return ValueListenableBuilder<Map<String, List<CallHistoryModel>>>(
+                return ValueListenableBuilder<Map<String, List<MessageModel>>>(
                   valueListenable: callHistoryNotifier,
                   builder: (context, allCalls, __) {
-                    final calls = allCalls[_otherUserId] ?? [];
-                    final timeline = <_TimelineEntry>[];
-                    for (final m in messages) timeline.add(_TimelineEntry.message(m));
-                    for (final c in calls) timeline.add(_TimelineEntry.call(c));
-                    timeline.sort((a, b) => a.at.compareTo(b.at));
-                        if (timeline.isEmpty) {
-                      return Center(
+                    final messages = [
+                      ...(allMessages[_otherUserId] ?? []),
+                      ...(allCalls[_otherUserId] ?? []),
+                    ]..sort((a, b) => a.sentAt.compareTo(b.sentAt));
+
+                if (messages.isEmpty) {
+                  return Center(
                     child: Text('Aucun message pour l\'instant',
                         style: GoogleFonts.poppins(fontSize: 13,
                             color: Theme.of(context).textTheme.bodySmall?.color
@@ -911,20 +852,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
-                    return ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      itemCount: timeline.length,
-                      itemBuilder: (_, i) {
-                        final entry = timeline[i];
-                        if (entry.call != null) {
-                          return _CallTimelineBubble(
-                            call: entry.call!,
-                            currentUserId: ChatService.instance.currentUserId,
-                            formatTime: _formatTime,
-                          );
-                        }
-                        final msg = entry.message!;
+                return ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final msg   = messages[i];
                     final isMe  = msg.senderId != _otherUserId;
                     final time  = _formatTime(msg.timestamp);
 
@@ -960,7 +893,21 @@ class _ChatScreenState extends State<ChatScreen> {
                                       blurRadius: 6)
                                 ],
                               ),
-                              child: Column(
+                              child: msg.id.startsWith('call_')
+                                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                      Icon(
+                                        msg.text.contains('manqué') ? Icons.phone_missed_rounded : Icons.call_rounded,
+                                        size: 18,
+                                        color: isMe ? Colors.white : AppTheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(msg.text, style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        color: isMe ? Colors.white : AppTheme.textPrimary,
+                                        fontWeight: FontWeight.w500,
+                                      )),
+                                    ])
+                                  : Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   msg.isImage
@@ -997,8 +944,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     );
                   },
                 );
-              },
-            );
+                  },
+                );
               },
             ),
           ),
