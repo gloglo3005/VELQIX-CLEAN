@@ -1,75 +1,90 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
 
+/// ===============================================================
+/// NOTIFICATION MODEL
+/// ===============================================================
+
 class NotificationModel {
   final String id;
-  final String titre;
-  final String corps;
-  final bool isRead;
+  final String title;
+  final String message;
   final String type;
-  final dynamic data;
+  final bool isRead;
   final DateTime createdAt;
+  final Map<String, dynamic>? data;
 
-  NotificationModel({
+  const NotificationModel({
     required this.id,
-    required this.titre,
-    required this.corps,
-    required this.isRead,
+    required this.title,
+    required this.message,
     required this.type,
-    this.data,
+    required this.isRead,
     required this.createdAt,
+    this.data,
   });
 
-  NotificationModel copyWith({
-    bool? isRead,
-  }) {
+  factory NotificationModel.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    final rawDate = json['createdAt']?.toString();
+
+    final rawData = json['data'];
+
+    Map<String, dynamic>? parsedData;
+
+    if (rawData is Map) {
+      parsedData = Map<String, dynamic>.from(rawData);
+    }
+
     return NotificationModel(
-      id: id,
-      titre: titre,
-      corps: corps,
-      isRead: isRead ?? this.isRead,
-      type: type,
-      data: data,
-      createdAt: createdAt,
+      id: json['id']?.toString() ??
+          json['_id']?.toString() ??
+          '',
+      title: json['title']?.toString() ?? '',
+      message: json['message']?.toString() ??
+          json['body']?.toString() ??
+          '',
+      type: json['type']?.toString() ?? 'general',
+      isRead:
+          json['isRead'] == true ||
+          json['isRead'] == 1 ||
+          json['isRead']?.toString().toLowerCase() ==
+              'true',
+      createdAt: rawDate != null
+          ? DateTime.tryParse(rawDate) ??
+              DateTime.now()
+          : DateTime.now(),
+      data: parsedData,
     );
   }
 
-  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+  NotificationModel copyWith({
+    String? id,
+    String? title,
+    String? message,
+    String? type,
+    bool? isRead,
+    DateTime? createdAt,
+    Map<String, dynamic>? data,
+  }) {
     return NotificationModel(
-      id: json['id']?.toString() ?? '',
-      titre: json['titre']?.toString() ?? '',
-      corps: json['corps']?.toString() ?? '',
-      isRead: json['isRead'] == true,
-      type: json['type']?.toString() ?? 'system',
-      data: json['data'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString()) ??
-              DateTime.now()
-          : DateTime.now(),
+      id: id ?? this.id,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      type: type ?? this.type,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+      data: data ?? this.data,
     );
   }
 }
 
-// ───────────────────────────────────────────────────────────────────
-// NOTIFIERS GLOBAUX
-// ───────────────────────────────────────────────────────────────────
-//
-// notificationsNotifier
-// → contient la liste des notifications.
-//
-// unreadNotifCountNotifier
-// → contient le nombre de notifications non lues.
-//
-// latestNotificationNotifier
-// → permet de prévenir immédiatement l'interface lorsqu'une nouvelle
-//   notification arrive, notamment pour afficher une SnackBar.
-//
-// Ce dernier notifier était utilisé par main_shell.dart et
-// push_notification_service.dart mais n'était pas déclaré.
-// ───────────────────────────────────────────────────────────────────
+/// ===============================================================
+/// GLOBAL NOTIFIERS
+/// ===============================================================
 
 final notificationsNotifier =
     ValueNotifier<List<NotificationModel>>([]);
@@ -79,6 +94,10 @@ final unreadNotifCountNotifier =
 
 final latestNotificationNotifier =
     ValueNotifier<NotificationModel?>(null);
+
+/// ===============================================================
+/// SERVICE
+/// ===============================================================
 
 class NotificationService {
   NotificationService._();
@@ -93,220 +112,339 @@ class NotificationService {
 
   bool _localReady = false;
 
-  // ────────────────────────────────────────────────────────────────
-  // NOTIFICATIONS LOCALES
-  // ────────────────────────────────────────────────────────────────
+  /// =============================================================
+  /// LOCAL NOTIFICATIONS INITIALIZATION
+  /// =============================================================
 
   Future<void> initializeLocalNotifications() async {
-    // Les notifications locales natives ne sont pas nécessaires sur Web.
-    if (_localReady || kIsWeb) {
+    if (kIsWeb || _localReady) {
       return;
     }
 
-    const android = AndroidInitializationSettings(
+    const androidSettings =
+        AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
 
-    const settings = InitializationSettings(
-      android: android,
+    const initializationSettings =
+        InitializationSettings(
+      android: androidSettings,
     );
 
-    await _local.initialize(settings);
+    await _local.initialize(
+      initializationSettings,
+    );
 
-    final androidImpl =
+    final androidPlugin =
         _local.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
-    await androidImpl?.requestNotificationsPermission();
-
-    await androidImpl?.createNotificationChannel(
+    await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
-        'velqix_messages',
-        'Messages et appels',
+        'velqix_notifications',
+        'VELQIX Notifications',
         description:
-            'Notifications VelQix de messages et appels',
+            'Notifications VELQIX',
         importance: Importance.high,
       ),
     );
 
+    await androidPlugin?.requestNotificationsPermission();
+
     _localReady = true;
   }
 
-  Future<void> showLocalNotification({
-    required String title,
-    required String body,
-    String payload = '',
-  }) async {
-    // Pas de notification locale native sur Web.
+  /// =============================================================
+  /// SHOW LOCAL NOTIFICATION
+  /// =============================================================
+
+  Future<void> showLocalNotification(
+    NotificationModel notification,
+  ) async {
     if (kIsWeb) {
       return;
     }
 
-    await initializeLocalNotifications();
+    if (!_localReady) {
+      await initializeLocalNotifications();
+    }
+
+    const androidDetails =
+        AndroidNotificationDetails(
+      'velqix_notifications',
+      'VELQIX Notifications',
+      channelDescription:
+          'Notifications VELQIX',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+    );
+
+    const details =
+        NotificationDetails(
+      android: androidDetails,
+    );
 
     await _local.show(
-      DateTime.now()
-          .millisecondsSinceEpoch
-          .remainder(2147483647),
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'velqix_messages',
-          'Messages et appels',
-          channelDescription:
-              'Notifications VelQix de messages et appels',
-          importance: Importance.high,
-          priority: Priority.high,
-          playSound: true,
-        ),
-      ),
-      payload: payload,
+      notification.id.hashCode,
+      notification.title,
+      notification.message,
+      details,
     );
   }
 
-  // ────────────────────────────────────────────────────────────────
-  // CHARGEMENT DES NOTIFICATIONS
-  // ────────────────────────────────────────────────────────────────
+  /// =============================================================
+  /// LOAD NOTIFICATIONS
+  /// =============================================================
 
   Future<void> loadNotifications() async {
     try {
-      final res = await _api.get(
-        '/notifications',
-        auth: true,
-      );
+      final response =
+          await _api.get('/notifications');
 
-      if (res['success'] != true) {
-        return;
+      final dynamic rawData =
+          response['data'];
+
+      List<dynamic> rawNotifications = [];
+
+      int? serverUnreadCount;
+
+      if (rawData is List) {
+        rawNotifications = rawData;
+      } else if (rawData is Map) {
+        final nested =
+            rawData['notifications'];
+
+        if (nested is List) {
+          rawNotifications = nested;
+        }
+
+        final unread =
+            rawData['unreadCount'];
+
+        if (unread is num) {
+          serverUnreadCount = unread.toInt();
+        }
       }
 
-      final rawList = res['data'];
+      final topLevelUnread =
+          response['unreadCount'];
 
-      if (rawList is! List) {
-        return;
+      if (topLevelUnread is num) {
+        serverUnreadCount =
+            topLevelUnread.toInt();
       }
 
-      final list = rawList
-          .whereType<Map<String, dynamic>>()
-          .map(NotificationModel.fromJson)
-          .toList();
+      final notifications =
+          rawNotifications
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    NotificationModel.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
+              .toList();
 
-      notificationsNotifier.value = list;
-
-      final unreadCount = res['unreadCount'];
+      notificationsNotifier.value =
+          notifications;
 
       unreadNotifCountNotifier.value =
-          unreadCount is int ? unreadCount : 0;
+          serverUnreadCount ??
+              notifications
+                  .where(
+                    (notification) =>
+                        !notification.isRead,
+                  )
+                  .length;
     } catch (e) {
       debugPrint(
-        '⚠️ Impossible de charger les notifications: $e',
+        'Failed to load notifications: $e',
       );
     }
   }
 
-  // ────────────────────────────────────────────────────────────────
-  // MARQUER UNE NOTIFICATION COMME LUE
-  // ────────────────────────────────────────────────────────────────
+  /// =============================================================
+  /// ADD FROM SOCKET
+  /// =============================================================
 
-  Future<void> markOneRead(String id) async {
-    final list =
+  Future<void> addFromSocket(
+    NotificationModel notification,
+  ) async {
+    _insertNotification(notification);
+
+    latestNotificationNotifier.value =
+        notification;
+
+    await showLocalNotification(
+      notification,
+    );
+  }
+
+  /// =============================================================
+  /// ADD FROM PUSH
+  /// =============================================================
+
+  Future<void> addFromPush(
+    NotificationModel notification,
+  ) async {
+    _insertNotification(notification);
+
+    latestNotificationNotifier.value =
+        notification;
+
+    await showLocalNotification(
+      notification,
+    );
+  }
+
+  /// =============================================================
+  /// INSERT / UPDATE
+  /// =============================================================
+
+  void _insertNotification(
+    NotificationModel notification,
+  ) {
+    final current =
         List<NotificationModel>.from(
       notificationsNotifier.value,
     );
 
-    final idx = list.indexWhere(
-      (notification) => notification.id == id,
+    final existingIndex =
+        current.indexWhere(
+      (item) => item.id == notification.id,
     );
 
-    if (idx != -1 && !list[idx].isRead) {
-      list[idx] = list[idx].copyWith(
-        isRead: true,
+    if (existingIndex >= 0) {
+      current[existingIndex] =
+          notification;
+    } else {
+      current.insert(
+        0,
+        notification,
       );
-
-      notificationsNotifier.value = list;
-
-      unreadNotifCountNotifier.value =
-          (unreadNotifCountNotifier.value - 1)
-              .clamp(0, 1 << 30);
     }
 
+    notificationsNotifier.value =
+        current;
+
+    unreadNotifCountNotifier.value =
+        current
+            .where(
+              (item) => !item.isRead,
+            )
+            .length;
+  }
+
+  /// =============================================================
+  /// MARK ONE AS READ
+  /// =============================================================
+
+  Future<void> markOneRead(
+    String notificationId,
+  ) async {
     try {
-      await _api.put(
-        '/notifications/$id/read',
-        {},
-        auth: true,
+      await _api.patch(
+        '/notifications/$notificationId/read',
       );
     } catch (e) {
       debugPrint(
-        '⚠️ Impossible de marquer la notification comme lue: $e',
+        'Failed to mark notification as read: $e',
       );
     }
+
+    final updated =
+        notificationsNotifier.value.map(
+      (notification) {
+        if (notification.id ==
+            notificationId) {
+          return notification.copyWith(
+            isRead: true,
+          );
+        }
+
+        return notification;
+      },
+    ).toList();
+
+    notificationsNotifier.value =
+        updated;
+
+    unreadNotifCountNotifier.value =
+        updated
+            .where(
+              (notification) =>
+                  !notification.isRead,
+            )
+            .length;
   }
 
-  // ────────────────────────────────────────────────────────────────
-  // MARQUER TOUTES LES NOTIFICATIONS COMME LUES
-  // ────────────────────────────────────────────────────────────────
+  /// =============================================================
+  /// MARK ALL AS READ
+  /// =============================================================
 
   Future<void> markAllRead() async {
-    notificationsNotifier.value =
+    try {
+      await _api.patch(
+        '/notifications/read-all',
+      );
+    } catch (e) {
+      debugPrint(
+        'Failed to mark all notifications as read: $e',
+      );
+    }
+
+    final updated =
         notificationsNotifier.value
             .map(
               (notification) =>
-                  notification.copyWith(isRead: true),
+                  notification.copyWith(
+                isRead: true,
+              ),
             )
             .toList();
 
-    unreadNotifCountNotifier.value = 0;
+    notificationsNotifier.value =
+        updated;
 
+    unreadNotifCountNotifier.value = 0;
+  }
+
+  /// =============================================================
+  /// DISMISS NOTIFICATION
+  /// =============================================================
+
+  Future<void> dismiss(
+    String notificationId,
+  ) async {
     try {
-      await _api.put(
-        '/notifications/read-all',
-        {},
-        auth: true,
+      await _api.delete(
+        '/notifications/$notificationId',
       );
     } catch (e) {
       debugPrint(
-        '⚠️ Impossible de marquer toutes les notifications comme lues: $e',
+        'Failed to dismiss notification: $e',
       );
     }
-  }
 
-  // ────────────────────────────────────────────────────────────────
-  // SUPPRESSION VISUELLE
-  // ────────────────────────────────────────────────────────────────
-
-  void dismiss(String id) {
-    notificationsNotifier.value =
+    final updated =
         notificationsNotifier.value
             .where(
-              (notification) => notification.id != id,
+              (notification) =>
+                  notification.id !=
+                  notificationId,
             )
             .toList();
-  }
 
-  // ────────────────────────────────────────────────────────────────
-  // NOUVELLE NOTIFICATION REÇUE VIA SOCKET.IO
-  // ────────────────────────────────────────────────────────────────
+    notificationsNotifier.value =
+        updated;
 
-  void addFromSocket(NotificationModel notif) {
-    notificationsNotifier.value = [
-      notif,
-      ...notificationsNotifier.value,
-    ];
-
-    unreadNotifCountNotifier.value++;
-
-    // Notifie immédiatement l'interface.
-    latestNotificationNotifier.value = notif;
-
-    // Notification native uniquement sur Android/iOS.
-    showLocalNotification(
-      title: notif.titre.isEmpty
-          ? 'VelQix'
-          : notif.titre,
-      body: notif.corps,
-      payload: 'notification:${notif.id}',
-    );
+    unreadNotifCountNotifier.value =
+        updated
+            .where(
+              (notification) =>
+                  !notification.isRead,
+            )
+            .length;
   }
 }
-```
