@@ -5,6 +5,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'screens/admin_dashboard_screen.dart';
 import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
 import 'services/auth_service.dart';
@@ -55,19 +56,19 @@ const List<CurrencyInfo> supportedCurrencies = [
   ),
   CurrencyInfo(
     code: 'EUR',
-    symbol: 'â‚¬',
+    symbol: '€',
     name: 'Euro',
     rateFromXof: 655.957,
   ),
   CurrencyInfo(
     code: 'USD',
     symbol: '\$',
-    name: 'Dollar amÃ©ricain',
+    name: 'Dollar américain',
     rateFromXof: 600.0,
   ),
   CurrencyInfo(
     code: 'GBP',
-    symbol: 'Â£',
+    symbol: '£',
     name: 'Livre sterling',
     rateFromXof: 760.0,
   ),
@@ -125,10 +126,10 @@ Future<void> firebaseMessagingBackgroundHandler(
   );
 
   // Les notifications FCM contenant un bloc "notification"
-  // sont prises en charge automatiquement par le systÃ¨me
-  // lorsque l'application est en arriÃ¨re-plan.
+  // sont prises en charge automatiquement par le système
+  // lorsque l'application est en arrière-plan.
   //
-  // Les donnÃ©es d'un Ã©ventuel appel seront traitÃ©es lorsque
+  // Les données d'un éventuel appel seront traitées lorsque
   // l'utilisateur ouvre la notification.
 }
 
@@ -149,7 +150,7 @@ Future<void> main() async {
   /// FIREBASE MESSAGING
   /// =============================================================
 
-  // Le handler background FCM n'est enregistrÃ© que sur mobile.
+  // Le handler background FCM n'est enregistré que sur mobile.
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(
       firebaseMessagingBackgroundHandler,
@@ -233,6 +234,10 @@ Future<void> main() async {
   /// =============================================================
   /// PUSH NOTIFICATIONS
   /// =============================================================
+  ///
+  /// Initialisé ici uniquement si l'utilisateur est déjà connecté
+  /// au démarrage. Après une connexion manuelle, l'initialisation
+  /// est faite dans MainShell (voir initState).
 
   if (alreadyLoggedIn) {
     try {
@@ -267,6 +272,21 @@ class VelQixApp extends StatelessWidget {
     super.key,
     required this.alreadyLoggedIn,
   });
+
+  /// Écran d'accueil d'un utilisateur déjà connecté.
+  /// Même logique que LoginScreen : l'admin va sur son dashboard,
+  /// les autres sur MainShell.
+  Widget _homeForLoggedUser() {
+    final user = AuthService.instance.currentUserOrEmpty;
+
+    if (user.role == 'admin') {
+      return const AdminDashboardScreen();
+    }
+
+    return MainShell(
+      username: AuthService.instance.loggedUsername,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +333,7 @@ class VelQixApp extends StatelessWidget {
               /// =================================================
 
               home: alreadyLoggedIn
-                  ? MainShell(username: AuthService.instance.loggedUsername)
+                  ? _homeForLoggedUser()
                   : const LoginScreen(),
             );
           },
