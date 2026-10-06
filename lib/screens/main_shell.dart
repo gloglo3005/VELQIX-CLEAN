@@ -8,11 +8,11 @@ import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
 import '../theme/app_theme.dart';
 import 'add_listing_screen.dart';
-import 'explore_screen.dart';
 import 'home_screen.dart';
 import 'incoming_call_screen.dart';
 import 'messages_screen.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 
 class MainShell extends StatefulWidget {
   final String username;
@@ -48,7 +48,7 @@ class _MainShellState
 
     _pages = [
       HomeScreen(username: widget.username),
-      const ExploreScreen(),
+      const SearchScreen(),
       const SizedBox.shrink(), // emplacement du bouton "Publier"
       const MessagesScreen(),
       const ProfileScreen(),
