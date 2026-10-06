@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
-import 'screens/login_screen.dart';
+import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -55,19 +55,19 @@ const List<CurrencyInfo> supportedCurrencies = [
   ),
   CurrencyInfo(
     code: 'EUR',
-    symbol: '€',
+    symbol: 'â‚¬',
     name: 'Euro',
     rateFromXof: 655.957,
   ),
   CurrencyInfo(
     code: 'USD',
     symbol: '\$',
-    name: 'Dollar américain',
+    name: 'Dollar amÃ©ricain',
     rateFromXof: 600.0,
   ),
   CurrencyInfo(
     code: 'GBP',
-    symbol: '£',
+    symbol: 'Â£',
     name: 'Livre sterling',
     rateFromXof: 760.0,
   ),
@@ -120,10 +120,15 @@ Future<void> firebaseMessagingBackgroundHandler(
     return;
   }
 
-  // Le message est traité par Firebase lorsque l'application
-  // est en arrière-plan.
+  debugPrint(
+    'FCM background message received: ${message.messageId}',
+  );
+
+  // Les notifications FCM contenant un bloc "notification"
+  // sont prises en charge automatiquement par le systÃ¨me
+  // lorsque l'application est en arriÃ¨re-plan.
   //
-  // Le traitement spécifique d'un appel sera effectué lorsque
+  // Les donnÃ©es d'un Ã©ventuel appel seront traitÃ©es lorsque
   // l'utilisateur ouvre la notification.
 }
 
@@ -134,25 +139,41 @@ Future<void> firebaseMessagingBackgroundHandler(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  /// Flutter Web : URLs propres
+  /// =============================================================
+  /// FLUTTER WEB
+  /// =============================================================
+
   usePathUrlStrategy();
 
-  /// FCM background uniquement sur mobile.
+  /// =============================================================
+  /// FIREBASE MESSAGING
+  /// =============================================================
+
+  // Le handler background FCM n'est enregistrÃ© que sur mobile.
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(
       firebaseMessagingBackgroundHandler,
     );
   }
 
-  /// Dates
+  /// =============================================================
+  /// DATE FORMATTING
+  /// =============================================================
+
   await initializeDateFormatting();
 
-  /// Portrait
+  /// =============================================================
+  /// DEVICE ORIENTATION
+  /// =============================================================
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
 
-  /// Status/navigation bars
+  /// =============================================================
+  /// SYSTEM UI
+  /// =============================================================
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -170,10 +191,11 @@ Future<void> main() async {
   /// =============================================================
 
   try {
-    alreadyLoggedIn =
-        await AuthService.instance.tryAutoLogin();
-  } catch (e) {
+    alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
+  } catch (e, stackTrace) {
     debugPrint('Auto login error: $e');
+    debugPrint('$stackTrace');
+
     alreadyLoggedIn = false;
   }
 
@@ -183,13 +205,14 @@ Future<void> main() async {
 
   if (alreadyLoggedIn) {
     try {
-      final user =
-          AuthService.instance.currentUserOrEmpty;
+      final user = AuthService.instance.currentUserOrEmpty;
 
-      localeNotifier.value =
-          countryCodeToLocale(user.countryCode);
-    } catch (e) {
+      localeNotifier.value = countryCodeToLocale(
+        user.countryCode,
+      );
+    } catch (e, stackTrace) {
       debugPrint('Locale loading error: $e');
+      debugPrint('$stackTrace');
     }
   }
 
@@ -200,10 +223,11 @@ Future<void> main() async {
   try {
     await NotificationService.instance
         .initializeLocalNotifications();
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint(
       'Local notification initialization error: $e',
     );
+    debugPrint('$stackTrace');
   }
 
   /// =============================================================
@@ -213,15 +237,16 @@ Future<void> main() async {
   if (alreadyLoggedIn) {
     try {
       await PushNotificationService.instance.initialize();
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint(
         'Push notification initialization error: $e',
       );
+      debugPrint('$stackTrace');
     }
   }
 
   /// =============================================================
-  /// APP
+  /// RUN APP
   /// =============================================================
 
   runApp(
@@ -264,9 +289,17 @@ class VelQixApp extends StatelessWidget {
 
               debugShowCheckedModeBanner: false,
 
+              /// =================================================
+              /// THEME
+              /// =================================================
+
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: themeMode,
+
+              /// =================================================
+              /// LOCALE
+              /// =================================================
 
               locale: locale,
 
@@ -275,8 +308,12 @@ class VelQixApp extends StatelessWidget {
                 Locale('en'),
               ],
 
+              /// =================================================
+              /// INITIAL SCREEN
+              /// =================================================
+
               home: alreadyLoggedIn
-                  ? const MainShell()
+                  ? MainShell(username: AuthService.instance.loggedUsername)
                   : const LoginScreen(),
             );
           },

@@ -1,3 +1,7 @@
+// ═══════════════════════════════════════════════════════════════════
+// NOTIFICATION SERVICE — VelQix
+// ═══════════════════════════════════════════════════════════════════
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -26,6 +30,12 @@ class NotificationModel {
     this.data,
   });
 
+  /// Compatibilité avec l'ancien écran de notifications.
+  String get titre => title;
+
+  /// Compatibilité avec l'ancien écran de notifications.
+  String get corps => message;
+
   factory NotificationModel.fromJson(
     Map<String, dynamic> json,
   ) {
@@ -43,11 +53,15 @@ class NotificationModel {
       id: json['id']?.toString() ??
           json['_id']?.toString() ??
           '',
-      title: json['title']?.toString() ?? '',
+      title: json['title']?.toString() ??
+          json['titre']?.toString() ??
+          '',
       message: json['message']?.toString() ??
           json['body']?.toString() ??
+          json['corps']?.toString() ??
           '',
-      type: json['type']?.toString() ?? 'general',
+      type: json['type']?.toString() ??
+          'general',
       isRead:
           json['isRead'] == true ||
           json['isRead'] == 1 ||
@@ -92,6 +106,8 @@ final notificationsNotifier =
 final unreadNotifCountNotifier =
     ValueNotifier<int>(0);
 
+/// Dernière notification reçue en temps réel.
+/// Utilisée notamment par MainShell pour afficher un SnackBar.
 final latestNotificationNotifier =
     ValueNotifier<NotificationModel?>(null);
 
@@ -132,7 +148,9 @@ class NotificationService {
     );
 
     await _local.initialize(
-      initializationSettings,
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse:
+          _onNotificationResponse,
     );
 
     final androidPlugin =
@@ -143,8 +161,7 @@ class NotificationService {
       const AndroidNotificationChannel(
         'velqix_notifications',
         'VELQIX Notifications',
-        description:
-            'Notifications VELQIX',
+        description: 'Notifications VELQIX',
         importance: Importance.high,
       ),
     );
@@ -154,13 +171,34 @@ class NotificationService {
     _localReady = true;
   }
 
+  /// Réponse lorsque l'utilisateur touche une notification locale.
+  void _onNotificationResponse(
+    NotificationResponse response,
+  ) {
+    debugPrint(
+      'Notification locale ouverte: ${response.payload}',
+    );
+  }
+
   /// =============================================================
   /// SHOW LOCAL NOTIFICATION
   /// =============================================================
 
-  Future<void> showLocalNotification(
-    NotificationModel notification,
-  ) async {
+  /// Affiche une notification locale.
+  ///
+  /// Cette signature est volontairement basée sur des paramètres
+  /// nommés car ChatService l'utilise déjà sous cette forme :
+  ///
+  /// NotificationService.instance.showLocalNotification(
+  ///   title: '...',
+  ///   body: '...',
+  ///   payload: '...',
+  /// );
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
     if (kIsWeb) {
       return;
     }
@@ -169,12 +207,16 @@ class NotificationService {
       await initializeLocalNotifications();
     }
 
+    if (!_localReady) {
+      return;
+    }
+
+    // ✅ CORRIGÉ : id et nom du canal sont des arguments positionnels
     const androidDetails =
         AndroidNotificationDetails(
       'velqix_notifications',
       'VELQIX Notifications',
-      channelDescription:
-          'Notifications VELQIX',
+      channelDescription: 'Notifications VELQIX',
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,
@@ -185,11 +227,17 @@ class NotificationService {
       android: androidDetails,
     );
 
+    final notificationId =
+        DateTime.now().millisecondsSinceEpoch.remainder(
+          2147483647,
+        );
+
     await _local.show(
-      notification.id.hashCode,
-      notification.title,
-      notification.message,
-      details,
+      id: notificationId,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
     );
   }
 
@@ -200,7 +248,18 @@ class NotificationService {
   Future<void> loadNotifications() async {
     try {
       final response =
-          await _api.get('/notifications');
+          await _api.get(
+        '/notifications',
+        auth: true,
+      );
+
+      if (response['success'] == false) {
+        debugPrint(
+          'Failed to load notifications: '
+          '${response['message']}',
+        );
+        return;
+      }
 
       final dynamic rawData =
           response['data'];
@@ -223,7 +282,8 @@ class NotificationService {
             rawData['unreadCount'];
 
         if (unread is num) {
-          serverUnreadCount = unread.toInt();
+          serverUnreadCount =
+              unread.toInt();
         }
       }
 
@@ -277,7 +337,9 @@ class NotificationService {
         notification;
 
     await showLocalNotification(
-      notification,
+      title: notification.title,
+      body: notification.message,
+      payload: notification.id,
     );
   }
 
@@ -294,7 +356,9 @@ class NotificationService {
         notification;
 
     await showLocalNotification(
-      notification,
+      title: notification.title,
+      body: notification.message,
+      payload: notification.id,
     );
   }
 
@@ -344,9 +408,19 @@ class NotificationService {
     String notificationId,
   ) async {
     try {
-      await _api.patch(
+      final response =
+          await _api.put(
         '/notifications/$notificationId/read',
+        {},
+        auth: true,
       );
+
+      if (response['success'] == false) {
+        debugPrint(
+          'Server failed to mark notification as read: '
+          '${response['message']}',
+        );
+      }
     } catch (e) {
       debugPrint(
         'Failed to mark notification as read: $e',
@@ -385,9 +459,19 @@ class NotificationService {
 
   Future<void> markAllRead() async {
     try {
-      await _api.patch(
+      final response =
+          await _api.put(
         '/notifications/read-all',
+        {},
+        auth: true,
       );
+
+      if (response['success'] == false) {
+        debugPrint(
+          'Server failed to mark all notifications as read: '
+          '${response['message']}',
+        );
+      }
     } catch (e) {
       debugPrint(
         'Failed to mark all notifications as read: $e',
@@ -407,7 +491,8 @@ class NotificationService {
     notificationsNotifier.value =
         updated;
 
-    unreadNotifCountNotifier.value = 0;
+    unreadNotifCountNotifier.value =
+        0;
   }
 
   /// =============================================================
@@ -418,9 +503,18 @@ class NotificationService {
     String notificationId,
   ) async {
     try {
-      await _api.delete(
+      final response =
+          await _api.delete(
         '/notifications/$notificationId',
+        auth: true,
       );
+
+      if (response['success'] == false) {
+        debugPrint(
+          'Server failed to delete notification: '
+          '${response['message']}',
+        );
+      }
     } catch (e) {
       debugPrint(
         'Failed to dismiss notification: $e',

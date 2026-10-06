@@ -1,15 +1,15 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
+import 'incoming_call_screen.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({
-    super.key,
-  });
+  final String username;
+  const MainShell({super.key, required this.username});
 
   @override
   State<MainShell> createState() =>
@@ -30,7 +30,7 @@ class _MainShellState
           .loadNotifications(),
     );
 
-    /// Notification reçue en temps réel.
+    /// Notification reÃ§ue en temps rÃ©el.
     latestNotificationNotifier
         .addListener(
       _handleLatestNotification,
@@ -142,7 +142,7 @@ class _MainShellState
           return;
         }
 
-        /// Empêche une deuxième navigation.
+        /// EmpÃªche une deuxiÃ¨me navigation.
         incomingCallNotifier.value =
             null;
 
@@ -179,8 +179,8 @@ class _MainShellState
         incomingCall,
         child,
       ) {
-        /// Si un appel arrive, on ouvre l'écran
-        /// après le frame courant.
+        /// Si un appel arrive, on ouvre l'Ã©cran
+        /// aprÃ¨s le frame courant.
         if (incomingCall != null) {
           _checkIncomingCall(
             incomingCall,
@@ -266,11 +266,11 @@ class _MainShellState
      * IMPORTANT :
      *
      * Garde ici ton contenu/navigateur principal
-     * existant si MainShell possède déjà une logique
+     * existant si MainShell possÃ¨de dÃ©jÃ  une logique
      * d'onglets/navigation.
      *
-     * Cette partie ne doit pas être remplacée par
-     * une interface vide dans ton projet réel.
+     * Cette partie ne doit pas Ãªtre remplacÃ©e par
+     * une interface vide dans ton projet rÃ©el.
      */
 
     return const SizedBox.expand();

@@ -127,12 +127,14 @@ class PushNotificationService {
     String token,
   ) async {
     try {
+      // ✅ CORRIGÉ : données en 2e argument positionnel + auth: true
       await _api.put(
         '/push/token',
-        data: {
+        {
           'token': token,
           'platform': defaultTargetPlatform.name,
         },
+        auth: true,
       );
 
       debugPrint(
