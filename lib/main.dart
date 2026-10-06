@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -322,6 +323,15 @@ class VelQixApp extends StatelessWidget {
               /// =================================================
 
               locale: locale,
+
+              // ✅ CORRIGÉ : sans ces délégués, les widgets Material
+              // (TextField, etc.) plantent avec "No MaterialLocalizations
+              // found" et s'affichent en zone grise.
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
 
               supportedLocales: const [
                 Locale('fr'),
