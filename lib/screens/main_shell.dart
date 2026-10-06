@@ -6,7 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
+import '../theme/app_theme.dart';
+import 'add_listing_screen.dart';
+import 'explore_screen.dart';
+import 'home_screen.dart';
 import 'incoming_call_screen.dart';
+import 'messages_screen.dart';
+import 'profile_screen.dart';
 
 class MainShell extends StatefulWidget {
   final String username;
@@ -25,9 +31,28 @@ class _MainShellState
     extends State<MainShell> {
   bool _openingIncomingCall = false;
 
+  /// Onglet actuellement affiché.
+  /// 0 = Accueil, 1 = Explorer, 3 = Messages, 4 = Profil
+  /// (l'index 2 est le bouton "Publier", qui ouvre un écran à part).
+  int _currentIndex = 0;
+
+  /// Pages créées une seule fois : l'état de chaque onglet
+  /// (défilement, recherche...) est conservé quand on change d'onglet.
+  late final List<Widget> _pages;
+
+  static const int _publishIndex = 2;
+
   @override
   void initState() {
     super.initState();
+
+    _pages = [
+      HomeScreen(username: widget.username),
+      const ExploreScreen(),
+      const SizedBox.shrink(), // emplacement du bouton "Publier"
+      const MessagesScreen(),
+      const ProfileScreen(),
+    ];
 
     /// Enregistre le token push (sans effet s'il est déjà initialisé).
     unawaited(
@@ -56,6 +81,28 @@ class _MainShellState
     );
 
     super.dispose();
+  }
+
+  /// =============================================================
+  /// NAVIGATION
+  /// =============================================================
+
+  void _onTabTap(int index) {
+    if (index == _publishIndex) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              const AddListingScreen(),
+        ),
+      );
+      return;
+    }
+
+    if (index == _currentIndex) {
+      return;
+    }
+
+    setState(() => _currentIndex = index);
   }
 
   /// =============================================================
@@ -200,8 +247,64 @@ class _MainShellState
 
         return Scaffold(
           body: _buildBody(context),
+          bottomNavigationBar:
+              _buildBottomBar(context),
         );
       },
+    );
+  }
+
+  /// =============================================================
+  /// BOTTOM BAR
+  /// =============================================================
+
+  Widget _buildBottomBar(
+    BuildContext context,
+  ) {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: _onTabTap,
+      type: BottomNavigationBarType.fixed,
+      backgroundColor:
+          Theme.of(context).colorScheme.surface,
+      selectedItemColor: AppTheme.primary,
+      unselectedItemColor: AppTheme.textHint,
+      selectedLabelStyle:
+          GoogleFonts.poppins(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle:
+          GoogleFonts.poppins(
+        fontSize: 11,
+      ),
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home_rounded),
+          label: 'Accueil',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.explore_rounded),
+          label: 'Explorer',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(
+            Icons.add_circle_rounded,
+            size: 34,
+          ),
+          label: 'Publier',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(
+            Icons.chat_bubble_rounded,
+          ),
+          label: 'Messages',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_rounded),
+          label: 'Profil',
+        ),
+      ],
     );
   }
 
@@ -232,30 +335,32 @@ class _MainShellState
             return Positioned(
               top: 12,
               right: 12,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: Colors.red,
-                  borderRadius:
-                      BorderRadius.circular(
-                    20,
+              child: IgnorePointer(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                ),
-                child: Text(
-                  unreadCount > 99
-                      ? '99+'
-                      : unreadCount.toString(),
-                  style:
-                      GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight:
-                        FontWeight.w700,
+                  decoration:
+                      BoxDecoration(
+                    color: Colors.red,
+                    borderRadius:
+                        BorderRadius.circular(
+                      20,
+                    ),
+                  ),
+                  child: Text(
+                    unreadCount > 99
+                        ? '99+'
+                        : unreadCount.toString(),
+                    style:
+                        GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight:
+                          FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -273,17 +378,9 @@ class _MainShellState
   Widget _buildMainContent(
     BuildContext context,
   ) {
-    /*
-     * IMPORTANT :
-     *
-     * Garde ici ton contenu/navigateur principal
-     * existant si MainShell possède déjà une logique
-     * d'onglets/navigation.
-     *
-     * Cette partie ne doit pas être remplacée par
-     * une interface vide dans ton projet réel.
-     */
-
-    return const SizedBox.expand();
+    return IndexedStack(
+      index: _currentIndex,
+      children: _pages,
+    );
   }
 }
