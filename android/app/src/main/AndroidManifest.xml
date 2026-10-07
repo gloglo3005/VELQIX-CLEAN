@@ -29,6 +29,8 @@
         <intent><action android:name="android.intent.action.DIAL"/></intent>
     </queries>
 
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    
     <application
         android:label="VelQix"
         android:name="${applicationName}"
