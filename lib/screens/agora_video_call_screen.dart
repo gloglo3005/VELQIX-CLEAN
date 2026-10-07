@@ -71,6 +71,15 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     if (mounted && !_remoteJoined) setState(() => _status = s);
   }
 
+  /// Exécute une étape et, si elle échoue, ajoute son nom à l'erreur.
+  Future<void> _step(String name, Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      throw Exception('étape "$name" : $e');
+    }
+  }
+
   Future<void> _initAgora() async {
     try {
       final perms = await [Permission.camera, Permission.microphone].request();
@@ -87,19 +96,24 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
       final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
       _setStatus('Connexion Agora (${creds.token.isEmpty ? "token VIDE" : "token OK"})...');
 
+      // Chaque étape est nommée : si Agora refuse (ex. erreur -4), l'écran
+      // indique laquelle. Pas de setClientRole : il n'est pas supporté
+      // en profil "communication" (c'est la cause probable de l'erreur -4).
       final engine = createAgoraRtcEngine();
       _engine = engine;
-      await engine.initialize(RtcEngineContext(appId: creds.appId));
-      await engine.setChannelProfile(ChannelProfileType.channelProfileCommunication);
-      await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-      await engine.enableVideo();
-      await engine.enableAudio();
-      await engine.setEnableSpeakerphone(_speakerOn);
-      await engine.startPreview();
+      await _step('initialize', () => engine.initialize(RtcEngineContext(
+            appId: creds.appId,
+            channelProfile: ChannelProfileType.channelProfileCommunication,
+          )));
+      await _step('enableVideo', () => engine.enableVideo());
+      await _step('enableAudio', () => engine.enableAudio());
+      await _step('startPreview', () => engine.startPreview());
 
       engine.registerEventHandler(RtcEngineEventHandler(
         onJoinChannelSuccess: (connection, elapsed) {
           _joinTimeout?.cancel();
+          // Le haut-parleur se règle une fois dans le canal.
+          _engine?.setEnableSpeakerphone(_speakerOn).catchError((_) {});
           if (!mounted) return;
           setState(() { _joined = true; _status = 'En attente...'; });
         },
@@ -131,19 +145,18 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
         }
       });
 
-      await engine.joinChannel(
-        token: creds.token,
-        channelId: widget.channelName,
-        uid: 0,
-        options: const ChannelMediaOptions(
-          channelProfile: ChannelProfileType.channelProfileCommunication,
-          clientRoleType: ClientRoleType.clientRoleBroadcaster,
-          publishMicrophoneTrack: true,
-          publishCameraTrack: true,
-          autoSubscribeAudio: true,
-          autoSubscribeVideo: true,
-        ),
-      );
+      await _step('joinChannel', () => engine.joinChannel(
+            token: creds.token,
+            channelId: widget.channelName,
+            uid: 0,
+            options: const ChannelMediaOptions(
+              channelProfile: ChannelProfileType.channelProfileCommunication,
+              publishMicrophoneTrack: true,
+              publishCameraTrack: true,
+              autoSubscribeAudio: true,
+              autoSubscribeVideo: true,
+            ),
+          ));
     } catch (e) {
       _setStatus('Échec : $e');
     }
