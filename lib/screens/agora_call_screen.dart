@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,11 +9,12 @@ import '../services/chat_service.dart';
 import '../widgets/widgets.dart';
 
 // ── Config Agora ─────────────────────────────────────────────────────────────
-const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2'; // 
+// Utilisé seulement si le serveur ne renvoie pas d'App ID.
+const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2';
 
 class AgoraCallScreen extends StatefulWidget {
   final UserModel remoteUser;
-  final String channelName; // ex: 'chat_${userId1}_${userId2}'
+  final String channelName;
   final bool isCaller;
   final String? callId; // si fourni : ferme l'écran si l'autre raccroche/refuse avant connexion
 
@@ -31,7 +31,8 @@ class AgoraCallScreen extends StatefulWidget {
 }
 
 class _AgoraCallScreenState extends State<AgoraCallScreen> {
-  late RtcEngine _engine;
+  // Nullable : si l'initialisation échoue, on ne plante pas.
+  RtcEngine? _engine;
   bool _joined        = false;
   bool _muted         = false;
   bool _speakerOn     = true;
@@ -39,6 +40,7 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
   bool _ending        = false;
   int  _callDuration  = 0;
   Timer? _timer;
+  Timer? _joinTimeout;
   String _status = 'Appel en cours...';
   StreamSubscription? _callStatusSub;
 
@@ -47,9 +49,8 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     super.initState();
     _initAgora();
 
-    // Si un callId a été fourni (flow signaling via callSocket.ts) : si
-    // l'appel est rejeté/terminé côté serveur avant que le distant ne
-    // rejoigne le canal Agora, on ferme cet écran au lieu de rester bloqué.
+    // Si un callId a été fourni : si l'appel est rejeté/terminé côté serveur
+    // avant que le distant ne rejoigne le canal, on ferme cet écran.
     if (widget.callId != null) {
       _callStatusSub = ChatService.instance.onCallStatus.listen((data) {
         if (data['callId'] == widget.callId &&
@@ -61,57 +62,87 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     }
   }
 
+  /// Affiche l'étape en cours à l'écran ET dans la console.
+  /// Sert à voir exactement où ça bloque.
+  void _setStatus(String s) {
+    debugPrint('AGORA $s');
+    if (mounted && !_remoteJoined) setState(() => _status = s);
+  }
+
   Future<void> _initAgora() async {
-    // 1. Demander permissions micro
-    await [Permission.microphone].request();
+    try {
+      // 1. Permission micro
+      final perm = await Permission.microphone.request();
+      if (!perm.isGranted) {
+        _setStatus('Micro refusé : autorise-le dans les réglages');
+        return;
+      }
 
-    // 2. Créer le moteur Agora
-    final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
-    _engine = createAgoraRtcEngine();
-    await _engine.initialize(RtcEngineContext(appId: creds.appId));
+      // 2. Token + App ID donnés par le serveur
+      _setStatus('Récupération du token...');
+      final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
+      _setStatus('Connexion Agora (${creds.token.isEmpty ? "token VIDE" : "token OK"})...');
 
-    // 3. Audio seulement (pas de vidéo)
-    await _engine.setChannelProfile(
-        ChannelProfileType.channelProfileCommunication);
-    await _engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-    await _engine.enableAudio();
-    await _engine.setEnableSpeakerphone(_speakerOn);
+      // 3. Moteur Agora, audio seulement
+      final engine = createAgoraRtcEngine();
+      _engine = engine;
+      await engine.initialize(RtcEngineContext(appId: creds.appId));
+      await engine.setChannelProfile(ChannelProfileType.channelProfileCommunication);
+      await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await engine.enableAudio();
+      await engine.setEnableSpeakerphone(_speakerOn);
 
-    // 4. Callbacks
-    _engine.registerEventHandler(RtcEngineEventHandler(
-      onJoinChannelSuccess: (connection, elapsed) {
-        if (!mounted) return;
-        setState(() { _joined = true; _status = 'En attente...'; });
-      },
-      onUserJoined: (connection, remoteUid, elapsed) {
-        if (!mounted) return;
-        setState(() { _remoteJoined = true; _status = 'Connecté'; });
-        _startTimer();
-      },
-      onUserOffline: (connection, remoteUid, reason) {
-        if (!mounted) return;
-        setState(() { _remoteJoined = false; _status = 'Appel terminé'; });
-        Future.delayed(const Duration(seconds: 1), _endCall);
-      },
-      onError: (err, msg) {
-        if (!mounted) return;
-        setState(() => _status = 'Erreur: $msg');
-      },
-    ));
+      // 4. Callbacks
+      engine.registerEventHandler(RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {
+          _joinTimeout?.cancel();
+          if (!mounted) return;
+          setState(() { _joined = true; _status = 'En attente...'; });
+        },
+        onUserJoined: (connection, remoteUid, elapsed) {
+          if (!mounted) return;
+          setState(() { _remoteJoined = true; _status = 'Connecté'; });
+          _startTimer();
+        },
+        onUserOffline: (connection, remoteUid, reason) {
+          if (!mounted) return;
+          setState(() { _remoteJoined = false; _status = 'Appel terminé'; });
+          Future.delayed(const Duration(seconds: 1), _endCall);
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          _setStatus('Agora : ${state.name} / ${reason.name}');
+        },
+        onError: (err, msg) {
+          _setStatus('Erreur Agora : ${err.name} $msg');
+        },
+      ));
 
-    // 5. Rejoindre le canal (token vide = projet Agora sans certificat)
-    await _engine.joinChannel(
-      token: creds.token,
-      channelId: widget.channelName,
-      uid: 0,
-      options: const ChannelMediaOptions(
-        channelProfile: ChannelProfileType.channelProfileCommunication,
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-      ),
-    );
+      // Si on n'a pas rejoint au bout de 15 s, on le dit clairement.
+      _joinTimeout = Timer(const Duration(seconds: 15), () {
+        if (!_joined && mounted) {
+          _setStatus('Connexion impossible (vérifie le token et le réseau)');
+        }
+      });
+
+      // 5. Rejoindre le canal
+      await engine.joinChannel(
+        token: creds.token,
+        channelId: widget.channelName,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          publishMicrophoneTrack: true,
+          autoSubscribeAudio: true,
+        ),
+      );
+    } catch (e) {
+      _setStatus('Échec : $e');
+    }
   }
 
   void _startTimer() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _callDuration++);
     });
@@ -123,33 +154,41 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     return '$m:$s';
   }
 
+  Future<void> _releaseEngine() async {
+    final engine = _engine;
+    _engine = null;
+    if (engine == null) return;
+    try { await engine.leaveChannel(); } catch (_) {}
+    try { await engine.release(); } catch (_) {}
+  }
+
   Future<void> _endCall() async {
     if (_ending) return;
     _ending = true;
     _timer?.cancel();
+    _joinTimeout?.cancel();
     _callStatusSub?.cancel();
     if (widget.callId != null) ChatService.instance.endCallSignal(widget.callId!);
-    try { await _engine.leaveChannel(); } catch (_) {}
-    try { await _engine.release(); } catch (_) {}
+    await _releaseEngine();
     if (mounted) Navigator.of(context).pop();
   }
 
   void _toggleMute() async {
     setState(() => _muted = !_muted);
-    await _engine.muteLocalAudioStream(_muted);
+    try { await _engine?.muteLocalAudioStream(_muted); } catch (_) {}
   }
 
   void _toggleSpeaker() async {
     setState(() => _speakerOn = !_speakerOn);
-    await _engine.setEnableSpeakerphone(_speakerOn);
+    try { await _engine?.setEnableSpeakerphone(_speakerOn); } catch (_) {}
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _joinTimeout?.cancel();
     _callStatusSub?.cancel();
-    _engine.leaveChannel();
-    _engine.release();
+    _releaseEngine();
     super.dispose();
   }
 
@@ -175,15 +214,23 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
             const SizedBox(height: 8),
 
             // ── Statut / durée ────────────────────────────────────────────
-            Text(
-              _remoteJoined ? _formattedDuration : _status,
-              style: GoogleFonts.poppins(fontSize: 15, color: Colors.white60),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                _remoteJoined ? _formattedDuration : _status,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 15, color: Colors.white60),
+              ),
             ),
 
             // ── Indicateur connexion ──────────────────────────────────────
             if (!_joined) ...[
               const SizedBox(height: 20),
-              const CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+              ),
             ],
 
             const Spacer(),

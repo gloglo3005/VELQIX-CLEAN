@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -122,6 +123,12 @@ Future<void> firebaseMessagingBackgroundHandler(
     return;
   }
 
+  // Ce code tourne dans un processus séparé : Firebase doit être
+  // initialisé ici aussi.
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+
   debugPrint(
     'FCM background message received: ${message.messageId}',
   );
@@ -153,6 +160,11 @@ Future<void> main() async {
 
   // Le handler background FCM n'est enregistré que sur mobile.
   if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase init (main): $e');
+    }
     FirebaseMessaging.onBackgroundMessage(
       firebaseMessagingBackgroundHandler,
     );

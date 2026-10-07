@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'chat_service.dart';
 import 'notification_service.dart';
-import 'property_service.dart';
 
 /// ===============================================================
 /// PUSH NOTIFICATION SERVICE
@@ -127,7 +126,6 @@ class PushNotificationService {
     String token,
   ) async {
     try {
-      // ✅ CORRIGÉ : données en 2e argument positionnel + auth: true
       await _api.put(
         '/push/token',
         {
@@ -171,6 +169,11 @@ class PushNotificationService {
     /// -----------------------------------------------------------
 
     if (type == 'incoming_call') {
+      // L'app est ouverte et le socket est connecté : c'est le socket
+      // qui affiche déjà l'écran d'appel. On évite un deuxième écran.
+      if (ChatService.instance.isConnected) {
+        return;
+      }
       await _handleCallMessage(data);
       return;
     }
@@ -265,56 +268,33 @@ class PushNotificationService {
         'audio';
 
     if (callId == null ||
+        callId.isEmpty ||
         callerId == null ||
-        channelName == null) {
+        channelName == null ||
+        channelName.isEmpty) {
       debugPrint(
         'Invalid incoming call payload: $data',
       );
       return;
     }
 
-    /// -----------------------------------------------------------
-    /// BASE CALL DATA
-    /// -----------------------------------------------------------
-    ///
-    /// IMPORTANT :
-    /// On affiche l'appel même si le profil de l'appelant
-    /// n'arrive pas à être récupéré.
-    final callData =
-        <String, dynamic>{
-      'type': 'incoming_call',
+    final avatar = data['avatarUrl']?.toString() ?? '';
+
+    // Même format que l'événement socket "call:incoming" :
+    // IncomingCallScreen lit 'type' ('audio' ou 'video') et 'caller' (Map).
+    // Le nom et l'avatar viennent directement du push : pas besoin
+    // de charger le profil de l'appelant.
+    incomingCallNotifier.value = <String, dynamic>{
       'callId': callId,
       'callerId': callerId,
       'channelName': channelName,
-      'callType': callType,
+      'type': callType,
+      'caller': <String, dynamic>{
+        'id': callerId,
+        'nom': data['nom']?.toString() ?? '',
+        'prenom': data['prenom']?.toString() ?? '',
+        'avatarUrl': avatar.isEmpty ? null : avatar,
+      },
     };
-
-    incomingCallNotifier.value =
-        callData;
-
-    /// -----------------------------------------------------------
-    /// OPTIONAL CALLER PROFILE
-    /// -----------------------------------------------------------
-
-    try {
-      final caller =
-          await PropertyService.instance
-              .fetchUserProfile(
-        callerId,
-      );
-
-      if (caller != null) {
-        incomingCallNotifier.value = {
-          ...callData,
-          'caller': caller,
-        };
-      }
-    } catch (e) {
-      debugPrint(
-        'Unable to load caller profile: $e',
-      );
-
-      /// On garde l'appel actif.
-    }
   }
 }

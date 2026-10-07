@@ -28,7 +28,7 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState
-    extends State<MainShell> {
+    extends State<MainShell> with WidgetsBindingObserver {
   bool _openingIncomingCall = false;
 
   /// Onglet actuellement affiché.
@@ -42,9 +42,20 @@ class _MainShellState
 
   static const int _publishIndex = 2;
 
+  /// Quand on revient dans l'app (après l'avoir quittée), on relance le
+  /// socket : Android le coupe en arrière-plan.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ChatService.instance.reconnectIfNeeded();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     _pages = [
       HomeScreen(username: widget.username),
@@ -75,6 +86,8 @@ class _MainShellState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
     latestNotificationNotifier
         .removeListener(
       _handleLatestNotification,

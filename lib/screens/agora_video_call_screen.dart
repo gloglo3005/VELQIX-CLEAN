@@ -1,5 +1,3 @@
-
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,7 +7,8 @@ import '../models/models.dart';
 import '../services/chat_service.dart';
 import '../widgets/widgets.dart';
 
-const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2'; 
+// Utilisé seulement si le serveur ne renvoie pas d'App ID.
+const String _agoraAppId = 'ba0140cb525942b1b0f81cd26d97f3d2';
 
 class AgoraVideoCallScreen extends StatefulWidget {
   final UserModel remoteUser;
@@ -30,7 +29,8 @@ class AgoraVideoCallScreen extends StatefulWidget {
 }
 
 class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
-  late RtcEngine _engine;
+  // Nullable : si l'initialisation échoue, on ne plante pas.
+  RtcEngine? _engine;
 
   bool _joined        = false;
   bool _remoteJoined  = false;
@@ -40,11 +40,12 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
   bool _frontCamera   = true;
 
   int  _remoteUid     = 0;
-  int  _callSeconds   = 0;  // durée totale en secondes
+  int  _callSeconds   = 0;
   String _status      = 'Appel en cours...';
   bool _ending        = false;
 
-  Timer? _secondTimer;  // tick chaque seconde (durée)
+  Timer? _secondTimer;
+  Timer? _joinTimeout;
   StreamSubscription? _callStatusSub;
 
   // ── Init ──────────────────────────────────────────────────────────
@@ -64,55 +65,91 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     }
   }
 
-  Future<void> _initAgora() async {
-    await [Permission.camera, Permission.microphone].request();
-
-    final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
-    _engine = createAgoraRtcEngine();
-    await _engine.initialize(RtcEngineContext(appId: creds.appId));
-    await _engine.setChannelProfile(
-        ChannelProfileType.channelProfileCommunication);
-    await _engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
-    await _engine.enableVideo();
-    await _engine.enableAudio();
-    await _engine.startPreview();
-
-    _engine.registerEventHandler(RtcEngineEventHandler(
-      onJoinChannelSuccess: (connection, elapsed) {
-        if (!mounted) return;
-        setState(() { _joined = true; _status = 'En attente...'; });
-      },
-      onUserJoined: (connection, remoteUid, elapsed) {
-        if (!mounted) return;
-        setState(() {
-          _remoteUid    = remoteUid;
-          _remoteJoined = true;
-          _status       = 'Connecté';
-        });
-        _startBillingTimer();
-      },
-      onUserOffline: (connection, remoteUid, reason) {
-        if (!mounted) return;
-        setState(() { _remoteJoined = false; _status = 'Appel terminé'; });
-        Future.delayed(const Duration(seconds: 1), _endCall);
-      },
-      onError: (err, msg) {
-        if (mounted) setState(() => _status = 'Erreur : $msg');
-      },
-    ));
-
-    await _engine.joinChannel(
-      token: creds.token,
-      channelId: widget.channelName,
-      uid: 0,
-      options: const ChannelMediaOptions(
-        channelProfile: ChannelProfileType.channelProfileCommunication,
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-      ),
-    );
+  /// Affiche l'étape en cours à l'écran ET dans la console.
+  void _setStatus(String s) {
+    debugPrint('AGORA $s');
+    if (mounted && !_remoteJoined) setState(() => _status = s);
   }
 
-  void _startBillingTimer() {
+  Future<void> _initAgora() async {
+    try {
+      final perms = await [Permission.camera, Permission.microphone].request();
+      if (perms[Permission.microphone]?.isGranted != true) {
+        _setStatus('Micro refusé : autorise-le dans les réglages');
+        return;
+      }
+      if (perms[Permission.camera]?.isGranted != true) {
+        _setStatus('Caméra refusée : autorise-la dans les réglages');
+        return;
+      }
+
+      _setStatus('Récupération du token...');
+      final creds = await ChatService.instance.agoraCredentials(widget.channelName, _agoraAppId);
+      _setStatus('Connexion Agora (${creds.token.isEmpty ? "token VIDE" : "token OK"})...');
+
+      final engine = createAgoraRtcEngine();
+      _engine = engine;
+      await engine.initialize(RtcEngineContext(appId: creds.appId));
+      await engine.setChannelProfile(ChannelProfileType.channelProfileCommunication);
+      await engine.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
+      await engine.enableVideo();
+      await engine.enableAudio();
+      await engine.setEnableSpeakerphone(_speakerOn);
+      await engine.startPreview();
+
+      engine.registerEventHandler(RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {
+          _joinTimeout?.cancel();
+          if (!mounted) return;
+          setState(() { _joined = true; _status = 'En attente...'; });
+        },
+        onUserJoined: (connection, remoteUid, elapsed) {
+          if (!mounted) return;
+          setState(() {
+            _remoteUid    = remoteUid;
+            _remoteJoined = true;
+            _status       = 'Connecté';
+          });
+          _startTimer();
+        },
+        onUserOffline: (connection, remoteUid, reason) {
+          if (!mounted) return;
+          setState(() { _remoteJoined = false; _status = 'Appel terminé'; });
+          Future.delayed(const Duration(seconds: 1), _endCall);
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          _setStatus('Agora : ${state.name} / ${reason.name}');
+        },
+        onError: (err, msg) {
+          _setStatus('Erreur Agora : ${err.name} $msg');
+        },
+      ));
+
+      _joinTimeout = Timer(const Duration(seconds: 15), () {
+        if (!_joined && mounted) {
+          _setStatus('Connexion impossible (vérifie le token et le réseau)');
+        }
+      });
+
+      await engine.joinChannel(
+        token: creds.token,
+        channelId: widget.channelName,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          publishMicrophoneTrack: true,
+          publishCameraTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        ),
+      );
+    } catch (e) {
+      _setStatus('Échec : $e');
+    }
+  }
+
+  void _startTimer() {
     _secondTimer?.cancel();
     _secondTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -126,86 +163,98 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     return '$m:$s';
   }
 
+  Future<void> _releaseEngine() async {
+    final engine = _engine;
+    _engine = null;
+    if (engine == null) return;
+    try { await engine.stopPreview(); } catch (_) {}
+    try { await engine.leaveChannel(); } catch (_) {}
+    try { await engine.release(); } catch (_) {}
+  }
+
   // ── Fin d'appel ───────────────────────────────────────────────────
   Future<void> _endCall() async {
     if (_ending) return;
     _ending = true;
     _secondTimer?.cancel();
+    _joinTimeout?.cancel();
     _callStatusSub?.cancel();
     if (widget.callId != null) ChatService.instance.endCallSignal(widget.callId!);
-    try {
-      await _engine.stopPreview();
-      await _engine.leaveChannel();
-      await _engine.release();
-    } catch (_) {}
+    await _releaseEngine();
     if (mounted) Navigator.pop(context);
   }
-
 
   // ── Contrôles ─────────────────────────────────────────────────────
   void _toggleMute() async {
     setState(() => _muted = !_muted);
-    await _engine.muteLocalAudioStream(_muted);
+    try { await _engine?.muteLocalAudioStream(_muted); } catch (_) {}
   }
 
   void _toggleCamera() async {
     setState(() => _cameraOff = !_cameraOff);
-    await _engine.muteLocalVideoStream(_cameraOff);
+    try { await _engine?.muteLocalVideoStream(_cameraOff); } catch (_) {}
   }
 
   void _switchCamera() async {
     setState(() => _frontCamera = !_frontCamera);
-    await _engine.switchCamera();
+    try { await _engine?.switchCamera(); } catch (_) {}
   }
 
   @override
   void dispose() {
     _secondTimer?.cancel();
+    _joinTimeout?.cancel();
     _callStatusSub?.cancel();
-    try {
-      _engine.stopPreview();
-      _engine.leaveChannel();
-      _engine.release();
-    } catch (_) {}
+    _releaseEngine();
     super.dispose();
   }
 
   // ── UI ────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final engine = _engine;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(children: [
 
         // ── Vidéo distante (plein écran) ─────────────────────────────
-        if (_remoteJoined)
+        if (_remoteJoined && engine != null)
           AgoraVideoView(
             controller: VideoViewController.remote(
-              rtcEngine: _engine,
+              rtcEngine: engine,
               canvas: VideoCanvas(uid: _remoteUid),
               connection: RtcConnection(channelId: widget.channelName),
             ),
           )
         else
-          Center(child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              UserAvatar(user: widget.remoteUser, radius: 50),
-              const SizedBox(height: 16),
-              Text(widget.remoteUser.fullName,
-                  style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
-              const SizedBox(height: 8),
-              Text(_status,
-                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white60)),
-              if (!_joined) ...[
-                const SizedBox(height: 20),
-                const CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+          Center(child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                UserAvatar(user: widget.remoteUser, radius: 50),
+                const SizedBox(height: 16),
+                Text(widget.remoteUser.fullName,
+                    style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
+                const SizedBox(height: 8),
+                Text(_status,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(fontSize: 14, color: Colors.white60)),
+                if (!_joined) ...[
+                  const SizedBox(height: 20),
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+                  ),
+                ],
               ],
-            ],
+            ),
           )),
 
         // ── Prévisualisation caméra locale (coin) ─────────────────────
-        if (_joined && !_cameraOff)
+        if (_joined && !_cameraOff && engine != null)
           Positioned(
             top: 60, right: 16,
             child: ClipRRect(
@@ -214,7 +263,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
                 width: 100, height: 140,
                 child: AgoraVideoView(
                   controller: VideoViewController(
-                    rtcEngine: _engine,
+                    rtcEngine: engine,
                     canvas: const VideoCanvas(uid: 0),
                   ),
                 ),
@@ -254,7 +303,6 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
               ]),
             ),
           ),
-
 
         // ── Contrôles bas ─────────────────────────────────────────────
         Positioned(
@@ -312,7 +360,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
                   active: _speakerOn,
                   onTap: () async {
                     setState(() => _speakerOn = !_speakerOn);
-                    await _engine.setEnableSpeakerphone(_speakerOn);
+                    try { await _engine?.setEnableSpeakerphone(_speakerOn); } catch (_) {}
                   },
                 ),
               ],

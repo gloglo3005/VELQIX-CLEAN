@@ -308,8 +308,28 @@ class ChatService {
     return completer.future.timeout(const Duration(seconds: 10), onTimeout: () => null);
   }
 
+  /// Relance le socket s'il est coupé (utile au retour dans l'app après
+  /// qu'Android l'a coupé en arrière-plan).
+  void reconnectIfNeeded() {
+    final s = _socket;
+    if (s != null && !s.connected) s.connect();
+  }
+
+  /// Attend que le socket soit connecté (max [timeout]).
+  /// Utile quand on ouvre l'app depuis une notification d'appel : le socket
+  /// n'a pas encore eu le temps de se reconnecter.
+  Future<bool> waitConnected({Duration timeout = const Duration(seconds: 8)}) async {
+    if (_isConnected) return true;
+    reconnectIfNeeded();
+    final end = DateTime.now().add(timeout);
+    while (!_isConnected && DateTime.now().isBefore(end)) {
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+    return _isConnected;
+  }
+
   Future<bool> acceptCall(String callId) async {
-    if (_socket == null || !_isConnected) return false;
+    if (!await waitConnected() || _socket == null) return false;
     final completer = Completer<bool>();
     _socket!.emitWithAck(
       'call:accept',
@@ -335,15 +355,20 @@ class ChatService {
   /// d'App ID configuré, on garde [fallbackAppId] et un token vide.
   Future<({String appId, String token})> agoraCredentials(
       String channelName, String fallbackAppId) async {
-    final res = await ApiService.instance.get(
-      '/calls/agora-token?channelName=${Uri.encodeQueryComponent(channelName)}',
-      auth: true,
-    );
-    final data = res['success'] == true ? res['data'] : null;
-    if (data is Map) {
-      final appId = (data['appId'] as String?) ?? '';
-      final token = (data['token'] as String?) ?? '';
-      if (appId.isNotEmpty) return (appId: appId, token: token);
+    try {
+      final res = await ApiService.instance.get(
+        '/calls/agora-token?channelName=${Uri.encodeQueryComponent(channelName)}',
+        auth: true,
+      );
+      final data = res['success'] == true ? res['data'] : null;
+      if (data is Map) {
+        final appId = (data['appId'] as String?) ?? '';
+        final token = (data['token'] as String?) ?? '';
+        if (appId.isNotEmpty) return (appId: appId, token: token);
+      }
+      debugPrint('⚠️ AGORA: token non reçu, token vide utilisé. Réponse = $res');
+    } catch (e) {
+      debugPrint('⚠️ AGORA: erreur en demandant le token : $e');
     }
     return (appId: fallbackAppId, token: '');
   }
