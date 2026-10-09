@@ -343,7 +343,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Column(children: [
-                  const Icon(Icons.inbox_rounded, size: 48, color: AppTheme.textHint),
+                  Icon(Icons.inbox_rounded, size: 48, color: AppTheme.textHint),
                   const SizedBox(height: 12),
                   Text('Aucune nouvelle annonce soumise',
                       style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary)),
@@ -371,7 +371,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         child: Padding(
           padding: const EdgeInsets.all(40),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.gavel_rounded, size: 56, color: AppTheme.textHint),
+            Icon(Icons.gavel_rounded, size: 56, color: AppTheme.textHint),
             const SizedBox(height: 16),
             Text('Aucun litige pour le moment',
                 style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
@@ -610,7 +610,7 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
                 child: p.images.isNotEmpty && p.images.first.startsWith('http')
                     ? Image.network(p.images.first, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(color: AppTheme.divider,
-                            child: const Icon(Icons.image_rounded, color: AppTheme.textHint)))
+                            child: Icon(Icons.image_rounded, color: AppTheme.textHint)))
                     : Container(color: AppTheme.primary.withOpacity(0.1),
                         child: const Icon(Icons.home_rounded, color: AppTheme.primary, size: 28)),
               ),

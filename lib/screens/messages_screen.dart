@@ -1143,7 +1143,7 @@ class _ImageMessageBubble extends StatelessWidget {
           errorBuilder: (_, __, ___) => Container(
             width: 180, height: 180,
             color: AppTheme.background,
-            child: const Icon(Icons.broken_image_rounded, color: AppTheme.textHint),
+            child: Icon(Icons.broken_image_rounded, color: AppTheme.textHint),
           ),
         ),
       ),

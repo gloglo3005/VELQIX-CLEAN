@@ -6,6 +6,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../models/models.dart';
 import '../services/property_service.dart';
 import '../services/auth_service.dart';
+import '../services/avis_service.dart';
 import '../services/chat_service.dart' show followersUpdateNotifier, propertyViewsUpdateNotifier;
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
@@ -14,6 +15,7 @@ import '../main.dart' show currencyNotifier, localeNotifier;
 import 'messages_screen.dart';
 import 'owner_profile_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel property;
@@ -33,6 +35,28 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   // Maintenant : chargés depuis GET /api/properties/:id/avis.
   List<AvisModel> _avis = [];
   bool _avisLoading = true;
+
+  // Note / nombre d'avis recalculés depuis la liste réelle des avis : évite
+  // d'afficher la valeur périmée de widget.property après un ajout/suppression.
+  double? _ratingLive;
+  int? _totalAvisLive;
+  double get _rating => _ratingLive ?? widget.property.rating;
+  int get _totalAvis => _totalAvisLive ?? widget.property.totalAvis;
+
+  /// L'avis laissé par l'utilisateur connecté sur ce bien (null s'il n'en a pas).
+  AvisModel? get _myAvis {
+    final uid = AuthService.instance.currentUser?.id;
+    if (uid == null) return null;
+    for (final a in _avis) {
+      if (a.auteur.id == uid) return a;
+    }
+    return null;
+  }
+
+  bool get _isMyProperty {
+    final uid = AuthService.instance.currentUser?.id;
+    return uid != null && uid == widget.property.proprietaire.id;
+  }
 
   // ⚠️ Avant : le bouton "Suivre" et les stats Abonnés/Suivi(e)s lisaient
   // followersMapNotifier/userFollowingMapNotifier — des ValueNotifier
@@ -187,10 +211,59 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   Future<void> _loadAvis() async {
     try {
-      final list = await PropertyService.instance.getAvis(widget.property.id);
-      if (mounted) setState(() { _avis = list; _avisLoading = false; });
+      final list = await AvisService.instance.getAvis(widget.property.id);
+      if (!mounted) return;
+      setState(() {
+        _avis = list;
+        _avisLoading = false;
+        if (list.isNotEmpty) {
+          final sum = list.fold<double>(0, (t, a) => t + a.note);
+          _ratingLive = (sum / list.length * 10).round() / 10;
+          _totalAvisLive = list.length;
+        }
+      });
     } catch (_) {
       if (mounted) setState(() => _avisLoading = false);
+    }
+  }
+
+  /// Appelé par le formulaire. Retourne un message d'erreur, ou null si OK.
+  Future<String?> _submitAvis(double note, String commentaire) async {
+    final r = await AvisService.instance.createAvis(
+      propertyId: widget.property.id,
+      note: note,
+      commentaire: commentaire,
+    );
+    if (r.error != null) return r.error;
+    await _loadAvis();
+    return null;
+  }
+
+  Future<void> _confirmDeleteAvis(AvisModel a) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer votre avis ?'),
+        content: const Text('Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final err = await AvisService.instance.deleteAvis(a.id);
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+    await _loadAvis();
+    if (mounted && _avis.isEmpty) {
+      setState(() { _ratingLive = 0; _totalAvisLive = 0; });
     }
   }
 
@@ -371,7 +444,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               child: Container(
                 margin: const EdgeInsets.all(10),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), shape: BoxShape.circle),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary),
+                child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary),
               ),
             ),
             actions: [
@@ -391,7 +464,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   margin: const EdgeInsets.only(top: 10, right: 16, bottom: 10),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), shape: BoxShape.circle),
-                  child: const Icon(Icons.share_rounded, size: 20, color: AppTheme.textPrimary),
+                  child: Icon(Icons.share_rounded, size: 20, color: AppTheme.textPrimary),
                 ),
               ),
             ],
@@ -483,19 +556,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                   Row(children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.textHint),
+                    Icon(Icons.location_on_outlined, size: 16, color: AppTheme.textHint),
                     const SizedBox(width: 4),
                     Expanded(child: Text(p.adresse.full, style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary))),
                   ]),
                   const SizedBox(height: 8),
                   Row(children: [
-                    const Icon(Icons.remove_red_eye_outlined, size: 14, color: AppTheme.textHint),
+                    Icon(Icons.remove_red_eye_outlined, size: 14, color: AppTheme.textHint),
                     const SizedBox(width: 4),
                     Text('${_liveVues ?? p.vues} ${tr("detail_views")}', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(width: 12),
                     const Icon(Icons.star_rounded, size: 14, color: AppTheme.accentLight),
                     const SizedBox(width: 3),
-                    Text('${p.rating} (${p.totalAvis} ${tr("detail_reviews")})', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text('${_rating.toStringAsFixed(1)} ($_totalAvis ${tr("detail_reviews")})', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
                   ]),
 
                   const SizedBox(height: 20),
@@ -702,22 +775,59 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ),
                   ),
 
+                  // Vidéo de l'annonce
+                  if (p.videoUrl != null && p.videoUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Text('Vidéo', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 10),
+                    _VideoCard(url: p.videoUrl!),
+                  ],
+
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 16),
 
-                  // Reviews
-                  if (avis.isNotEmpty) ...[
-                    Row(children: [
-                      Text(tr('detail_reviews_title'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                  // Reviews — section toujours visible (avant : masquée tant qu'il
+                  // n'y avait aucun avis, donc impossible d'en laisser un premier).
+                  Row(children: [
+                    Text(tr('detail_reviews_title'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                    if (avis.isNotEmpty) ...[
                       const SizedBox(width: 8),
-                      RatingBarIndicator(rating: p.rating, itemBuilder: (_, __) => const Icon(Icons.star_rounded, color: AppTheme.accentLight), itemCount: 5, itemSize: 16),
+                      RatingBarIndicator(rating: _rating, itemBuilder: (_, __) => const Icon(Icons.star_rounded, color: AppTheme.accentLight), itemCount: 5, itemSize: 16),
                       const SizedBox(width: 6),
-                      Text('${p.rating}', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
-                    ]),
-                    const SizedBox(height: 12),
-                    ...avis.map((a) => _AvisCard(avis: a)),
-                  ],
+                      Text(_rating.toStringAsFixed(1), style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+                    ],
+                  ]),
+                  const SizedBox(height: 12),
+
+                  // Formulaire : connecté, pas le propriétaire, pas encore d'avis
+                  if (!AuthService.instance.isLoggedIn)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text('Connectez-vous pour laisser un avis.',
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                    )
+                  else if (!_isMyProperty && _myAvis == null && !_avisLoading)
+                    _AvisForm(onSubmit: _submitAvis),
+
+                  if (_avisLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  else if (avis.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text('Aucun avis pour le moment.',
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                    )
+                  else
+                    ...avis.map((a) => _AvisCard(
+                          avis: a,
+                          onDelete: (a.id == _myAvis?.id || AuthService.instance.currentUser?.role == 'admin')
+                              ? () => _confirmDeleteAvis(a)
+                              : null,
+                        )),
 
                   const SizedBox(height: 80),
                 ],
@@ -875,7 +985,8 @@ class _StatusBanner extends StatelessWidget {
 
 class _AvisCard extends StatelessWidget {
   final AvisModel avis;
-  const _AvisCard({required this.avis});
+  final VoidCallback? onDelete;
+  const _AvisCard({required this.avis, this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -899,9 +1010,223 @@ class _AvisCard extends StatelessWidget {
               ),
             ),
             Text('${avis.createdAt.day}/${avis.createdAt.month}/${avis.createdAt.year}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
+            if (onDelete != null)
+              IconButton(
+                tooltip: 'Supprimer',
+                icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.red),
+                onPressed: onDelete,
+              ),
           ]),
           const SizedBox(height: 8),
           Text(avis.commentaire, style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.5)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Vidéo de l'annonce ──────────────────────────────────────────────────────
+class _VideoCard extends StatelessWidget {
+  final String url;
+  const _VideoCard({required this.url});
+
+  // Cloudinary génère une image de la vidéo en changeant l'extension en .jpg
+  String get _thumb => url.replaceFirst(RegExp(r'\.[a-zA-Z0-9]+$'), '.jpg');
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        barrierColor: Colors.black.withOpacity(0.9),
+        builder: (_) => _VideoPlayerDialog(url: url),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(fit: StackFit.expand, children: [
+            Image.network(_thumb, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: Colors.black87)),
+            Container(color: Colors.black26),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.play_arrow_rounded, size: 36, color: Colors.black87),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoPlayerDialog extends StatefulWidget {
+  final String url;
+  const _VideoPlayerDialog({required this.url});
+
+  @override
+  State<_VideoPlayerDialog> createState() => _VideoPlayerDialogState();
+}
+
+class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
+  VideoPlayerController? _ctrl;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      _ctrl = c;
+      await c.initialize();
+      if (!mounted) return;
+      setState(() {});
+      c.play();
+    } catch (_) {
+      // Lecteur intégré indisponible (ex: Windows) → on ouvre le navigateur.
+      if (!mounted) return;
+      setState(() => _failed = true);
+      final uri = Uri.parse(widget.url);
+      if (await canLaunchUrl(uri)) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _ctrl;
+    final ready = c != null && c.value.isInitialized && !_failed;
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: const EdgeInsets.all(12),
+      child: Stack(children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 200),
+          child: ready
+              ? Column(mainAxisSize: MainAxisSize.min, children: [
+                  AspectRatio(aspectRatio: c.value.aspectRatio, child: VideoPlayer(c)),
+                  VideoProgressIndicator(c, allowScrubbing: true),
+                  IconButton(
+                    icon: Icon(c.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 32),
+                    onPressed: () => setState(() => c.value.isPlaying ? c.pause() : c.play()),
+                  ),
+                ])
+              : const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
+        ),
+        Positioned(
+          top: 4, right: 4,
+          child: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─── Formulaire d'avis ────────────────────────────────────────────────────────
+class _AvisForm extends StatefulWidget {
+  /// Retourne un message d'erreur, ou null en cas de succès.
+  final Future<String?> Function(double note, String commentaire) onSubmit;
+  const _AvisForm({required this.onSubmit});
+
+  @override
+  State<_AvisForm> createState() => _AvisFormState();
+}
+
+class _AvisFormState extends State<_AvisForm> {
+  final _ctrl = TextEditingController();
+  double _note = 0;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_note < 1) {
+      setState(() => _error = 'Choisissez une note de 1 à 5 étoiles.');
+      return;
+    }
+    if (_ctrl.text.trim().isEmpty) {
+      setState(() => _error = 'Écrivez un commentaire.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    final err = await widget.onSubmit(_note, _ctrl.text.trim());
+    if (!mounted) return;
+    // En cas de succès, le parent recharge les avis et ce formulaire disparaît.
+    setState(() { _busy = false; _error = err; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Donnez votre avis',
+              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          RatingBar.builder(
+            initialRating: _note,
+            minRating: 1,
+            itemCount: 5,
+            itemSize: 30,
+            allowHalfRating: false,
+            itemBuilder: (_, __) => const Icon(Icons.star_rounded, color: AppTheme.accentLight),
+            onRatingUpdate: (v) => setState(() { _note = v; _error = null; }),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _ctrl,
+            maxLines: 3,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              hintText: 'Votre commentaire...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _busy ? null : _send,
+              child: _busy
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Publier mon avis'),
+            ),
+          ),
         ],
       ),
     );

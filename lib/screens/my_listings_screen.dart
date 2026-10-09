@@ -29,8 +29,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
   // fusionner avec MockDataService ni de deviner l'état localement.
   List<PropertyModel> get _myProps => _serverProps;
 
+  // Onglet « En attente » : annonces en cours de validation ET refusées
+  // (avant, les refusées n'apparaissaient nulle part avec une action possible).
   List<PropertyModel> get _myPendingProps =>
-      _serverProps.where((p) => p.status == 'en_attente').toList();
+      _serverProps.where((p) => p.status != 'approuve').toList();
 
   List<PropertyModel> get _activeProps =>
       _serverProps.where((p) => p.isAvailable && p.status == 'approuve').toList();
@@ -89,7 +91,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
           child: Container(margin: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(12),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)]),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary)),
+              child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary)),
         ),
         title: Text(tr('mylist_title'), style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         centerTitle: true,
@@ -159,7 +161,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
       itemCount: props.length,
       itemBuilder: (_, i) {
         final p = props[i];
-        return _PendingPropertyCard(property: p);
+        return _PendingPropertyCard(
+          property: p,
+          onEdit: () => _editProperty(p),
+          onResubmit: () => _resubmit(p),
+        );
       },
     );
   }
@@ -181,11 +187,34 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
       itemBuilder: (_, i) => _ListingManageCard(
         property: props[i],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: props[i]))),
-        onEdit: () {}, // Modification pas encore implémentée
+        onEdit: () => _editProperty(props[i]),
         onDelete: () => _confirmDelete(context, props[i]),
         onToggle: (newValue) => _toggleAvailability(props[i], newValue),
       ),
     );
+  }
+
+  // ─── Modifier une annonce (ouvre le formulaire pré-rempli) ─────────────────
+  Future<void> _editProperty(PropertyModel p) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddListingScreen(editing: p)),
+    );
+    if (mounted) _loadMyProperties();
+  }
+
+  // ─── Soumettre à nouveau une annonce refusée ───────────────────────────────
+  Future<void> _resubmit(PropertyModel p) async {
+    final err = await PropertyService.instance.submitProperty(p.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(err ?? 'Annonce soumise à nouveau. En attente de validation.',
+          style: GoogleFonts.poppins(color: Colors.white)),
+      backgroundColor: err != null ? AppTheme.error : AppTheme.warning,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+    _loadMyProperties();
   }
 
   // ─── Activer / mettre en pause une annonce (persisté côté serveur) ─────────
@@ -319,9 +348,19 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                         Text(p.titre, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: _active ? AppTheme.textPrimary : AppTheme.textHint), maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 3),
                         Text(p.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+                        if (p.status != 'approuve') ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            p.status == 'rejete' ? 'Refusée' : 'En attente de validation',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10, fontWeight: FontWeight.w600,
+                              color: p.status == 'rejete' ? AppTheme.error : AppTheme.warning,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 6),
                         Row(children: [
-                          const Icon(Icons.remove_red_eye_outlined, size: 13, color: AppTheme.textHint),
+                          Icon(Icons.remove_red_eye_outlined, size: 13, color: AppTheme.textHint),
                           const SizedBox(width: 3),
                           Text('${p.vues} vues', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
                           const SizedBox(width: 8),
@@ -395,7 +434,9 @@ class _ListingManageCardState extends State<_ListingManageCard> {
 // ─── Carte d'annonce en attente avec son statut serveur ──────────────────────
 class _PendingPropertyCard extends StatelessWidget {
   final PropertyModel property;
-  const _PendingPropertyCard({required this.property});
+  final VoidCallback? onEdit;
+  final VoidCallback? onResubmit;
+  const _PendingPropertyCard({required this.property, this.onEdit, this.onResubmit});
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +468,7 @@ class _PendingPropertyCard extends StatelessWidget {
       badgeBg = AppTheme.error.withOpacity(0.08);
       badgeText = AppTheme.error;
       statusIcon = Icons.error_outline_rounded;
-      statusLabel = tr('mylist_status_not_submitted');
+      statusLabel = 'Refusée';
     }
 
     return Container(
@@ -451,7 +492,7 @@ class _PendingPropertyCard extends StatelessWidget {
                     ? Image.network(p.images.first, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                             color: AppTheme.divider,
-                            child: const Icon(Icons.image_rounded, color: AppTheme.textHint)))
+                            child: Icon(Icons.image_rounded, color: AppTheme.textHint)))
                     : Container(
                         color: AppTheme.primary.withOpacity(0.1),
                         child: const Icon(Icons.home_rounded, color: AppTheme.primary, size: 28)),
@@ -478,6 +519,28 @@ class _PendingPropertyCard extends StatelessWidget {
             ])),
           ]),
         ),
+        if (!published && (onEdit != null || onResubmit != null)) ...[
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              if (onEdit != null)
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: Text('Modifier le bien', style: GoogleFonts.poppins(fontSize: 12)),
+                ),
+              if (p.status == 'rejete' && onResubmit != null) ...[
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: onResubmit,
+                  icon: const Icon(Icons.publish_rounded, size: 16),
+                  label: Text('Soumettre à nouveau', style: GoogleFonts.poppins(fontSize: 12)),
+                ),
+              ],
+            ]),
+          ),
+        ],
       ]),
     );
   }

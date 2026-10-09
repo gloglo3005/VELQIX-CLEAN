@@ -102,7 +102,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)],
             ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary),
+            child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary),
           ),
         ),
         title: Text(tr('fav_title'),
@@ -219,7 +219,7 @@ class _FavoriteCard extends StatelessWidget {
                     ]),
                     const SizedBox(height: 4),
                     Row(children: [
-                      const Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textHint),
+                      Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textHint),
                       const SizedBox(width: 3),
                       Text(p.adresse.short,
                           style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),

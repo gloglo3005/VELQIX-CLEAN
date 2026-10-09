@@ -112,6 +112,7 @@ class PropertyModel {
   final double prix;
   final String? prixParJour;
   final List<String> images;
+  final String? videoUrl; // vidéo de l'annonce (Cloudinary), optionnelle
   final AddressModel adresse;
   final UserModel proprietaire;
   final List<String> caracteristiques;
@@ -142,6 +143,7 @@ class PropertyModel {
     required this.prix,
     this.prixParJour,
     required this.images,
+    this.videoUrl,
     required this.adresse,
     required this.proprietaire,
     this.caracteristiques = const [],
@@ -279,6 +281,7 @@ class PropertyModel {
       prix:            (json['prix'] ?? 0).toDouble(),
       prixParJour:     json['prixParJour']?.toString(),
       images:          (json['images'] as List?)?.cast<String>() ?? [],
+      videoUrl:        (json['videoUrl'] as String?)?.trim().isEmpty == true ? null : json['videoUrl'] as String?,
       adresse:         adresse,
       proprietaire:    proprietaire,
       caracteristiques:(json['caracteristiques'] as List?)?.cast<String>() ?? [],

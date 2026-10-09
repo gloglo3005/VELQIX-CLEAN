@@ -6,6 +6,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/auth_screens.dart';
@@ -198,6 +199,26 @@ Future<void> main() async {
     ),
   );
 
+  /// =============================================================
+  /// THEME (clair / sombre) — restauré puis sauvegardé
+  /// =============================================================
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('theme_mode');
+    themeModeNotifier.value =
+        saved == 'dark' ? ThemeMode.dark : ThemeMode.light;
+    AppTheme.isDark = themeModeNotifier.value == ThemeMode.dark;
+    themeModeNotifier.addListener(() {
+      prefs.setString(
+        'theme_mode',
+        themeModeNotifier.value == ThemeMode.dark ? 'dark' : 'light',
+      );
+    });
+  } catch (e) {
+    debugPrint('Theme restore error: $e');
+  }
+
   bool alreadyLoggedIn = false;
 
   /// =============================================================
@@ -330,6 +351,11 @@ class VelQixApp extends StatelessWidget {
               darkTheme: AppTheme.darkTheme,
               themeMode: themeMode,
 
+              /// Synchronise AppTheme.isDark avec le thème réellement actif
+              /// et force le rafraîchissement de tout l'écran au changement.
+              builder: (context, child) =>
+                  _ThemeSync(child: child ?? const SizedBox.shrink()),
+
               /// =================================================
               /// LOCALE
               /// =================================================
@@ -362,5 +388,61 @@ class VelQixApp extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// ===============================================================
+/// THEME SYNC
+/// ===============================================================
+///
+/// AppTheme.surface / textPrimary / border... dépendent de AppTheme.isDark.
+/// Les widgets qui n'écoutent pas le Theme ne se reconstruisent pas seuls au
+/// changement de mode : on force donc un rebuild de tout l'arbre (la pile de
+/// navigation et les états sont conservés).
+class _ThemeSync extends StatefulWidget {
+  final Widget child;
+  const _ThemeSync({required this.child});
+
+  @override
+  State<_ThemeSync> createState() => _ThemeSyncState();
+}
+
+class _ThemeSyncState extends State<_ThemeSync> {
+  bool? _lastDark;
+
+  void _rebuildAll(Element el) {
+    el.markNeedsBuild();
+    el.visitChildren(_rebuildAll);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    AppTheme.isDark = dark;
+
+    if (_lastDark != dark) {
+      final isChange = _lastDark != null;
+      _lastDark = dark;
+
+      SystemChrome.setSystemUIOverlayStyle(
+        SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: dark ? AppTheme.darkBgSolid : Colors.white,
+          systemNavigationBarIconBrightness:
+              dark ? Brightness.light : Brightness.dark,
+        ),
+      );
+
+      if (isChange) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          (context as Element).visitChildren(_rebuildAll);
+        });
+      }
+    }
+
+    return widget.child;
   }
 }

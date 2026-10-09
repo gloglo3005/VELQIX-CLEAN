@@ -106,7 +106,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
                       decoration: InputDecoration(
                         hintText: tr('explore_search_hint'),
                         hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint),
-                        prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textHint),
+                        prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint),
                         suffixIcon: GestureDetector(
                           onTap: _showFilters,
                           child: Container(
@@ -284,7 +284,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => Container(
           height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppTheme.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -315,7 +315,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
                   decoration: InputDecoration(
                     hintText: tr('explore_search_country'),
                     hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textHint),
+                    prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint),
                     filled: true, fillColor: AppTheme.surface,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -360,7 +360,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),

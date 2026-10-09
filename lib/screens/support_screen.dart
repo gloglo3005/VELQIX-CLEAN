@@ -71,7 +71,7 @@ class SupportScreen extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(tr('support_title'),

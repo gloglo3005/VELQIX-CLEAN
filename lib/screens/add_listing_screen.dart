@@ -11,7 +11,9 @@ import '../services/web_file_picker.dart';
 import '../widgets/smart_image.dart';
 
 class AddListingScreen extends StatefulWidget {
-  const AddListingScreen({super.key});
+  /// null = création ; non-null = modification de cette annonce.
+  final PropertyModel? editing;
+  const AddListingScreen({super.key, this.editing});
   @override
   State<AddListingScreen> createState() => _AddListingScreenState();
 }
@@ -63,6 +65,36 @@ class _AddListingScreenState extends State<AddListingScreen> {
     PropertyCategory.equipement:  tr('add_cat_equipement'),
     PropertyCategory.autre:       tr('add_cat_autre'),
   };
+
+  bool get _isEdit => widget.editing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.editing;
+    if (p != null) {
+      _titreCtrl.text = p.titre;
+      _descCtrl.text  = p.description;
+      _prixCtrl.text  = p.prix % 1 == 0 ? p.prix.toInt().toString() : p.prix.toString();
+      _villeCtrl.text = p.adresse.ville;
+      _rueCtrl.text   = p.adresse.rue;
+      _type        = p.type;
+      _listingType = p.listingType;
+      _category    = p.categorie;
+      _selectedPhotos.addAll(p.images.take(2));
+      if (p.videoUrl != null && p.videoUrl!.isNotEmpty) _selectedVideos.add(p.videoUrl!);
+    }
+  }
+
+  @override
+  void dispose() {
+    _titreCtrl.dispose();
+    _descCtrl.dispose();
+    _prixCtrl.dispose();
+    _villeCtrl.dispose();
+    _rueCtrl.dispose();
+    super.dispose();
+  }
 
   // ─── Galerie ────────────────────────────────────────────────────────────────
   Future<void> _pickPhotos() async {
@@ -130,7 +162,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -194,6 +226,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 
   void _nextOrSubmit() {
+    if (_loading) return; // évite le double envoi (double-clic sur Publier)
     if (!_validateStep()) return;
     if (_currentStep < 2) {
       setState(() => _currentStep++);
@@ -224,6 +257,37 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
   }
 
+  // ─── Vidéo : extension déduite de la data-URI ou du chemin ─────────────────
+  String _videoExt(String src) {
+    var ext = RegExp(r'^data:video/([a-z0-9\-+.]+)').firstMatch(src)?.group(1) ?? '';
+    if (ext.isEmpty) {
+      ext = RegExp(r'\.(mp4|mov|webm|3gp|m4v)(\?.*)?$', caseSensitive: false)
+              .firstMatch(src)?.group(1)?.toLowerCase() ?? 'mp4';
+    }
+    if (ext == 'quicktime') return 'mov';
+    if (ext == 'x-m4v') return 'm4v';
+    return ext;
+  }
+
+  /// Envoie la vidéo sur Cloudinary (sauf si c'est déjà une URL http, cas d'une
+  /// modification où la vidéo existante est conservée).
+  Future<({String? url, String? error})> _uploadVideo(String src) async {
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      return (url: src, error: null);
+    }
+    try {
+      final bytes = await WebFilePicker.readBytes(src);
+      if (bytes == null) return (url: null, error: 'Impossible de lire la vidéo.');
+      if (bytes.length > 30 * 1024 * 1024) {
+        return (url: null, error: 'Vidéo trop volumineuse (30 Mo maximum).');
+      }
+      return await PropertyService.instance.uploadVideoBytes(bytes, 'video.${_videoExt(src)}');
+    } catch (e) {
+      debugPrint('Erreur upload vidéo : $e');
+      return (url: null, error: 'Échec de l\'envoi de la vidéo.');
+    }
+  }
+
   // ─── Soumission réelle au backend ───────────────────────────────────────────
   void _submit() async {
     if (!_validateStep()) return;
@@ -247,7 +311,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
 
     if (!mounted) return;
-    if (_selectedPhotos.isNotEmpty && uploadedImages.isEmpty) {
+    // Avant : si une photo sur deux échouait, l'annonce partait quand même
+    // avec une seule photo, sans prévenir. On bloque maintenant.
+    if (uploadedImages.length != _selectedPhotos.length) {
       setState(() => _loading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -260,14 +326,31 @@ class _AddListingScreenState extends State<AddListingScreen> {
       return;
     }
 
+    // ── Étape 1b : uploader la vidéo (optionnelle) ──
+    // Avant : la vidéo choisie n'était ni envoyée ni enregistrée.
+    String? videoUrl;
+    if (_selectedVideos.isNotEmpty) {
+      final v = await _uploadVideo(_selectedVideos.first);
+      if (!mounted) return;
+      if (v.url == null) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(v.error ?? 'Échec de l\'envoi de la vidéo.'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+        return;
+      }
+      videoUrl = v.url;
+    }
+
     final images = uploadedImages.isNotEmpty
         ? uploadedImages
         : [_categoryImageUrl(_category)];
 
     // ── Étape 2 : créer l'annonce avec les URLs (légères) au lieu du base64 ──
-    final res = await ApiService.instance.post(
-      '/properties',
-      {
+    final payload = <String, dynamic>{
         'titre': _titreCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
         'prix': prix,
@@ -278,9 +361,13 @@ class _AddListingScreenState extends State<AddListingScreen> {
         'adresse': _rueCtrl.text.trim(),
         'ville': _villeCtrl.text.trim(),
         'pays': AuthService.instance.currentUserOrEmpty.countryName ?? 'Togo',
-      },
-      auth: true,
-    );
+        // En modification, null = retirer la vidéo ; en création, rien si pas de vidéo.
+        if (_isEdit || videoUrl != null) 'videoUrl': videoUrl,
+    };
+
+    final res = _isEdit
+        ? await ApiService.instance.put('/properties/${widget.editing!.id}', payload, auth: true)
+        : await ApiService.instance.post('/properties', payload, auth: true);
 
     if (!mounted) return;
     setState(() => _loading = false);
@@ -298,6 +385,23 @@ class _AddListingScreenState extends State<AddListingScreen> {
     // Le backend a créé l'annonce et notifié l'admin (Socket.io + email).
     // On construit aussi un PropertyModel local pour un affichage optimiste
     // immédiat côté "Mes annonces" si l'écran l'utilise déjà ainsi.
+    if (_isEdit) {
+      final wasLive = widget.editing!.status != 'en_attente';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          wasLive
+              ? 'Modifications enregistrées. L\'annonce repasse en validation.'
+              : 'Modifications enregistrées.',
+          style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+        ),
+        backgroundColor: AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      Navigator.pop(context, true);
+      return;
+    }
+
     final data = res['data'] as Map<String, dynamic>;
     final newProperty = PropertyModel.fromJson(data);
     pendingPropertiesNotifier.value = [...pendingPropertiesNotifier.value, newProperty];
@@ -340,7 +444,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: tr('add_title')),
+      appBar: CustomAppBar(title: _isEdit ? 'Modifier le bien' : tr('add_title')),
       body: Column(children: [
         // Barre de progression
         Padding(
@@ -383,7 +487,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
               const SizedBox(width: 12),
             ],
             Expanded(child: PrimaryButton(
-              label: _currentStep == 2 ? tr('add_publish') : tr('add_next'),
+              label: _currentStep == 2 ? (_isEdit ? 'Enregistrer' : tr('add_publish')) : tr('add_next'),
               isLoading: _loading,
               icon: _currentStep == 2 ? Icons.publish_rounded : null,
               onPressed: _nextOrSubmit,
@@ -545,7 +649,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Row(children: [
-            const Icon(Icons.info_outline_rounded, size: 13, color: AppTheme.textHint),
+            Icon(Icons.info_outline_rounded, size: 13, color: AppTheme.textHint),
             const SizedBox(width: 5),
             Text(tr('detail_add_listing_hint'),
                 style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
@@ -599,7 +703,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       Padding(
         padding: const EdgeInsets.only(top: 6),
         child: Row(children: [
-          const Icon(Icons.info_outline_rounded, size: 13, color: AppTheme.textHint),
+          Icon(Icons.info_outline_rounded, size: 13, color: AppTheme.textHint),
           const SizedBox(width: 5),
           Text('Une vidéo améliore la visibilité de votre annonce',
               style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),

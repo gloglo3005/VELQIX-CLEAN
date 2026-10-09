@@ -36,6 +36,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     userStateNotifier.addListener(_onUserChanged);
     _loadMyListingsCount();
+    // Recharge la note/avis à jour depuis /auth/me (sinon on garde la valeur
+    // mise en cache à la connexion, qui ne bouge plus ensuite).
+    if (AuthService.instance.isLoggedIn) {
+      AuthService.instance.refreshUser();
+    }
   }
 
   Future<void> _loadMyListingsCount() async {
@@ -135,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setModal) => Container(
           height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppTheme.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -161,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   decoration: InputDecoration(
                     hintText: tr('prof_search_country'),
                     hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textHint),
+                    prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint),
                     filled: true, fillColor: Theme.of(context).colorScheme.surface,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -248,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -299,7 +304,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => ValueListenableBuilder<String>(
         valueListenable: currencyNotifier,
         builder: (ctx, activeCurrencyCode, __) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppTheme.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -470,7 +475,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               _StatPill(label: 'Annonces', value: '$_myListingsCount'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                              _StatPill(label: 'Note', value: '${user.rating} ⭐'),
+                              _StatPill(label: 'Note', value: '${user.rating.toStringAsFixed(1)} ⭐'),
                               Container(width: 1, height: 30, color: Colors.white.withOpacity(0.3), margin: const EdgeInsets.symmetric(horizontal: 16)),
                               _StatPill(label: 'Avis', value: '${user.totalAvis}'),
                             ],
@@ -552,7 +557,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   const SizedBox(height: 2),
                                   Text('${entry.$1}  ${entry.$2}', style: GoogleFonts.poppins(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
                                 ])),
-                                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
+                                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
                               ]),
                             ),
                           );
@@ -588,7 +593,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   const SizedBox(height: 2),
                                   Text(cur.name, style: GoogleFonts.poppins(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
                                 ])),
-                                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
+                                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
                               ]),
                             ),
                           );
@@ -738,7 +743,7 @@ class _MenuItem extends StatelessWidget {
           child: Text(badge!, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: badgeColor ?? AppTheme.primary)),
         ),
         const SizedBox(width: 4),
-        const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
+        Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textHint),
       ]),
     );
   }
@@ -922,7 +927,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppTheme.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -1041,7 +1046,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(children: [
-                      const Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.textHint),
+                      Icon(Icons.lock_outline_rounded, size: 14, color: AppTheme.textHint),
                       const SizedBox(width: 6),
                       Text(tr('prof_non_editable'), style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint)),
                     ]),
@@ -1236,7 +1241,7 @@ class _EditField extends StatelessWidget {
         labelStyle: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint),
         prefixIcon: Icon(icon, size: 18, color: readOnly ? AppTheme.textHint : AppTheme.primary),
         suffixIcon: readOnly
-            ? const Padding(
+            ? Padding(
                 padding: EdgeInsets.only(right: 12),
                 child: Icon(Icons.lock_outline_rounded, size: 16, color: AppTheme.textHint),
               )

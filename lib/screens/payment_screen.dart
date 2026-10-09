@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,6 +34,24 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
   bool _awaitingConfirmation = false;
   bool _checkingStatus = false;
 
+  // Sur le web (et parfois sur mobile) l'événement « resumed » n'arrive pas
+  // au retour du paiement : on interroge donc aussi le serveur toutes les
+  // 5 s (3 min max) tant qu'on attend la confirmation du webhook.
+  Timer? _poll;
+  int _pollCount = 0;
+
+  void _startPolling() {
+    _poll?.cancel();
+    _pollCount = 0;
+    _poll = Timer.periodic(const Duration(seconds: 5), (t) {
+      if (!mounted || !_awaitingConfirmation || ++_pollCount > 36) {
+        t.cancel();
+        return;
+      }
+      _checkPremiumStatus(silent: true);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +60,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
 
   @override
   void dispose() {
+    _poll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -97,9 +117,10 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
       _processing = false;
       _awaitingConfirmation = true;
     });
+    _startPolling();
   }
 
-  Future<void> _checkPremiumStatus() async {
+  Future<void> _checkPremiumStatus({bool silent = false}) async {
     if (_checkingStatus) return;
     setState(() => _checkingStatus = true);
 
@@ -109,9 +130,10 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     setState(() => _checkingStatus = false);
 
     if (AuthService.instance.currentUserOrEmpty.isPremium) {
+      _poll?.cancel();
       setState(() => _awaitingConfirmation = false);
       _showSuccess();
-    } else {
+    } else if (!silent) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Paiement pas encore confirmé. Réessaie dans quelques instants.',
             style: GoogleFonts.poppins(color: Colors.white)),
@@ -230,7 +252,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
             const SizedBox(height: 12),
             Center(
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.shield_outlined, size: 14, color: AppTheme.textHint),
+                Icon(Icons.shield_outlined, size: 14, color: AppTheme.textHint),
                 const SizedBox(width: 5),
                 Text('Paiement 100 % sécurisé par FedaPay',
                     style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),

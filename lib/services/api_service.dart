@@ -326,6 +326,44 @@ class ApiService {
     }
   }
 
+  // ── Upload vidéo (multipart, timeout long) ───────────────────────
+  MediaType _videoMediaType(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'mov':  return MediaType('video', 'quicktime');
+      case 'webm': return MediaType('video', 'webm');
+      case '3gp':  return MediaType('video', '3gpp');
+      case 'm4v':  return MediaType('video', 'x-m4v');
+      case 'mp4':
+      default:     return MediaType('video', 'mp4');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadVideoBytes(
+    String path,
+    List<int> bytes,
+    String filename,
+  ) async {
+    try {
+      final token   = await getValidToken();
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _videoMediaType(filename),
+      ));
+      final streamed = await request.send().timeout(const Duration(minutes: 3));
+      final res      = await http.Response.fromStream(streamed);
+      return _parse(res);
+    } on SocketException {
+      return _error('Impossible de joindre le serveur.');
+    } catch (e) {
+      return _error('Erreur upload vidéo : $e');
+    }
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────
   Map<String, dynamic> _parse(http.Response res) {
     try {

@@ -1,4 +1,3 @@
-
 import 'dart:io';
 import '../models/models.dart';
 import 'api_service.dart';
@@ -121,6 +120,13 @@ class PropertyService {
     return null;
   }
 
+  // ─── POST — Soumettre à nouveau une annonce refusée ───────────────
+  Future<String?> submitProperty(String id) async {
+    final res = await _api.post('/properties/$id/submit', {}, auth: true);
+    if (res['success'] != true) return res['message'] ?? 'Erreur lors de la soumission';
+    return null;
+  }
+
   // ─── POST — Incrémenter les vues ──────────────────────────────────
   Future<void> incrementViews(String id) async {
     await _api.post('/properties/$id/views', {});
@@ -236,6 +242,18 @@ class PropertyService {
     final res = await _api.uploadBytes('/upload/image', bytes, filename);
     if (res['success'] != true) {
       return (url: null, error: (res['message'] as String?) ?? 'Erreur upload');
+    }
+    return (url: res['data']['url'] as String?, error: null);
+  }
+
+  /// Upload d'une vidéo d'annonce (retourne l'URL Cloudinary)
+  Future<({String? url, String? error})> uploadVideoBytes(
+    List<int> bytes,
+    String filename,
+  ) async {
+    final res = await _api.uploadVideoBytes('/upload/video', bytes, filename);
+    if (res['success'] != true) {
+      return (url: null, error: (res['message'] as String?) ?? 'Erreur upload vidéo');
     }
     return (url: res['data']['url'] as String?, error: null);
   }

@@ -40,7 +40,7 @@ class _SharedPropertyScreenState extends State<SharedPropertyScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppTheme.background,
         body: Center(child: CircularProgressIndicator()),
       );
@@ -53,7 +53,7 @@ class _SharedPropertyScreenState extends State<SharedPropertyScreen> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.search_off_rounded, size: 48, color: AppTheme.textHint),
+              Icon(Icons.search_off_rounded, size: 48, color: AppTheme.textHint),
               const SizedBox(height: 16),
               Text('Cette annonce est introuvable ou n\'est plus disponible.',
                   textAlign: TextAlign.center,

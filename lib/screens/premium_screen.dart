@@ -28,16 +28,41 @@ class _PremiumScreenState extends State<PremiumScreen> {
     {'label': 'Premium',  'price': formatFcfa(_premiumPriceFcfa), 'period': ' / $_premiumDurationDays jours', 'color': AppTheme.primary, 'isFree': false},
   ];
 
-  List<Map<String, dynamic>> get _features => [
-    {'icon': Icons.star_rounded,              'titleKey': 'feat_badge',     'subtitleKey': 'feat_badge_sub'},
-    {'icon': Icons.trending_up_rounded,       'titleKey': 'feat_vedette',   'subtitleKey': 'feat_vedette_sub'},
-    {'icon': Icons.photo_library_rounded,     'titleKey': 'feat_photos',    'subtitleKey': 'feat_photos_sub'},
-    {'icon': Icons.analytics_rounded,         'titleKey': 'feat_stats',     'subtitleKey': 'feat_stats_sub'},
-    {'icon': Icons.support_agent_rounded,     'titleKey': 'feat_support',   'subtitleKey': 'feat_support_sub'},
-    {'icon': Icons.verified_rounded,          'titleKey': 'feat_kyc',       'subtitleKey': 'feat_kyc_sub'},
-    {'icon': Icons.shield_rounded, 'titleKey': 'feat_assurance', 'subtitleKey': 'feat_assurance_sub'},
-    {'icon': Icons.notifications_active_rounded, 'titleKey': 'feat_alertes', 'subtitleKey': 'feat_alertes_sub'},
-  ];
+  // Source unique des fonctionnalités par plan : le même tableau alimente la
+  // liste affichée au clic sur chaque offre. Valeur '✗' = non inclus ;
+  // '✔' = inclus sans valeur chiffrée ; autre texte = valeur affichée.
+  List<_PlanRow> _planRows(bool premium) {
+    final table = <List<Object>>[
+      [Icons.home_work_rounded,   tr('prem_table_listings'),  '3',  tr('prem_table_unlimited')],
+      [Icons.photo_library_rounded, tr('prem_table_photos'),  '2',  '30'],
+      [Icons.trending_up_rounded, tr('prem_table_featured'),  '✗',  '✔'],
+      [Icons.star_rounded,        tr('prem_table_badge'),     '✗',  '✔'],
+      [Icons.analytics_rounded,   tr('prem_table_stats'),     tr('prem_table_basic'),    tr('prem_table_advanced')],
+      [Icons.support_agent_rounded, tr('prem_table_support'), tr('prem_table_standard'), tr('prem_table_priority')],
+      [Icons.verified_rounded,    tr('prem_table_kyc'),       '48h', tr('prem_table_express')],
+      [Icons.sell_rounded,        tr('prem_table_commission'), '5%', '2%'],
+    ];
+    final rows = <_PlanRow>[
+      for (final r in table)
+        () {
+          final v = (premium ? r[3] : r[2]) as String;
+          return _PlanRow(
+            icon: r[0] as IconData,
+            title: r[1] as String,
+            included: v != '✗',
+            value: (v == '✔' || v == '✗') ? null : v,
+          );
+        }(),
+      // Avantages exclusivement Premium
+      _PlanRow(icon: Icons.shield_rounded, title: tr('feat_assurance'), subtitle: tr('feat_assurance_sub'), included: premium),
+      _PlanRow(icon: Icons.notifications_active_rounded, title: tr('feat_alertes'), subtitle: tr('feat_alertes_sub'), included: premium),
+    ];
+    // Plan gratuit : ce qui est inclus d'abord, ce qui ne l'est pas ensuite.
+    if (!premium) {
+      return [...rows.where((r) => r.included), ...rows.where((r) => !r.included)];
+    }
+    return rows;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +76,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           child: Container(margin: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)]),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary)),
+              child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: AppTheme.textPrimary)),
         ),
       ),
       body: CustomScrollView(
@@ -100,7 +125,15 @@ class _PremiumScreenState extends State<PremiumScreen> {
                               border: Border.all(color: selected ? (plan['color'] as Color) : AppTheme.border, width: selected ? 2 : 1),
                             ),
                             child: Column(children: [
-                              const SizedBox(height: 14),
+                              if ((plan['isFree'] as bool? ?? false) != AuthService.instance.currentUserOrEmpty.isPremium)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: (plan['color'] as Color).withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                                  child: Text('Plan actuel', style: GoogleFonts.poppins(fontSize: 9, fontWeight: FontWeight.w700, color: plan['color'] as Color)),
+                                )
+                              else
+                                const SizedBox(height: 14),
                               const SizedBox(height: 6),
                               Text(plan['price'] as String, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w800, color: selected ? plan['color'] as Color : AppTheme.textPrimary)),
                               if ((plan['period'] as String).isNotEmpty)
@@ -114,27 +147,19 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     }),
                   ),
                   const SizedBox(height: 28),
-                  // Features
-                  Text(tr('prem_whats_included'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+                  // Fonctionnalités du plan sélectionné (change au clic sur l'offre)
+                  Text('${tr('prem_whats_included')} — ${_plans[_selectedPlan]['label']}',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 14),
-                  ..._features.map((f) => Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                        child: Icon(f['icon'] as IconData, size: 18, color: AppTheme.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(tr(f['titleKey'] as String), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text(tr(f['subtitleKey'] as String), style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-                      ])),
-                      const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 18),
-                    ]),
-                  )),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Column(
+                      key: ValueKey(_selectedPlan),
+                      children: _planRows(!(_plans[_selectedPlan]['isFree'] as bool? ?? false))
+                          .map((r) => _FeatureTile(row: r))
+                          .toList(),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   // Free vs Premium comparison
                   Text(tr('prem_free_vs'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -143,10 +168,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   const SizedBox(height: 24),
                   PrimaryButton(
                     label: (_plans[_selectedPlan]['isFree'] as bool? ?? false)
-                        ? 'Commencer gratuitement'
-                        : 'Passer Premium — ${_plans[_selectedPlan]['price']}${_plans[_selectedPlan]['period']}',
+                        ? 'Rester sur le plan Gratuit'
+                        : (AuthService.instance.currentUserOrEmpty.isPremium
+                            ? 'Premium déjà actif'
+                            : 'Passer Premium — ${_plans[_selectedPlan]['price']}${_plans[_selectedPlan]['period']}'),
                     icon: (_plans[_selectedPlan]['isFree'] as bool? ?? false)
-                        ? Icons.rocket_launch_rounded
+                        ? Icons.check_rounded
                         : Icons.workspace_premium_rounded,
                     isLoading: _loading,
                     onPressed: _subscribe,
@@ -164,26 +191,29 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   void _subscribe() {
-    final plan = _plans[_selectedPlan];
-    final isFree = plan['isFree'] as bool? ?? false;
+    final isFree = _plans[_selectedPlan]['isFree'] as bool? ?? false;
 
     if (isFree) {
-      // Plan gratuit → activation directe sans paiement, pas de badge
-      _activateFreePlan();
+      // Plan gratuit = plan par défaut de tout compte : rien à acheter.
+      // (Un abonnement Premium encore actif n'est jamais retiré d'ici.)
+      Navigator.of(context).pop();
+      return;
+    }
+
+    if (AuthService.instance.currentUserOrEmpty.isPremium) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Votre abonnement Premium est déjà actif.',
+            style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
       return;
     }
 
     // Plan payant → vrai checkout FedaPay côté backend. Le montant réel est
     // décidé par le serveur (PREMIUM_PRICE_FCFA) ; le badge Premium n'est
-    // débloqué que si le webhook FedaPay confirme le paiement — jamais depuis
-    // ce client. Voir PaymentScreen._startPremiumCheckout / _checkPremiumStatus.
-    //
-    // ⚠️ Limite actuelle : le backend ne gère qu'un seul tarif/durée fixes
-    // (PREMIUM_PRICE_FCFA / PREMIUM_DURATION_DAYS), alors que ce sélecteur
-    // propose 3 formules (mensuel/semestriel/annuel) à des prix différents.
-    // Tant que /api/premium/checkout n'accepte pas un planId, le prix
-    // effectivement facturé sera celui fixé côté serveur, quel que soit le
-    // plan choisi ici.
+    // débloqué que si le webhook FedaPay confirme le paiement.
     _goToRealCheckout();
   }
 
@@ -197,15 +227,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
     // a confirmé (PaymentScreen a déjà appelé AuthService.refreshUser() si
     // le webhook FedaPay a validé le paiement pendant l'absence).
     if (!mounted) return;
+    setState(() {}); // rafraîchit « Plan actuel » / bouton selon le vrai statut
     if (AuthService.instance.currentUserOrEmpty.isPremium) {
       _showResultDialog(isFree: false);
     }
-  }
-
-  void _activateFreePlan() {
-    // Le statut Premium est géré par le serveur : choisir "Gratuit" ne
-    // doit pas retirer localement un abonnement payé encore actif.
-    _showResultDialog(isFree: true);
   }
 
   void _showResultDialog({required bool isFree}) {
@@ -224,6 +249,60 @@ class _PremiumScreenState extends State<PremiumScreen> {
 }
 
 
+
+// ─── Ligne de fonctionnalité d'un plan ───────────────────────────────────────
+class _PlanRow {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? value;   // valeur chiffrée (ex: "3", "30", "5%") ou null
+  final bool included;
+  const _PlanRow({required this.icon, required this.title, this.subtitle, this.value, required this.included});
+}
+
+class _FeatureTile extends StatelessWidget {
+  final _PlanRow row;
+  const _FeatureTile({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final on = row.included;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (on ? AppTheme.primary : AppTheme.textHint).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(row.icon, size: 18, color: on ? AppTheme.primary : AppTheme.textHint),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(row.title, style: GoogleFonts.poppins(
+            fontSize: 13, fontWeight: FontWeight.w600,
+            color: on ? null : AppTheme.textHint,
+            decoration: on ? null : TextDecoration.lineThrough,
+          )),
+          if (row.subtitle != null)
+            Text(row.subtitle!, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+        ])),
+        if (on && row.value != null)
+          Text(row.value!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.success))
+        else
+          Icon(on ? Icons.check_circle_rounded : Icons.cancel_rounded,
+              color: on ? AppTheme.success : AppTheme.error.withOpacity(0.6), size: 18),
+      ]),
+    );
+  }
+}
 
 // ─── Dialog Succès Premium ────────────────────────────────────────────────────
 class _PremiumSuccessDialog extends StatelessWidget {

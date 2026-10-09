@@ -1115,7 +1115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(width: 10),
                         Text("Type d\'activité *", style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint)),
                       ]),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textHint),
+                      icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textHint),
                       items: _typesActivite.map((t) => DropdownMenuItem(
                         value: t,
                         child: Text(t, style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textPrimary)),
@@ -1450,7 +1450,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1669,7 +1669,7 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1845,7 +1845,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_rounded, color: AppTheme.textPrimary, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1927,7 +1927,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             decoration: InputDecoration(
               hintText: '••••••••',
               hintStyle: GoogleFonts.poppins(color: AppTheme.textHint),
-              prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.textHint, size: 20),
+              prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.textHint, size: 20),
               suffixIcon: IconButton(
                 icon: Icon(_showNew ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                     color: AppTheme.textHint, size: 20),
@@ -1958,7 +1958,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             decoration: InputDecoration(
               hintText: '••••••••',
               hintStyle: GoogleFonts.poppins(color: AppTheme.textHint),
-              prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.textHint, size: 20),
+              prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.textHint, size: 20),
               suffixIcon: IconButton(
                 icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                     color: AppTheme.textHint, size: 20),

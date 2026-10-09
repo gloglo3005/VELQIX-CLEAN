@@ -709,7 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: InputDecoration(
                           hintText: tr('home_search_hint'),
                           hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint),
-                          prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textHint, size: 22),
+                          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint, size: 22),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? GestureDetector(
                                   onTap: _clearSearch,
@@ -847,7 +847,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.06), shape: BoxShape.circle),
-                        child: const Icon(Icons.search_off_rounded, size: 48, color: AppTheme.textHint),
+                        child: Icon(Icons.search_off_rounded, size: 48, color: AppTheme.textHint),
                       ),
                       const SizedBox(height: 16),
                       Text(tr('home_no_results'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -1015,7 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? SliverToBoxAdapter(
                       child: Padding(padding: const EdgeInsets.all(40),
                         child: Column(children: [
-                          const Icon(Icons.home_outlined, size: 48, color: AppTheme.textHint),
+                          Icon(Icons.home_outlined, size: 48, color: AppTheme.textHint),
                           const SizedBox(height: 12),
                           Text(tr('home_no_cat'),
                               style: GoogleFonts.poppins(fontSize: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
@@ -1164,7 +1164,7 @@ class _SuggestionChip extends StatelessWidget {
         decoration: BoxDecoration(color: AppTheme.surface,
             borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.border)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.north_west_rounded, size: 11, color: AppTheme.textHint),
+          Icon(Icons.north_west_rounded, size: 11, color: AppTheme.textHint),
           const SizedBox(width: 5),
           Text(label, style: GoogleFonts.poppins(
               fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary, fontWeight: FontWeight.w500)),

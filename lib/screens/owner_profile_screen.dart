@@ -401,7 +401,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 side: _isFollowing
-                                    ? const BorderSide(color: AppTheme.border)
+                                    ? BorderSide(color: AppTheme.border)
                                     : BorderSide.none,
                               ),
                               elevation: _isFollowing ? 0 : 2,

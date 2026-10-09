@@ -69,7 +69,7 @@ Widget _smartImage({
     fit: fit,
     errorBuilder: (_, __, ___) =>
         fallback?.call() ?? Container(width: width, height: height, color: AppTheme.divider,
-            child: const Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
+            child: Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
   );
 }
 
@@ -114,7 +114,7 @@ class _VerticalCard extends StatelessWidget {
                   child: _smartImage(
                     url: property.firstImage,
                     height: 155, width: double.infinity, fit: BoxFit.cover,
-                    fallback: () => Container(height: 155, color: AppTheme.divider, child: const Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
+                    fallback: () => Container(height: 155, color: AppTheme.divider, child: Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
                   ),
                 ),
                 Positioned(
@@ -173,7 +173,7 @@ class _VerticalCard extends StatelessWidget {
                   Text(property.getLocalizedTitre(localeNotifier.value.languageCode), style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
                   Row(children: [
-                    const Icon(Icons.location_on_outlined, size: 13, color: AppTheme.textHint),
+                    Icon(Icons.location_on_outlined, size: 13, color: AppTheme.textHint),
                     const SizedBox(width: 3),
                     Expanded(child: Text(property.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ]),
@@ -259,7 +259,7 @@ class _HorizontalCard extends StatelessWidget {
                     Text(property.getLocalizedTitre(localeNotifier.value.languageCode), style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 3),
                     Row(children: [
-                      const Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textHint),
+                      Icon(Icons.location_on_outlined, size: 12, color: AppTheme.textHint),
                       const SizedBox(width: 2),
                       Text(property.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
                     ]),
@@ -462,7 +462,7 @@ class ShareButton extends StatelessWidget {
           color: AppTheme.background,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.share_outlined, size: 18, color: AppTheme.textHint),
+        child: Icon(Icons.share_outlined, size: 18, color: AppTheme.textHint),
       ),
     );
   }
@@ -978,7 +978,7 @@ class LoadingCard extends StatelessWidget {
       decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(20)),
       child: Column(
         children: [
-          Container(height: 165, decoration: const BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)))),
+          Container(height: 165, decoration: BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)))),
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
