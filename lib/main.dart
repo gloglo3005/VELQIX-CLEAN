@@ -1,4 +1,6 @@
-﻿import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -219,97 +221,128 @@ Future<void> main() async {
     debugPrint('Theme restore error: $e');
   }
 
-  bool alreadyLoggedIn = false;
+  // runApp immédiatement : avant, main() attendait la connexion automatique
+  // (appel réseau, jusqu'à 40 s si Render dormait) → écran blanc. La connexion
+  // se fait maintenant derrière un écran de chargement (voir _startup).
+  runApp(const VelQixApp());
+}
 
-  /// =============================================================
-  /// AUTO LOGIN
-  /// =============================================================
+/// Connexion automatique + services dépendant de l'utilisateur.
+/// Retourne true si l'utilisateur est déjà connecté.
+Future<bool> _startup() async {
+  bool alreadyLoggedIn = false;
 
   try {
     alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
   } catch (e, stackTrace) {
     debugPrint('Auto login error: $e');
     debugPrint('$stackTrace');
-
     alreadyLoggedIn = false;
   }
-
-  /// =============================================================
-  /// USER LOCALE
-  /// =============================================================
 
   if (alreadyLoggedIn) {
     try {
       final user = AuthService.instance.currentUserOrEmpty;
-
-      localeNotifier.value = countryCodeToLocale(
-        user.countryCode,
-      );
+      localeNotifier.value = countryCodeToLocale(user.countryCode);
     } catch (e, stackTrace) {
       debugPrint('Locale loading error: $e');
       debugPrint('$stackTrace');
     }
   }
 
-  /// =============================================================
-  /// LOCAL NOTIFICATIONS
-  /// =============================================================
-
   try {
-    await NotificationService.instance
-        .initializeLocalNotifications();
+    await NotificationService.instance.initializeLocalNotifications();
   } catch (e, stackTrace) {
-    debugPrint(
-      'Local notification initialization error: $e',
-    );
+    debugPrint('Local notification initialization error: $e');
     debugPrint('$stackTrace');
   }
 
-  /// =============================================================
-  /// PUSH NOTIFICATIONS
-  /// =============================================================
-  ///
-  /// Initialisé ici uniquement si l'utilisateur est déjà connecté
-  /// au démarrage. Après une connexion manuelle, l'initialisation
-  /// est faite dans MainShell (voir initState).
-
+  // Push : initialisé ici si déjà connecté. Après une connexion manuelle,
+  // c'est fait dans MainShell.
   if (alreadyLoggedIn) {
     try {
       await PushNotificationService.instance.initialize();
     } catch (e, stackTrace) {
-      debugPrint(
-        'Push notification initialization error: $e',
-      );
+      debugPrint('Push notification initialization error: $e');
       debugPrint('$stackTrace');
     }
   }
 
-  /// =============================================================
-  /// RUN APP
-  /// =============================================================
+  return alreadyLoggedIn;
+}
 
-  runApp(
-    VelQixApp(
-      alreadyLoggedIn: alreadyLoggedIn,
-    ),
-  );
+/// Écran affiché pendant la connexion automatique.
+class _SplashScreen extends StatefulWidget {
+  const _SplashScreen();
+
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen> {
+  Timer? _slowTimer;
+  bool _slow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Le serveur gratuit peut mettre ~1 min à se réveiller : on prévient.
+    _slowTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.home_work_rounded, size: 72),
+              const SizedBox(height: 28),
+              const CircularProgressIndicator(),
+              if (_slow) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Le serveur se réveille, encore quelques secondes…',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// ===============================================================
 /// VELQIX APP
 /// ===============================================================
 
-class VelQixApp extends StatelessWidget {
-  final bool alreadyLoggedIn;
+class VelQixApp extends StatefulWidget {
+  const VelQixApp({super.key});
 
-  const VelQixApp({
-    super.key,
-    required this.alreadyLoggedIn,
-  });
+  @override
+  State<VelQixApp> createState() => _VelQixAppState();
+}
 
-  /// Écran d'accueil d'un utilisateur déjà connecté.
-  /// Même logique que LoginScreen : l'admin va sur son dashboard,
-  /// les autres sur MainShell.
+class _VelQixAppState extends State<VelQixApp> {
+  // Créé une seule fois : un changement de thème/langue ne relance pas
+  // la connexion automatique.
+  late final Future<bool> _startupFuture = _startup();
+
+  /// Écran d'accueil d'un utilisateur déjà connecté : l'admin va sur son
+  /// dashboard, les autres sur MainShell.
   Widget _homeForLoggedUser() {
     final user = AuthService.instance.currentUserOrEmpty;
 
@@ -326,27 +359,13 @@ class VelQixApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeModeNotifier,
-      builder: (
-        context,
-        themeMode,
-        child,
-      ) {
+      builder: (context, themeMode, child) {
         return ValueListenableBuilder<Locale>(
           valueListenable: localeNotifier,
-          builder: (
-            context,
-            locale,
-            child,
-          ) {
+          builder: (context, locale, child) {
             return MaterialApp(
               title: 'VELQIX',
-
               debugShowCheckedModeBanner: false,
-
-              /// =================================================
-              /// THEME
-              /// =================================================
-
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: themeMode,
@@ -362,27 +381,29 @@ class VelQixApp extends StatelessWidget {
 
               locale: locale,
 
-              // ✅ CORRIGÉ : sans ces délégués, les widgets Material
-              // (TextField, etc.) plantent avec "No MaterialLocalizations
-              // found" et s'affichent en zone grise.
+              // Sans ces délégués, les widgets Material (TextField, etc.)
+              // plantent avec "No MaterialLocalizations found".
               localizationsDelegates: const [
                 GlobalMaterialLocalizations.delegate,
                 GlobalWidgetsLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
               ],
-
               supportedLocales: const [
                 Locale('fr'),
                 Locale('en'),
               ],
 
-              /// =================================================
-              /// INITIAL SCREEN
-              /// =================================================
-
-              home: alreadyLoggedIn
-                  ? _homeForLoggedUser()
-                  : const LoginScreen(),
+              home: FutureBuilder<bool>(
+                future: _startupFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const _SplashScreen();
+                  }
+                  return snapshot.data == true
+                      ? _homeForLoggedUser()
+                      : const LoginScreen();
+                },
+              ),
             );
           },
         );

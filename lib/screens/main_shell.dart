@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
+import '../services/premium_plan_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ai_assistant_widget.dart';
 import 'add_listing_screen.dart';
 import 'home_screen.dart';
 import 'incoming_call_screen.dart';
@@ -76,6 +78,9 @@ class _MainShellState
       NotificationService.instance
           .loadNotifications(),
     );
+
+    /// Tarif Premium (source unique : le backend, repli local sinon).
+    unawaited(PremiumPlanService.instance.load());
 
     /// Notification reçue en temps réel.
     latestNotificationNotifier
@@ -331,6 +336,11 @@ class _MainShellState
     return Stack(
       children: [
         _buildMainContent(context),
+
+        /// Assistant IA VelqIA : bouton flottant + panneau de chat.
+        /// Il ne capte que les touches sur le bouton et le panneau :
+        /// le reste de l'écran reste utilisable.
+        const AiAssistantWidget(),
 
         /// Badge de notifications.
         ValueListenableBuilder<int>(

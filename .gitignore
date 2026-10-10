@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .vercel
+
+# Fichiers locaux à ne pas versionner
+arborescence.txt
+node_modules/

@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/premium_plan_service.dart';
 
 // ═══════════════════════════════════════════════════════════════════
 // PAYMENT SCREEN — Abonnement Premium via FedaPay
@@ -178,9 +179,9 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
                 border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
               ),
               child: Column(children: [
-                const _Row(label: 'Durée', value: '$kPremiumDurationDays jours'),
+                _Row(label: 'Durée', value: '${PremiumPlanService.instance.plan.value.durationDays} jours'),
                 const Divider(height: 20),
-                _Row(label: 'Total à payer', value: formatFcfa(kPremiumPriceFcfa), bold: true),
+                _Row(label: 'Total à payer', value: formatFcfa(PremiumPlanService.instance.plan.value.priceFcfa), bold: true),
               ]),
             ),
 

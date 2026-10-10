@@ -48,6 +48,10 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   // ── Reconnaissance vocale Web Speech API ──────────────────────────────
   bool _isListening = false;
   bool _speechAvailable = false;
+  // Initialisation paresseuse : la permission micro n'est demandée qu'au
+  // premier appui sur le bouton micro, pas au lancement de l'application.
+  bool _speechInitStarted = false;
+  bool _startVoiceAfterInit = false;
   String _voicePartial = '';
   late AnimationController _micPulseAnim;
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -85,7 +89,8 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _micPulseAnim = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
     _fabAnim.forward();
-    _initSpeech();
+    // La reconnaissance vocale est initialisée au premier appui sur le
+    // micro (voir _toggleVoice).
   }
 
   /// Initialise la reconnaissance vocale
@@ -113,7 +118,14 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         _micPulseAnim.reset();
       },
     ).then((available) {
-      if (mounted) setState(() => _speechAvailable = available);
+      if (!mounted) return;
+      setState(() => _speechAvailable = available);
+      // L'appui sur le micro qui a déclenché l'initialisation démarre
+      // maintenant l'écoute (ou affiche « micro indisponible »).
+      if (_startVoiceAfterInit) {
+        _startVoiceAfterInit = false;
+        _toggleVoice();
+      }
     });
   }
 
@@ -419,7 +431,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
               ? _history.sublist(0, _history.length - 1) // tout sauf le dernier (déjà dans message)
               : [],
         }),
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 35));
 
       setState(() => _isTyping = false);
 
@@ -515,14 +527,20 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         // Panneau chat
         if (_isOpen)
           Positioned(
+            // top + bottom : le panneau reste dans la zone visible, même
+            // quand le clavier réduit la hauteur disponible.
+            top: 8,
             bottom: 90,
             right: 16,
-            child: FadeTransition(
-              opacity: _panelOpacity,
-              child: ScaleTransition(
-                scale: _panelScale,
-                alignment: Alignment.bottomRight,
-                child: _buildPanel(context),
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: FadeTransition(
+                opacity: _panelOpacity,
+                child: ScaleTransition(
+                  scale: _panelScale,
+                  alignment: Alignment.bottomRight,
+                  child: _buildPanel(context),
+                ),
               ),
             ),
           ),
@@ -1338,6 +1356,15 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
   // ─── Reconnaissance vocale – Web Speech API (natif navigateur) ──────────
   void _toggleVoice() {
+    // Première utilisation : on initialise la reconnaissance vocale (c'est
+    // là que le système demande l'accès au micro), puis l'écoute démarre.
+    if (!_speechInitStarted) {
+      _speechInitStarted = true;
+      _startVoiceAfterInit = true;
+      _initSpeech();
+      return;
+    }
+
     if (!_speechAvailable) {
       _addAiMessage(tr('ai_mic_unavailable'));
       return;

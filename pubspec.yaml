@@ -24,7 +24,6 @@ dependencies:
   shared_preferences: ^2.2.0
   http: ^1.1.0
   http_parser: ^4.0.0
-  dio: ^5.0.0
 
   # Auth sociale
   google_sign_in: ^6.2.0
@@ -36,9 +35,6 @@ dependencies:
   # Reconnaissance vocale
   speech_to_text: ^7.0.0
 
-  # FedaPay WebView
-  webview_flutter: ^4.7.0
-
   # Sélection image/vidéo natif Android/iOS
   image_picker: ^1.1.2
 
@@ -46,10 +42,7 @@ dependencies:
   agora_rtc_engine: ^6.3.2
   permission_handler: ^11.3.1
   
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   socket_io_client: ^2.0.3+1   # pour mobile uniquement
-  connectivity_plus: ^6.0.3
   record: ^6.2.1
   audioplayers: ^6.7.1
   path_provider: ^2.1.6

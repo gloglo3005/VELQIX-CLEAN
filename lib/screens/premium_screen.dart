@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
+import '../services/premium_plan_service.dart';
 import 'payment_screen.dart';
 
 class PremiumScreen extends StatefulWidget {
@@ -20,8 +21,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
   // ne gère qu'un tarif/durée fixes (PREMIUM_PRICE_FCFA / PREMIUM_DURATION_DAYS,
   // par défaut 2000 FCFA / 30 jours). Si un jour le backend accepte plusieurs
   // formules (planId → prix/durée), ce sélecteur pourra être ré-étoffé.
-  static const double _premiumPriceFcfa = 2000;
-  static const int _premiumDurationDays = 30;
+  // Valeurs lues auprès du serveur (GET /premium/plan), avec repli local.
+  double get _premiumPriceFcfa => PremiumPlanService.instance.plan.value.priceFcfa;
+  int get _premiumDurationDays => PremiumPlanService.instance.plan.value.durationDays;
 
   List<Map<String, dynamic>> get _plans => [
     {'label': 'Gratuit',  'price': '0 FCFA', 'period': '', 'color': AppTheme.success, 'isFree': true},

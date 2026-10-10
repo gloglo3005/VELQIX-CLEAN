@@ -2,6 +2,7 @@
 // API SERVICE — Couche réseau centrale VelQix
 // ═══════════════════════════════════════════════════════════════════
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show ValueNotifier;
@@ -117,7 +118,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'refreshToken': refreshToken}),
           )
-          .timeout(const Duration(seconds: 40));
+          .timeout(const Duration(seconds: 60));
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (res.statusCode == 200 && data['success'] == true) {
@@ -171,13 +172,47 @@ class ApiService {
     }
   }
 
+  // ── Gestion centralisée des erreurs réseau ───────────────────────
+  // `on SocketException` seul ne fonctionne PAS sur Flutter Web : le navigateur
+  // lève une http.ClientException. Le serveur Render gratuit peut aussi mettre
+  // ~1 minute à se réveiller : un timeout de 40 s faisait échouer le premier
+  // appel de la journée. On gère les trois cas et, pour les lectures (GET),
+  // on réessaie une fois.
+  static const Duration _timeout = Duration(seconds: 60);
+
+  Future<Map<String, dynamic>> _guard(
+    Future<Map<String, dynamic>> Function() action, {
+    int retries = 0,
+  }) async {
+    for (var attempt = 0;; attempt++) {
+      try {
+        return await action();
+      } on TimeoutException {
+        if (attempt < retries) continue;
+        return _error('Le serveur met du temps à répondre (il est peut-être en train de se réveiller). Réessaie dans quelques secondes.');
+      } on SocketException {
+        if (attempt < retries) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
+      } on http.ClientException {
+        if (attempt < retries) {
+          await Future.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
+      } catch (e) {
+        return _error('Erreur inattendue : $e');
+      }
+    }
+  }
+
   // ── GET ──────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> get(String path, {bool auth = false}) async {
-    try {
+  Future<Map<String, dynamic>> get(String path, {bool auth = false}) {
+    return _guard(() async {
       final uri = Uri.parse('$baseUrl$path');
-      final res = await http
-          .get(uri, headers: await _headers(auth: auth))
-          .timeout(const Duration(seconds: 40));
+      final res = await http.get(uri, headers: await _headers(auth: auth)).timeout(_timeout);
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -185,11 +220,7 @@ class ApiService {
         );
       }
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
-    } catch (e) {
-      return _error('Erreur inattendue : $e');
-    }
+    }, retries: 1);
   }
 
   // ── POST ─────────────────────────────────────────────────────────
@@ -197,13 +228,13 @@ class ApiService {
     String path,
     Map<String, dynamic> body, {
     bool auth = false,
-  }) async {
-    try {
+  }) {
+    return _guard(() async {
       final uri      = Uri.parse('$baseUrl$path');
       final bodyJson = jsonEncode(body);
       final res = await http
           .post(uri, headers: await _headers(auth: auth), body: bodyJson)
-          .timeout(const Duration(seconds: 40));
+          .timeout(_timeout);
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -211,11 +242,7 @@ class ApiService {
         );
       }
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
-    } catch (e) {
-      return _error('Erreur inattendue : $e');
-    }
+    });
   }
 
   // ── PUT ──────────────────────────────────────────────────────────
@@ -223,13 +250,13 @@ class ApiService {
     String path,
     Map<String, dynamic> body, {
     bool auth = false,
-  }) async {
-    try {
+  }) {
+    return _guard(() async {
       final uri      = Uri.parse('$baseUrl$path');
       final bodyJson = jsonEncode(body);
       final res = await http
           .put(uri, headers: await _headers(auth: auth), body: bodyJson)
-          .timeout(const Duration(seconds: 40));
+          .timeout(_timeout);
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -237,20 +264,14 @@ class ApiService {
         );
       }
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
-    } catch (e) {
-      return _error('Erreur inattendue : $e');
-    }
+    });
   }
 
   // ── DELETE ───────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> delete(String path, {bool auth = false}) async {
-    try {
+  Future<Map<String, dynamic>> delete(String path, {bool auth = false}) {
+    return _guard(() async {
       final uri = Uri.parse('$baseUrl$path');
-      final res = await http
-          .delete(uri, headers: await _headers(auth: auth))
-          .timeout(const Duration(seconds: 40));
+      final res = await http.delete(uri, headers: await _headers(auth: auth)).timeout(_timeout);
       if (auth) {
         return _parseWithRefresh(
           res,
@@ -258,11 +279,7 @@ class ApiService {
         );
       }
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur. Vérifie ta connexion.');
-    } catch (e) {
-      return _error('Erreur inattendue : $e');
-    }
+    });
   }
 
   // ── Upload multipart (images) ────────────────────────────────────
@@ -283,8 +300,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> uploadFile(String path, File file) async {
-    try {
+  Future<Map<String, dynamic>> uploadFile(String path, File file) {
+    return _guard(() async {
       final token   = await getValidToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
@@ -293,22 +310,18 @@ class ApiService {
         file.path,
         contentType: _mediaTypeFromFilename(file.path),
       ));
-      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await request.send().timeout(const Duration(seconds: 120));
       final res      = await http.Response.fromStream(streamed);
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur.');
-    } catch (e) {
-      return _error('Erreur upload : $e');
-    }
+    });
   }
 
   Future<Map<String, dynamic>> uploadBytes(
     String path,
     List<int> bytes,
     String filename,
-  ) async {
-    try {
+  ) {
+    return _guard(() async {
       final token   = await getValidToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
@@ -318,12 +331,10 @@ class ApiService {
         filename: filename,
         contentType: _mediaTypeFromFilename(filename),
       ));
-      final streamed = await request.send().timeout(const Duration(seconds: 30));
+      final streamed = await request.send().timeout(const Duration(seconds: 120));
       final res      = await http.Response.fromStream(streamed);
       return _parse(res);
-    } catch (e) {
-      return _error('Erreur upload : $e');
-    }
+    });
   }
 
   // ── Upload vidéo (multipart, timeout long) ───────────────────────
@@ -343,8 +354,8 @@ class ApiService {
     String path,
     List<int> bytes,
     String filename,
-  ) async {
-    try {
+  ) {
+    return _guard(() async {
       final token   = await getValidToken();
       final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'));
       if (token != null) request.headers['Authorization'] = 'Bearer $token';
@@ -354,14 +365,11 @@ class ApiService {
         filename: filename,
         contentType: _videoMediaType(filename),
       ));
-      final streamed = await request.send().timeout(const Duration(minutes: 3));
+      // Une vidéo peut être longue à envoyer sur un réseau mobile.
+      final streamed = await request.send().timeout(const Duration(minutes: 5));
       final res      = await http.Response.fromStream(streamed);
       return _parse(res);
-    } on SocketException {
-      return _error('Impossible de joindre le serveur.');
-    } catch (e) {
-      return _error('Erreur upload vidéo : $e');
-    }
+    });
   }
 
   // ── Helpers ──────────────────────────────────────────────────────

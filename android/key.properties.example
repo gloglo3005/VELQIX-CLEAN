@@ -1,0 +1,12 @@
+# Modèle de android\key.properties (ce dernier n'est JAMAIS versionné).
+#
+# 1) Générer la clé de signature (à conserver précieusement, elle est
+#    irremplaçable pour mettre à jour l'application sur le Play Store) :
+#      keytool -genkey -v -keystore android\app\velqix-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias velqix
+# 2) Copier ce fichier en android\key.properties et renseigner les valeurs.
+#
+# storeFile est relatif au dossier android\app.
+storePassword=CHANGER_MOI
+keyPassword=CHANGER_MOI
+keyAlias=velqix
+storeFile=velqix-release.jks

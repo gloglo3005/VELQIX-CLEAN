@@ -1,124 +1,96 @@
-# 🏠 InnoRent – Plateforme de Location & Vente
+# VelQix — application Flutter
 
-Application Flutter complète pour la location et vente de biens mobiliers et immobiliers.
+Plateforme de location et de vente de biens (immobilier, véhicules, mobilier) pour
+l'Afrique de l'Ouest. Application Flutter (Android, web, Windows) connectée à
+l'API `velqix-backend`.
 
-## 📱 Fonctionnalités implémentées
+## Fonctionnalités
 
-### ✅ Authentification
-- Onboarding animé (3 slides)
-- Connexion (email/téléphone + mot de passe)
-- Inscription avec choix de rôle (client / propriétaire)
-- Connexion sociale (Google, Facebook – UI)
+- **Compte** : inscription, connexion email / Google / Facebook, mot de passe
+  oublié, rôles client, propriétaire et admin, comptes entreprise.
+- **Annonces** : publication (photos, vidéo) avec validation par la modération,
+  recherche, filtres, favoris, avis et notes, suivi des propriétaires.
+- **Messagerie temps réel** (Socket.IO) : texte, vocal, notifications.
+- **Appels audio et vidéo** (Agora) avec notification d'appel entrant (FCM).
+- **Premium** : abonnement payé via FedaPay. Le statut Premium vient toujours du
+  serveur (webhook FedaPay), jamais d'une valeur locale.
+- **VelqIA** : assistant IA (Gemini côté serveur) pour trouver un bien et
+  répondre aux questions sur la plateforme. Bouton flottant présent sur les
+  onglets principaux, saisie vocale à la demande.
+- **Tableau de bord admin** : modération des annonces, utilisateurs, statistiques.
+- 6 langues (fr, en, es, pt, de, ar), 4 devises, mode sombre.
 
-### ✅ Accueil
-- Annonces vedettes (carrousel horizontal)
-- Filtres par catégorie (Maisons, Voitures, etc.)
-- Barre de recherche rapide
-- Statistiques rapides (Annonces, Mobilier, Immobilier)
+## Prérequis
 
-### ✅ Explorer
-- Recherche full-text (titre, ville, catégorie)
-- Tri : Récent, Prix ↑↓, Note
-- Filtres avancés (fourchette de prix, disponibilité)
-- Onglets : Tous / Immobilier / Mobilier
+- Flutter stable (SDK Dart `>=3.0.0 <4.0.0`)
+- Un backend VelQix joignable (par défaut `https://velqix.onrender.com/api`)
 
-### ✅ Détail d'un bien
-- Galerie photos (swipeable)
-- Caractéristiques
-- Description complète
-- Fiche propriétaire
-- Avis et notes
-- CTA : Réserver / Acheter
+## Lancer en développement
 
-### ✅ Paiement
-- Mobile Money (Flooz, T-Money, MTN MoMo)
-- Carte bancaire (Visa, Mastercard)
-- PayPal
-- Sélection de dates pour locations
-- Confirmation animée
-
-### ✅ Messagerie
-- Liste des conversations
-- Chat en temps réel (simulé)
-- Indicateur non-lus
-
-### ✅ Profil
-- Stats utilisateur (annonces, note, avis)
-- Badge Premium + Vérifié
-- Historique des transactions
-- Menu paramètres complet
-- Déconnexion
-
-### ✅ Publier une annonce
-- Formulaire en 3 étapes
-- Sélection type de bien (immobilier/mobilier)
-- Sélection catégorie
-- Upload photos (UI)
-- Validation et soumission
-
-## 🚀 Installation & Démarrage
-
-### Prérequis
-- Flutter SDK ≥ 3.0.0
-- Dart ≥ 3.0.0
-- Android Studio / VS Code
-- Android Emulator ou appareil physique
-
-### Étapes
-
-```bash
-# 1. Cloner ou extraire le projet
-cd innorent
-
-# 2. Installer les dépendances
+```powershell
 flutter pub get
 
-# 3. Lancer l'application
-flutter run
+# API de production (valeur par défaut)
+flutter run -d chrome
 
-# Pour un build release Android
-flutter build apk --release
+# API locale
+flutter run -d chrome --dart-define=API_URL=http://localhost:3000/api
 ```
 
-## 📁 Structure du projet
+`API_URL` doit se terminer par `/api` : l'adresse WebSocket en est déduite.
+
+## Builds
+
+```powershell
+# Web (déployé sur Vercel via vercel-build.sh)
+flutter build web --release
+
+# Android
+flutter build apk --release
+flutter build appbundle --release
+```
+
+### Signature Android
+
+La release est signée avec `android\key.properties` s'il existe, sinon avec la
+clé debug (build local possible, publication Play Store impossible).
+
+1. Générer la clé : voir les commandes dans `android\key.properties.example`.
+2. Copier `android\key.properties.example` en `android\key.properties` et le
+   renseigner. Ce fichier et les `.jks` sont ignorés par git.
+
+### Firebase (notifications push)
+
+`android\app\google-services.json` doit être celui d'une application Android
+Firebase dont le nom de package est **identique** à `applicationId`
+(`com.example.velqix`). Un package différent fait échouer le build Android.
+
+## Cohérence avec le backend
+
+| Sujet | Contrat |
+| --- | --- |
+| Format des réponses | `{ success, data, message, error }` |
+| Session | `401 TOKEN_EXPIRED` → refresh automatique ; `401/403` au refresh ou `403 ACCOUNT_BANNED` → session fermée |
+| Tarif Premium | `GET /api/premium/plan` (repli local : 2000 FCFA / 30 jours) |
+| Statut Premium | `GET /api/auth/me` et `GET /api/premium/status` |
+| Assistant IA | `POST /api/ai/chat` `{ message, history }` → `{ data: { text, properties } }`, `503 GEMINI_UNAVAILABLE` si le modèle est surchargé |
+| Appels | `GET /api/calls/agora-token?channelName=…` (App ID Agora de repli dans l'app) |
+
+## Tests
+
+```powershell
+flutter test
+flutter analyze
+```
+
+## Structure
 
 ```
 lib/
-├── main.dart                   # Point d'entrée
-├── theme/
-│   └── app_theme.dart          # Thème, couleurs, typographie
-├── models/
-│   └── models.dart             # UserModel, PropertyModel, etc.
-├── services/
-│   └── mock_data.dart          # Données de démonstration
-├── widgets/
-│   └── widgets.dart            # Composants réutilisables
-└── screens/
-    ├── auth_screens.dart       # Onboarding, Login, Register
-    ├── main_shell.dart         # Navigation principale
-    ├── home_screen.dart        # Accueil
-    ├── explore_screen.dart     # Recherche & filtres
-    ├── property_detail_screen.dart  # Détail d'un bien
-    ├── payment_screen.dart     # Paiement
-    ├── add_listing_screen.dart # Publier une annonce
-    ├── messages_screen.dart    # Messagerie
-    └── profile_screen.dart     # Profil utilisateur
+  main.dart            point d'entrée, thème, langue, devise, Firebase
+  models/              modèles de données
+  screens/             écrans (MainShell héberge les onglets et VelqIA)
+  services/            API, auth, chat, notifications, traductions, tarif Premium
+  theme/               thème clair / sombre
+  widgets/             composants partagés et assistant IA
 ```
-
-## 🎨 Design System
-- **Couleurs** : Bleu primaire #0D47A1, Orange accent #FF6F00
-- **Typographie** : Google Fonts Poppins
-- **Composants** : Cards, Boutons, Champs de formulaire personnalisés
-
-## 🔌 Intégration Backend (À faire)
-- Connecter à une API REST (Node.js / Django / Laravel)
-- Firebase Authentication pour la vraie auth
-- Stripe / Campay / FedaPay pour les paiements Mobile Money
-- Firebase Cloud Messaging pour les notifications push
-- Google Maps pour la géolocalisation
-
-## 🌍 Adapté pour l'Afrique de l'Ouest
-- Monnaie FCFA
-- Mobile Money (Flooz, T-Money, MTN MoMo)
-- Interface en français
-- Données de démo situées à Lomé, Togo

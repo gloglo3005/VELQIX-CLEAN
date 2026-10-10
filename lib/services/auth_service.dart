@@ -28,9 +28,15 @@ const _kAuthMethod = 'auth_method';
 const _kCountryCode = 'auth_country_code';
 const _kCountryName = 'auth_country_name';
 
+// Identifiant client OAuth « Web » du projet Google. Sur Web c'est le clientId ;
+// sur Android/iOS il doit etre passe en serverClientId, sinon idToken reste null
+// et la connexion Google echoue.
+const _kGoogleWebClientId =
+    '330595771551-209on5g1r101munca38unkks8kogbgql.apps.googleusercontent.com';
+
 final _googleSignIn = GoogleSignIn(
-  clientId:
-      '330595771551-209on5g1r101munca38unkks8kogbgql.apps.googleusercontent.com',
+  clientId: kIsWeb ? _kGoogleWebClientId : null,
+  serverClientId: kIsWeb ? null : _kGoogleWebClientId,
   scopes: ['email', 'profile'],
 );
 
