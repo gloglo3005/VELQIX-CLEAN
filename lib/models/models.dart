@@ -18,6 +18,7 @@ class UserModel {
   final String? avatarUrl;
   final bool isVerified;
   final bool isActive; // false = compte suspendu par un administrateur
+  final bool mustChangePassword; // true après une réinitialisation par un admin
   final double rating;
   final int totalAvis;
   final DateTime createdAt;
@@ -41,6 +42,7 @@ class UserModel {
     this.avatarUrl,
     this.isVerified = false,
     this.isActive = true,
+    this.mustChangePassword = false,
     this.rating = 0.0,
     this.totalAvis = 0,
     required this.createdAt,
@@ -92,6 +94,7 @@ String get initials {
     avatarUrl: json['avatarUrl'],
     isVerified: json['isVerified'] ?? false,
     isActive: json['isActive'] ?? true,
+    mustChangePassword: json['mustChangePassword'] ?? false,
     rating: (json['rating'] ?? 0.0).toDouble(),
     totalAvis: json['totalAvis'] ?? 0,
     createdAt: DateTime.parse(json['createdAt']),

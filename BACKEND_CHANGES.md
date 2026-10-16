@@ -48,3 +48,50 @@ Clés de permissions utilisées : `stats.view`, `users.view`, `users.edit`, `use
 
 ⚠️ Le tableau « Rôles & permissions » ne fait que CONFIGURER. L'API doit vérifier ces
 permissions sur chaque route (middleware), et refuser la connexion si `isActive == false`.
+
+---
+
+# Mots de passe : réinitialisation par l'admin + hachage Argon2id
+
+## `POST /admin/users/:id/reset-password` (admin uniquement)
+Body : `{ newPassword: string (≥ 10 car.), mustChangePassword: true }`
+- Hacher `newPassword` avec **Argon2id** (jamais de stockage ni de log en clair).
+- Mettre `mustChangePassword = true` sur l'utilisateur et le renvoyer dans les réponses
+  `/auth/login` et `/auth/me` (`"mustChangePassword": true`) : l'app force alors un
+  changement de mot de passe avant d'entrer (via `PUT /auth/password`, qui doit remettre le flag à `false`).
+- **Invalider les sessions / refresh tokens** existants de cet utilisateur.
+- Interdire à un admin de réinitialiser son propre compte par cette route.
+- Journaliser l'action (qui, quand, quel compte) sans enregistrer le mot de passe.
+
+## Argon2id
+Le hachage se fait UNIQUEMENT côté API (le client Flutter envoie le mot de passe en HTTPS,
+jamais de hachage côté app). Paramètres recommandés par l'OWASP : Argon2id,
+mémoire 19 MiB, 2 itérations, parallélisme 1 (ou 46 MiB / 1 itération / 1) ; sel aléatoire
+unique par mot de passe (géré par la bibliothèque).
+
+Exemple Node.js (si l'API est en Node) — `npm i argon2` :
+
+```js
+const argon2 = require('argon2');
+const OPTS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 };
+
+const hashPassword = (plain) => argon2.hash(plain, OPTS);
+
+// Connexion — avec migration progressive depuis bcrypt
+async function verifyAndUpgrade(user, plain) {
+  if (user.passwordHash.startsWith('$argon2')) {
+    const ok = await argon2.verify(user.passwordHash, plain);
+    if (ok && argon2.needsRehash(user.passwordHash, OPTS)) {
+      await saveHash(user.id, await hashPassword(plain));
+    }
+    return ok;
+  }
+  // Ancien hash (ex. bcrypt) : vérifier, puis re-hacher en Argon2id
+  const ok = await require('bcrypt').compare(plain, user.passwordHash);
+  if (ok) await saveHash(user.id, await hashPassword(plain));
+  return ok;
+}
+```
+
+À appliquer partout où un mot de passe est créé : inscription, `PUT /auth/password`,
+`/auth/reset-password` (mot de passe oublié), `POST /admin/staff` et `POST /admin/users/:id/reset-password`.

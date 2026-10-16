@@ -3,6 +3,8 @@
 // utilisateurs, annonces, rôles et permissions.
 // Les routes utilisées sont listées dans BACKEND_CHANGES.md.
 
+import 'dart:math';
+
 import '../models/models.dart';
 import 'api_service.dart';
 
@@ -86,6 +88,35 @@ class AdminService {
   Future<String?> updateUser(String id, Map<String, dynamic> changes) async {
     final res = await _api.put('/admin/users/$id', changes, auth: true);
     return res['success'] == true ? null : (res['message'] ?? 'Modification impossible.').toString();
+  }
+
+  /// Réinitialise le mot de passe d'un utilisateur. Le mot de passe est envoyé
+  /// en HTTPS puis haché (Argon2id) côté API : il n'est jamais stocké en clair.
+  /// L'utilisateur devra le changer à sa prochaine connexion.
+  Future<String?> resetUserPassword(String id, String newPassword) async {
+    final res = await _api.post(
+      '/admin/users/$id/reset-password',
+      {'newPassword': newPassword, 'mustChangePassword': true},
+      auth: true,
+    );
+    return res['success'] == true ? null : (res['message'] ?? 'Réinitialisation impossible.').toString();
+  }
+
+  /// Génère un mot de passe temporaire robuste (aléatoire cryptographique).
+  static String generateTempPassword({int length = 12}) {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#\$%*?-_';
+    final rnd = Random.secure();
+    String pick(String s) => s[rnd.nextInt(s.length)];
+    final all = upper + lower + digits + symbols;
+    final chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+    while (chars.length < length) {
+      chars.add(pick(all));
+    }
+    chars.shuffle(rnd);
+    return chars.join();
   }
 
   Future<String?> deleteUser(String id) async {

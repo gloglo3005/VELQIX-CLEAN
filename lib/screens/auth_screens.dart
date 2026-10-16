@@ -179,6 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // 🔐 Mot de passe réinitialisé par un admin : changement obligatoire
+    if (AuthService.instance.currentUserOrEmpty.mustChangePassword) {
+      final done = await _forcePasswordChange(password);
+      if (!done || !mounted) {
+        await AuthService.instance.logout();
+        return;
+      }
+    }
+
     // ✅ CORRECTIF Bug 2 : appliquer la locale du pays de l'utilisateur après login
     // Sans ça, localeNotifier reste 'fr' même si l'utilisateur est portugais/espagnol/etc.
     localeNotifier.value = countryCodeToLocale(
@@ -190,6 +199,74 @@ class _LoginScreenState extends State<LoginScreen> {
         ? const AdminDashboardScreen()
         : MainShell(username: AuthService.instance.loggedUsername);
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
+  }
+
+  /// Dialogue non fermable : l'utilisateur doit remplacer son mot de passe temporaire.
+  Future<bool> _forcePasswordChange(String tempPassword) async {
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    String? error;
+    bool saving = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('Nouveau mot de passe',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('Votre mot de passe a été réinitialisé par un administrateur. Choisissez-en un nouveau pour continuer.',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+            const SizedBox(height: 12),
+            TextField(controller: newCtrl, obscureText: true,
+                decoration: const InputDecoration(labelText: 'Nouveau mot de passe')),
+            const SizedBox(height: 10),
+            TextField(controller: confirmCtrl, obscureText: true,
+                decoration: const InputDecoration(labelText: 'Confirmer le mot de passe')),
+            if (error != null) ...[
+              const SizedBox(height: 8),
+              Text(error!, style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.error)),
+            ],
+          ]),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx, false),
+              child: const Text('Se déconnecter'),
+            ),
+            TextButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (newCtrl.text.length < 8) {
+                        setD(() => error = 'Au moins 8 caractères.');
+                        return;
+                      }
+                      if (newCtrl.text == tempPassword) {
+                        setD(() => error = 'Choisissez un mot de passe différent du temporaire.');
+                        return;
+                      }
+                      if (newCtrl.text != confirmCtrl.text) {
+                        setD(() => error = 'Les mots de passe ne correspondent pas.');
+                        return;
+                      }
+                      setD(() { saving = true; error = null; });
+                      final err = await AuthService.instance
+                          .changePassword(oldPassword: tempPassword, newPassword: newCtrl.text);
+                      if (err != null) {
+                        setD(() { saving = false; error = err; });
+                      } else if (ctx.mounted) {
+                        Navigator.pop(ctx, true);
+                      }
+                    },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    newCtrl.dispose();
+    confirmCtrl.dispose();
+    return ok == true;
   }
 
   void _showError(String msg) {

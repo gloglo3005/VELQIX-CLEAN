@@ -3,6 +3,7 @@
 // changement de rôle, suppression.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../services/admin_service.dart';
@@ -84,6 +85,107 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
     }
     await _run(() => AdminService.instance.updateUser(u.id, {'role': picked}),
         'Rôle mis à jour : ${AdminService.roleLabel(picked)}.');
+  }
+
+  // ─── Réinitialisation du mot de passe ────────────────────────────────────
+  Future<void> _resetPassword(UserModel u) async {
+    final ctrl = TextEditingController(text: AdminService.generateTempPassword());
+    bool visible = true;
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('Réinitialiser le mot de passe',
+              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Compte : ${u.fullName}', style: GoogleFonts.poppins(fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              obscureText: !visible,
+              style: GoogleFonts.robotoMono(fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Mot de passe temporaire',
+                suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    tooltip: 'Afficher / masquer',
+                    icon: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                    onPressed: () => setD(() => visible = !visible),
+                  ),
+                  IconButton(
+                    tooltip: 'Générer un autre',
+                    icon: const Icon(Icons.autorenew_rounded, size: 20),
+                    onPressed: () => setD(() => ctrl.text = AdminService.generateTempPassword()),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+                "L'utilisateur devra choisir un nouveau mot de passe à sa prochaine connexion "
+                'et ses sessions actuelles seront fermées.',
+                style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+            TextButton(
+              onPressed: () {
+                if (ctrl.text.length < 10) {
+                  adminSnack(ctx, 'Au moins 10 caractères.', error: true);
+                  return;
+                }
+                Navigator.pop(ctx, ctrl.text);
+              },
+              child: Text('Réinitialiser',
+                  style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+    ctrl.dispose();
+    if (chosen == null || !mounted) return;
+
+    final err = await AdminService.instance.resetUserPassword(u.id, chosen);
+    if (!mounted) return;
+    if (err != null) {
+      adminSnack(context, err, error: true);
+      return;
+    }
+    // Le mot de passe n'est affiché qu'une seule fois
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text('Mot de passe réinitialisé',
+            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Transmettez ce mot de passe à ${u.fullName} par un canal sûr. '
+              "Il ne sera plus affiché après fermeture de cette fenêtre.",
+              style: GoogleFonts.poppins(fontSize: 12)),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: AppTheme.border.withOpacity(0.5), borderRadius: BorderRadius.circular(10)),
+            child: SelectableText(chosen, style: GoogleFonts.robotoMono(fontSize: 15, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: chosen));
+              if (ctx.mounted) adminSnack(ctx, 'Copié.');
+            },
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('Copier'),
+          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Terminé')),
+        ],
+      ),
+    );
+    await widget.onRefresh();
   }
 
   Future<void> _delete(UserModel u) async {
@@ -261,6 +363,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 }
                 break;
               case 'role': await _changeRole(u); break;
+              case 'reset': await _resetPassword(u); break;
               case 'delete': await _delete(u); break;
             }
           },
@@ -268,6 +371,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             const PopupMenuItem(value: 'details', child: Text('Voir les détails')),
             PopupMenuItem(value: 'verify', child: Text(u.isVerified ? 'Retirer la vérification' : 'Vérifier le compte')),
             PopupMenuItem(value: 'role', enabled: !me, child: const Text('Changer le rôle')),
+            PopupMenuItem(value: 'reset', enabled: !me, child: const Text('Réinitialiser le mot de passe')),
             PopupMenuItem(value: 'suspend', enabled: !me, child: Text(u.isActive ? 'Suspendre' : 'Réactiver')),
             PopupMenuItem(
                 value: 'delete',
