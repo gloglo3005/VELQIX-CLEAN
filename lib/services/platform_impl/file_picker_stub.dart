@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 /// Implémentation native Android/iOS avec image_picker.
 import 'package:image_picker/image_picker.dart';
 
@@ -40,3 +41,6 @@ Future<String?> pickVideoWeb({bool capture = false}) async {
     return null;
   }
 }
+
+/// Non utilisé hors web (les chemins locaux sont lus via XFile).
+Future<Uint8List?> readUrlBytesWeb(String url) async => null;

@@ -1,4 +1,8 @@
+import 'dart:io' show File;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import '../services/app_translations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
@@ -273,6 +277,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
     return ext;
   }
 
+  /// Détecte le vrai format d'après les premiers octets (les URL blob: n'ont pas d'extension).
+  String? _sniffVideoExt(Uint8List b) {
+    if (b.length < 12) return null;
+    if (b[0] == 0x1A && b[1] == 0x45 && b[2] == 0xDF && b[3] == 0xA3) return 'webm';
+    if (b[4] == 0x66 && b[5] == 0x74 && b[6] == 0x79 && b[7] == 0x70) { // "ftyp"
+      final brand = String.fromCharCodes(b.sublist(8, 12));
+      return brand == 'qt  ' ? 'mov' : 'mp4';
+    }
+    return null;
+  }
+
   /// Envoie la vidéo sur Cloudinary (sauf si c'est déjà une URL http, cas d'une
   /// modification où la vidéo existante est conservée).
   Future<({String? url, String? error})> _uploadVideo(String src) async {
@@ -285,7 +300,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
       if (bytes.length > 30 * 1024 * 1024) {
         return (url: null, error: 'Vidéo trop volumineuse (30 Mo maximum).');
       }
-      return await PropertyService.instance.uploadVideoBytes(bytes, 'video.${_videoExt(src)}');
+      final ext = _sniffVideoExt(bytes) ?? _videoExt(src);
+      return await PropertyService.instance.uploadVideoBytes(bytes, 'video.$ext');
     } catch (e) {
       debugPrint('Erreur upload vidéo : $e');
       return (url: null, error: 'Échec de l\'envoi de la vidéo.');
@@ -408,6 +424,15 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
     final data = res['data'] as Map<String, dynamic>;
     final newProperty = PropertyModel.fromJson(data);
+    if (videoUrl != null && newProperty.videoUrl == null) {
+      // La vidéo a bien été envoyée, mais l'API ne l'a pas enregistrée / renvoyée.
+      debugPrint('⚠️ videoUrl envoyé ($videoUrl) mais absent de la réponse POST /properties');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text("La vidéo n'a pas été enregistrée par le serveur (champ videoUrl). Contactez l'équipe technique."),
+        backgroundColor: AppTheme.warning,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
     pendingPropertiesNotifier.value = [...pendingPropertiesNotifier.value, newProperty];
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -684,6 +709,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         spacing: 10, runSpacing: 10,
         children: [
           ..._selectedVideos.asMap().entries.map((e) => _VideoThumb(
+            key: ValueKey(e.value),
             filename: e.value,
             onRemove: () => setState(() => _selectedVideos.removeAt(e.key)),
           )),
@@ -929,40 +955,137 @@ class _ListingTypeOption extends StatelessWidget {
 
 // ─── Miniature vidéo avec preview ────────────────────────────────────────────
 class _VideoThumb extends StatefulWidget {
-  final String filename;
+  final String filename; // data:, blob:, http(s) ou chemin local
   final VoidCallback onRemove;
-  const _VideoThumb({required this.filename, required this.onRemove});
+  const _VideoThumb({super.key, required this.filename, required this.onRemove});
   @override
   State<_VideoThumb> createState() => _VideoThumbState();
 }
 
 class _VideoThumbState extends State<_VideoThumb> {
+  VideoPlayerController? _c;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final s = widget.filename;
+      final isUrl = s.startsWith('http') || s.startsWith('blob:') || s.startsWith('data:');
+      final c = (isUrl || kIsWeb)
+          ? VideoPlayerController.networkUrl(Uri.parse(s))
+          : VideoPlayerController.file(File(s));
+      _c = c;
+      await c.initialize();
+      await c.setVolume(0);
+      await c.seekTo(const Duration(milliseconds: 100)); // affiche la 1re image
+      if (mounted) setState(() => _ready = true);
+    } catch (e) {
+      debugPrint('Aperçu vidéo impossible : $e');
+      if (mounted) setState(() => _ready = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c?.dispose();
+    super.dispose();
+  }
+
+  void _openPreview() {
+    final c = _c;
+    if (c == null || !_ready) return;
+    c.setVolume(1);
+    c.seekTo(Duration.zero);
+    c.play();
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(alignment: Alignment.center, children: [
+          AspectRatio(
+            aspectRatio: c.value.aspectRatio == 0 ? 16 / 9 : c.value.aspectRatio,
+            child: Stack(alignment: Alignment.bottomCenter, children: [
+              VideoPlayer(c),
+              VideoProgressIndicator(c, allowScrubbing: true),
+            ]),
+          ),
+          ValueListenableBuilder<VideoPlayerValue>(
+            valueListenable: c,
+            builder: (_, v, __) => IconButton(
+              iconSize: 56,
+              color: Colors.white,
+              icon: Icon(v.isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded),
+              onPressed: () => v.isPlaying ? c.pause() : c.play(),
+            ),
+          ),
+          Positioned(
+            top: 4, right: 4,
+            child: IconButton(
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ),
+        ]),
+      ),
+    ).then((_) {
+      c.pause();
+      c.setVolume(0);
+      c.seekTo(const Duration(milliseconds: 100));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     const color = Color(0xFFEF4444);
-    return SizedBox(width: 90, height: 90,
+    final c = _c;
+    return SizedBox(
+      width: 110, height: 110,
       child: Stack(children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Container(width: 90, height: 90,
-              decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: color.withOpacity(0.35))),
-              child: const Icon(Icons.videocam_rounded, size: 32, color: color)),
+        GestureDetector(
+          onTap: _openPreview,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 110, height: 110,
+              decoration: BoxDecoration(
+                color: _ready ? Colors.black : color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: color.withOpacity(0.35)),
+              ),
+              child: _ready && c != null
+                  ? Stack(fit: StackFit.expand, children: [
+                      FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: c.value.size.width,
+                          height: c.value.size.height,
+                          child: VideoPlayer(c),
+                        ),
+                      ),
+                      Container(color: Colors.black26),
+                      const Center(child: Icon(Icons.play_circle_fill_rounded, size: 38, color: Colors.white)),
+                    ])
+                  : const Center(child: Icon(Icons.videocam_rounded, size: 32, color: color)),
+            ),
+          ),
         ),
-        // Label
-        Positioned(bottom: 8, left: 0, right: 0,
-          child: Text('Vidéo', textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
-        // Bouton supprimer
         Positioned(top: 4, right: 4,
           child: GestureDetector(onTap: widget.onRemove,
-            child: Container(width: 20, height: 20,
+            child: Container(width: 22, height: 22,
               decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
-              child: const Icon(Icons.close_rounded, size: 12, color: Colors.white)))),
-        // Badge succès
+              child: const Icon(Icons.close_rounded, size: 13, color: Colors.white)))),
         Positioned(bottom: 4, left: 4,
           child: Container(padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(color: AppTheme.success, shape: BoxShape.circle),
-            child: const Icon(Icons.check_rounded, size: 10, color: Colors.white))),
+            child: const Icon(Icons.check_rounded, size: 11, color: Colors.white))),
       ]),
     );
   }

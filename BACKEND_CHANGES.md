@@ -95,3 +95,16 @@ async function verifyAndUpgrade(user, plain) {
 
 À appliquer partout où un mot de passe est créé : inscription, `PUT /auth/password`,
 `/auth/reset-password` (mot de passe oublié), `POST /admin/staff` et `POST /admin/users/:id/reset-password`.
+
+---
+
+# Vidéo d'annonce — points à vérifier côté API
+
+Le formulaire envoie la vidéo à `POST /upload/video` (multipart, champ `file`, réponse
+`{ success, data: { url } }`), puis ajoute `videoUrl` dans `POST /properties` / `PUT /properties/:id`.
+Pour que la vidéo apparaisse sur la plateforme, l'API doit :
+- accepter et **enregistrer** `videoUrl` (colonne / champ sur l'annonce) à la création ET à la modification ;
+- **renvoyer** `videoUrl` dans `POST /properties`, `GET /properties`, `GET /properties/:id`,
+  `GET /admin/properties/pending` et `GET /admin/properties` ;
+- accepter les formats mp4, mov, webm, 3gp, m4v (taille max 30 Mo côté app).
+Si le serveur ne renvoie pas `videoUrl` après la création, l'app affiche maintenant un avertissement.

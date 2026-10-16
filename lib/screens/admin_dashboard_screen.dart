@@ -704,6 +704,7 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
       categorie: p.categorie,
       adresse: p.adresse,
       images: p.images,
+      videoUrl: p.videoUrl, // ← la vidéo était perdue à l'approbation
       caracteristiques: p.caracteristiques,
       isAvailable: p.isAvailable,
       isFeatured: p.isFeatured,

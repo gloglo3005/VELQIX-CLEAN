@@ -37,6 +37,11 @@ class WebFilePicker {
         if (parts.length != 2) return null;
         return base64Decode(parts[1]);
       }
+      // Web : les vidéos arrivent sous forme d'URL blob:
+      if (pathOrDataUri.startsWith('blob:')) {
+        final b = await readUrlBytesWeb(pathOrDataUri);
+        if (b != null) return b;
+      }
       return await XFile(pathOrDataUri).readAsBytes();
     } catch (_) {
       return null;

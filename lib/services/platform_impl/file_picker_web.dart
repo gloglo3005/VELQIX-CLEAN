@@ -370,3 +370,15 @@ Future<String?> _captureFromWebcamPC() async {
 
   return completer.future;
 }
+
+
+/// Lit les octets d'une URL blob: (vidéo choisie ou enregistrée dans le navigateur).
+Future<Uint8List?> readUrlBytesWeb(String url) async {
+  try {
+    final req = await html.HttpRequest.request(url, responseType: 'arraybuffer');
+    final buf = req.response as ByteBuffer;
+    return Uint8List.view(buf);
+  } catch (_) {
+    return null;
+  }
+}
