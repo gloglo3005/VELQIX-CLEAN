@@ -667,7 +667,11 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
 
     if (res['success'] != true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['message'] ?? 'Erreur lors de l\'approbation')),
+        SnackBar(
+          content: Text(res['message'] ?? 'Erreur lors de l\'approbation'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -736,7 +740,11 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
 
     if (res['success'] != true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res['message'] ?? 'Erreur lors du rejet')),
+        SnackBar(
+          content: Text(res['message'] ?? 'Erreur lors du rejet'),
+          backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -849,11 +857,13 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(children: [
             Expanded(child: GestureDetector(
-              onTap: _reject,
+              onTap: _submitting ? null : _reject,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(color: AppTheme.error.withOpacity(0.08), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.error.withOpacity(0.2))),
-                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                child: _submitting
+                    ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.error)))
+                    : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Icon(Icons.close_rounded, color: AppTheme.error, size: 16),
                   const SizedBox(width: 5),
                   Text('Rejeter', style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.error, fontWeight: FontWeight.w600)),
@@ -862,11 +872,13 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
             )),
             const SizedBox(width: 10),
             Expanded(child: GestureDetector(
-              onTap: _approve,
+              onTap: _submitting ? null : _approve,
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(color: AppTheme.success, borderRadius: BorderRadius.circular(10)),
-                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                child: _submitting
+                    ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
+                    : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Icon(Icons.check_rounded, color: Colors.white, size: 16),
                   const SizedBox(width: 5),
                   Text('Approuver', style: GoogleFonts.poppins(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600)),

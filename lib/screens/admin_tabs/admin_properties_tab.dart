@@ -23,6 +23,7 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
   String _q = '';
   String _status = 'all';
   String _type = 'all';
+  String? _busyId; // annonce en cours d'approbation / rejet / suppression
 
   @override
   void initState() {
@@ -62,21 +63,49 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
     }).toList();
   }
 
-  Future<void> _act(Future<String?> Function() action, String okMsg, {String? removeFromPending}) async {
+  /// Exécute une action sur une annonce, avec indicateur d'attente, message de
+  /// résultat et mise à jour locale immédiate (sans recharger toute la liste).
+  Future<void> _act(
+    PropertyModel p,
+    Future<String?> Function() action,
+    String okMsg, {
+    String? newStatus,
+    bool remove = false,
+  }) async {
+    if (_busyId != null) return;
+    setState(() => _busyId = p.id);
     final err = await action();
     if (!mounted) return;
+    setState(() => _busyId = null);
     if (err != null) {
       adminSnack(context, err, error: true);
       return;
     }
-    if (removeFromPending != null) {
-      pendingPropertiesNotifier.value =
-          pendingPropertiesNotifier.value.where((x) => (x as PropertyModel).id != removeFromPending).toList();
+
+    final pending = pendingPropertiesNotifier.value;
+    pendingPropertiesNotifier.value =
+        pending.where((x) => (x as PropertyModel).id != p.id).toList();
+
+    if (newStatus == 'approuve') {
+      // Publie tout de suite l'annonce côté accueil / explorer
+      publishedPropertiesNotifier.value = [
+        ...publishedPropertiesNotifier.value.where((x) => (x as PropertyModel).id != p.id),
+        p.withStatus('approuve'),
+      ];
+    } else {
+      publishedPropertiesNotifier.value = [
+        ...publishedPropertiesNotifier.value.where((x) => (x as PropertyModel).id != p.id),
+      ];
     }
-    // Prévient l'accueil / explorer de se recharger
-    publishedPropertiesNotifier.value = [...publishedPropertiesNotifier.value];
+
+    setState(() {
+      if (remove) {
+        _all = _all.where((x) => x.id != p.id).toList();
+      } else if (newStatus != null) {
+        _all = _all.map((x) => x.id == p.id ? x.withStatus(newStatus) : x).toList();
+      }
+    });
     adminSnack(context, okMsg);
-    _load();
   }
 
   Future<void> _delete(PropertyModel p) async {
@@ -86,8 +115,8 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
         confirmLabel: 'Supprimer',
         danger: true);
     if (!ok) return;
-    await _act(() => AdminService.instance.deleteProperty(p.id), 'Annonce supprimée.',
-        removeFromPending: p.id);
+    await _act(p, () => AdminService.instance.deleteProperty(p.id), 'Annonce supprimée.',
+        remove: true);
   }
 
   Color _statusColor(String s) =>
@@ -219,15 +248,20 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
             const SizedBox(height: 6),
             Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
               AdminBadge(_statusLabel(p.status), _statusColor(p.status)),
-              if (p.status != 'approuve')
-                _miniAction('Approuver', AppTheme.success,
-                    () => _act(() => AdminService.instance.approveProperty(p.id), 'Annonce approuvée.',
-                        removeFromPending: p.id)),
-              if (p.status != 'rejete')
-                _miniAction('Rejeter', AppTheme.warning,
-                    () => _act(() => AdminService.instance.rejectProperty(p.id), 'Annonce rejetée.',
-                        removeFromPending: p.id)),
-              _miniAction('Supprimer', AppTheme.error, () => _delete(p)),
+              if (_busyId == p.id)
+                const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              else ...[
+                if (p.status != 'approuve')
+                  _miniAction('Approuver', AppTheme.success,
+                      () => _act(p, () => AdminService.instance.approveProperty(p.id),
+                          'Annonce approuvée et publiée.', newStatus: 'approuve')),
+                if (p.status != 'rejete')
+                  _miniAction('Rejeter', AppTheme.warning,
+                      () => _act(p, () => AdminService.instance.rejectProperty(p.id),
+                          'Annonce rejetée.', newStatus: 'rejete')),
+                _miniAction('Supprimer', AppTheme.error, () => _delete(p)),
+              ],
             ]),
           ]),
         ),

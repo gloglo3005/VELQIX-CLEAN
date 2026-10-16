@@ -5,6 +5,8 @@
 
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../models/models.dart';
 import 'api_service.dart';
 
@@ -138,11 +140,13 @@ class AdminService {
 
   Future<String?> approveProperty(String id) async {
     final res = await _api.put('/admin/properties/$id/approve', {}, auth: true);
+    debugPrint('approve $id → $res');
     return res['success'] == true ? null : (res['message'] ?? 'Erreur.').toString();
   }
 
   Future<String?> rejectProperty(String id) async {
     final res = await _api.put('/admin/properties/$id/reject', {}, auth: true);
+    debugPrint('reject $id → $res');
     return res['success'] == true ? null : (res['message'] ?? 'Erreur.').toString();
   }
 

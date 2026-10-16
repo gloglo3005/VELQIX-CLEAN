@@ -183,6 +183,29 @@ class PropertyModel {
     this.updatedAt,
   });
 
+  /// Statut normalisé : accepte les variantes (pending / approved / rejected…).
+  static String _normalizeStatus(dynamic raw) {
+    final s = (raw ?? 'approuve').toString().trim().toLowerCase();
+    if (s == 'pending' || s == 'en_attente' || s == 'en attente' || s == 'pending_review') return 'en_attente';
+    if (s == 'rejected' || s == 'rejete' || s == 'rejeté' || s == 'rejetee' || s == 'rejetée') return 'rejete';
+    return 'approuve';
+  }
+
+  /// Copie de l'annonce avec un autre statut.
+  PropertyModel withStatus(String newStatus) => PropertyModel(
+        id: id, titre: titre, description: description, type: type,
+        listingType: listingType, categorie: categorie, prix: prix,
+        prixParJour: prixParJour, images: images, videoUrl: videoUrl,
+        adresse: adresse, proprietaire: proprietaire,
+        caracteristiques: caracteristiques, rating: rating, totalAvis: totalAvis,
+        isAvailable: isAvailable, isFeatured: isFeatured, createdAt: createdAt,
+        vues: vues, surface: surface, nombrePieces: nombrePieces, annee: annee,
+        status: newStatus, titreTranslations: titreTranslations,
+        descriptionTranslations: descriptionTranslations,
+        caracteristiquesTranslations: caracteristiquesTranslations,
+        updatedAt: DateTime.now(),
+      );
+
   /// Lien de partage vers la page du bien (deep link web)
   // ⚠️ Corrigé : pointait vers "velqix.tg", un domaine jamais configuré —
   // lien mort à chaque partage. Vraie URL Vercel de l'app en attendant un
@@ -319,7 +342,7 @@ class PropertyModel {
       surface:         _formatSurface(json['surface']),
       nombrePieces:    (json['nombrePieces'] as num?)?.toInt(),
       annee:           (json['annee'] as num?)?.toInt(),
-      status:          json['status'] ?? 'approuve',
+      status:          _normalizeStatus(json['status'] ?? json['statut']),
       // ⚠️ Corrigé : ces 3 champs existaient dans le modèle et étaient
       // utilisés par getLocalizedTitre/getLocalizedDescription/
       // getLocalizedCaracteristiques, mais n'étaient jamais lus depuis le
