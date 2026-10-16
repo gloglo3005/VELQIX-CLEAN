@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' show localeNotifier, countryCodeToLocale;
 import '../widgets/widgets.dart';
-import '../widgets/animated_brand_background.dart';
+import '../widgets/video_brand_background.dart';
 import 'legal_screen.dart';
 import '../services/auth_service.dart';
 import 'main_shell.dart';
@@ -384,7 +384,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ]),
         );
 
-    return AnimatedBrandBackground(
+    return VideoBrandBackground(
       child: Padding(
         padding: const EdgeInsets.all(48),
         child: SafeArea(

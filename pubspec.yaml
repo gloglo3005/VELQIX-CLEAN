@@ -69,3 +69,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
+    - assets/videos/login_bg.mp4
