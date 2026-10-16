@@ -7,8 +7,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../services/admin_socket_service.dart'; // NEW
 import '../services/api_service.dart'; // NEW : vraies routes /api/admin/*
+import '../services/staff_service.dart';
+import '../services/admin_service.dart';
+import 'admin_tabs/admin_users_tab.dart';
+import 'admin_tabs/admin_properties_tab.dart';
+import 'admin_tabs/admin_roles_tab.dart';
+import 'admin_tabs/admin_common.dart' show adminRoleColor;
 import '../theme/app_theme.dart';
-import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, StatCard, UserAvatar;
+import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, StatCard, UserAvatar, AppTextField, PrimaryButton;
 import '../models/models.dart';
 import 'auth_screens.dart';
 
@@ -34,6 +40,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   bool _loadingDashboard = true;
   String? _dashboardError;
 
+  /// Recharge uniquement la liste des utilisateurs (sans écran de chargement).
+  Future<void> _refreshUsers() async {
+    try {
+      final list = await AdminService.instance.getUsers();
+      if (mounted) setState(() => _users = list);
+    } catch (_) {}
+  }
+
   Future<void> _loadDashboardData() async {
     setState(() {
       _loadingDashboard = true;
@@ -42,7 +56,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     try {
       final results = await Future.wait([
-        ApiService.instance.get('/admin/users?limit=100', auth: true),
+        ApiService.instance.get('/admin/users?limit=500', auth: true),
         ApiService.instance.get('/admin/stats', auth: true),
         ApiService.instance.get('/admin/properties/pending', auth: true),
       ]);
@@ -79,7 +93,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
+    // Met à jour la barre latérale (grand écran) quand l'onglet change
+    _tabController.addListener(() {
+      if (mounted && !_tabController.indexIsChanging) setState(() {});
+    });
 
     // ── NEW : Charger les vraies données (users/stats/annonces) ─────────
     _loadDashboardData();
@@ -176,6 +194,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     }
     final users = _users;
     final properties = _totalProperties;
+    final isWide = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -224,8 +243,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             },
           ),
         ],
-        bottom: TabBar(
+        bottom: isWide ? null : TabBar(
           controller: _tabController,
+          isScrollable: true,
           labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600),
           unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
           labelColor: Colors.white,
@@ -235,7 +255,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           // ── NEW : Badge sur l'onglet Annonces ─────────────────────
           tabs: [
             const Tab(text: 'Tableau de bord'),
-            Tab(child: _TabWithBadge(label: 'Annonces', notifier: pendingPropertiesNotifier)),
+            Tab(child: _TabWithBadge(label: 'Modération', notifier: pendingPropertiesNotifier)),
+            const Tab(text: 'Utilisateurs'),
+            const Tab(text: 'Annonces'),
+            const Tab(text: 'Équipe'),
+            const Tab(text: 'Rôles & permissions'),
             const Tab(text: 'Litiges'),
           ],
         ),
@@ -244,20 +268,188 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         valueListenable: pendingPropertiesNotifier,
         builder: (context, _, __) => ValueListenableBuilder(
           valueListenable: publishedPropertiesNotifier,
-          builder: (context, published, __) => TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDashboard(users.length, properties),
-              _buildAnnoncesValidation(),
-              _buildLitiges(),
-            ],
-          ),
+          builder: (context, published, __) {
+            final view = TabBarView(
+              controller: _tabController,
+              physics: isWide ? const NeverScrollableScrollPhysics() : null,
+              children: [
+                _buildDashboard(users.length, properties),
+                _buildAnnoncesValidation(),
+                AdminUsersTab(users: users, onRefresh: _refreshUsers),
+                const AdminPropertiesTab(),
+                _buildEquipe(),
+                const AdminRolesTab(),
+                _buildLitiges(),
+              ],
+            );
+            if (!isWide) return view;
+            return Row(children: [
+              _buildSideRail(),
+              VerticalDivider(width: 1, color: AppTheme.border),
+              Expanded(child: view),
+            ]);
+          },
         ),
       ),
     );
   }
 
+  // ─── Équipe : démarcheurs & agents d'entretien (comptes créés par l'admin) ─
+  Widget _buildEquipe() {
+    final staff = _users.where((u) => u.isStaff).toList();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(children: [
+          Expanded(
+            child: Text("Démarcheurs & agents d'entretien",
+                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+          ElevatedButton.icon(
+            onPressed: _openCreateStaff,
+            icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+            label: const Text('Créer un compte'),
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Text("Ces comptes ne peuvent pas s'inscrire eux-mêmes : seul l'administrateur les crée.",
+            style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+        const SizedBox(height: 14),
+        if (staff.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: Center(
+              child: Text('Aucun compte pour le moment.',
+                  style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
+            ),
+          ),
+        ...staff.map((u) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.border)),
+              child: Row(children: [
+                UserAvatar(user: u, radius: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(u.fullName, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(u.roleLabel,
+                        style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.primary)),
+                    if (u.telephone.isNotEmpty)
+                      Text(u.telephone,
+                          style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+                  ]),
+                ),
+              ]),
+            )),
+      ],
+    );
+  }
+
+  Future<void> _openCreateStaff() async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => const _CreateStaffSheet(),
+    );
+    if (created == true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Compte créé avec succès.')));
+      _loadDashboardData();
+    }
+  }
+
   // ─── Le reste est IDENTIQUE à l'original ─────────────────────────────────
+
+  // ─── Barre latérale façon « Django admin » (grand écran) ──────────────────
+  Widget _buildSideRail() {
+    Widget icon(IconData i) => Icon(i);
+    return NavigationRail(
+      backgroundColor: AppTheme.surface,
+      extended: MediaQuery.of(context).size.width >= 1200,
+      selectedIndex: _tabController.index,
+      onDestinationSelected: (i) => setState(() => _tabController.animateTo(i)),
+      labelType: MediaQuery.of(context).size.width >= 1200 ? null : NavigationRailLabelType.all,
+      selectedIconTheme: IconThemeData(color: AppTheme.primary),
+      selectedLabelTextStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primary),
+      unselectedLabelTextStyle: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary),
+      destinations: [
+        NavigationRailDestination(icon: icon(Icons.dashboard_rounded), label: const Text('Tableau de bord')),
+        NavigationRailDestination(
+          icon: ValueListenableBuilder<List<dynamic>>(
+            valueListenable: pendingPropertiesNotifier,
+            builder: (_, l, __) => Badge(
+              isLabelVisible: l.isNotEmpty,
+              label: Text('${l.length}'),
+              child: const Icon(Icons.fact_check_rounded),
+            ),
+          ),
+          label: const Text('Modération'),
+        ),
+        NavigationRailDestination(icon: icon(Icons.people_alt_rounded), label: const Text('Utilisateurs')),
+        NavigationRailDestination(icon: icon(Icons.home_work_rounded), label: const Text('Annonces')),
+        NavigationRailDestination(icon: icon(Icons.support_agent_rounded), label: const Text('Équipe')),
+        NavigationRailDestination(icon: icon(Icons.admin_panel_settings_rounded), label: const Text('Rôles')),
+        NavigationRailDestination(icon: icon(Icons.gavel_rounded), label: const Text('Litiges')),
+      ],
+    );
+  }
+
+  // ─── Répartition des utilisateurs par rôle ────────────────────────────────
+  Widget _buildRoleBreakdown() {
+    final total = _users.isEmpty ? 1 : _users.length;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Utilisateurs par rôle',
+            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        for (final r in AdminService.roles)
+          Builder(builder: (_) {
+            final n = _users.where((u) => u.role == r).length;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                SizedBox(
+                    width: 120,
+                    child: Text(AdminService.roleLabel(r), style: GoogleFonts.poppins(fontSize: 12))),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: n / total,
+                      minHeight: 8,
+                      backgroundColor: AppTheme.border,
+                      color: adminRoleColor(r),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('$n', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+              ]),
+            );
+          }),
+        const SizedBox(height: 4),
+        Text(
+          '${_users.where((u) => !u.isVerified).length} non vérifiés · '
+          '${_users.where((u) => !u.isActive).length} suspendus',
+          style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+      ]),
+    );
+  }
 
   Widget _buildDashboard(int userCount, int propCount) {
     return SingleChildScrollView(
@@ -282,6 +474,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Expanded(child: StatCard(label: 'Litiges', value: '${_disputes.length}', icon: Icons.gavel_rounded, color: AppTheme.error)),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildRoleBreakdown(),
           const SizedBox(height: 20),
           Text('Utilisateurs récents', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
@@ -681,6 +875,115 @@ class _AdminRealAnnonceCardState extends State<_AdminRealAnnonceCard> {
           ]),
         ),
       ]),
+    );
+  }
+}
+
+
+// ─── Formulaire de création d'un compte démarcheur / agent d'entretien ───────
+class _CreateStaffSheet extends StatefulWidget {
+  const _CreateStaffSheet();
+  @override
+  State<_CreateStaffSheet> createState() => _CreateStaffSheetState();
+}
+
+class _CreateStaffSheetState extends State<_CreateStaffSheet> {
+  final _prenom = TextEditingController();
+  final _nom = TextEditingController();
+  final _tel = TextEditingController();
+  final _email = TextEditingController();
+  final _username = TextEditingController();
+  final _pass = TextEditingController();
+  String _role = StaffService.roleDemarcheur;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    for (final c in [_prenom, _nom, _tel, _email, _username, _pass]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if ([_prenom, _nom, _tel, _email].any((c) => c.text.trim().isEmpty) ||
+        !_email.text.contains('@')) {
+      setState(() => _error = 'Prénom, nom, téléphone et e-mail valides sont obligatoires.');
+      return;
+    }
+    if (_pass.text.length < 8) {
+      setState(() => _error = 'Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    setState(() { _saving = true; _error = null; });
+    final err = await StaffService.instance.createStaff(
+      role: _role,
+      prenom: _prenom.text.trim(),
+      nom: _nom.text.trim(),
+      telephone: _tel.text.trim(),
+      email: _email.text.trim(),
+      username: _username.text,
+      password: _pass.text,
+    );
+    if (!mounted) return;
+    if (err != null) {
+      setState(() { _saving = false; _error = err; });
+      return;
+    }
+    Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nouveau compte',
+                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 14),
+                Wrap(spacing: 8, children: [
+                  ChoiceChip(
+                    label: const Text('Démarcheur'),
+                    selected: _role == StaffService.roleDemarcheur,
+                    onSelected: (_) => setState(() => _role = StaffService.roleDemarcheur),
+                  ),
+                  ChoiceChip(
+                    label: const Text("Agent d'entretien"),
+                    selected: _role == StaffService.roleAgentEntretien,
+                    onSelected: (_) => setState(() => _role = StaffService.roleAgentEntretien),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                AppTextField(label: 'Prénom', controller: _prenom, prefixIcon: Icons.person_outline_rounded),
+                const SizedBox(height: 12),
+                AppTextField(label: 'Nom', controller: _nom, prefixIcon: Icons.person_outline_rounded),
+                const SizedBox(height: 12),
+                AppTextField(label: 'Téléphone', controller: _tel, prefixIcon: Icons.phone_outlined, keyboardType: TextInputType.phone),
+                const SizedBox(height: 12),
+                AppTextField(label: 'E-mail', controller: _email, prefixIcon: Icons.mail_outline_rounded, keyboardType: TextInputType.emailAddress),
+                const SizedBox(height: 12),
+                AppTextField(label: "Nom d'utilisateur (facultatif)", controller: _username, prefixIcon: Icons.alternate_email_rounded),
+                const SizedBox(height: 12),
+                AppTextField(label: 'Mot de passe provisoire', controller: _pass, prefixIcon: Icons.lock_outline_rounded, obscureText: true),
+                if (_error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_error!, style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.error)),
+                ],
+                const SizedBox(height: 16),
+                PrimaryButton(label: 'Créer le compte', isLoading: _saving, onPressed: _submit),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

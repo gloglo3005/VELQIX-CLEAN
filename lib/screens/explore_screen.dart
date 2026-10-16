@@ -26,7 +26,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     // ✅ Écoute les approbations admin en temps réel
     publishedPropertiesNotifier.addListener(_onPublished);
     _loadProperties();
@@ -63,9 +63,10 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
       final matchCountry = _filterCountryCode == null ||
           pays == _filterCountryCode!.toLowerCase() ||
           pays == (_filterCountryName ?? '').toLowerCase();
-      bool matchTab = true;
-      if (_tabController.index == 1) matchTab = p.type == PropertyType.immobilier;
-      if (_tabController.index == 2) matchTab = p.type == PropertyType.mobilier;
+      // Immobilier et mobilier ne sont plus mélangés : un onglet = un type de bien
+      final matchTab = _tabController.index == 0
+          ? p.type == PropertyType.immobilier
+          : p.type == PropertyType.mobilier;
       return matchSearch && matchAvailable && matchPrice && matchTab && matchCountry;
     }).toList();
 
@@ -170,7 +171,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
                     unselectedLabelColor: AppTheme.textSecondary,
                     indicatorColor: AppTheme.primary,
                     indicatorWeight: 3,
-                    tabs: [Tab(text: tr('explore_tab_all')), Tab(text: tr('explore_tab_immo')), Tab(text: tr('explore_tab_mobilier'))],
+                    tabs: [Tab(text: tr('explore_tab_immo')), Tab(text: tr('add_type_mobilier'))],
                   ),
                 ],
               ),

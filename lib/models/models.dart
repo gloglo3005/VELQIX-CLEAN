@@ -5,7 +5,7 @@
 enum PropertyType { immobilier, mobilier }
 enum ListingType { vente, location, les_deux }
 enum PropertyCategory {
-  maison, appartement, terrain, bureau, entrepot,
+  maison, appartement, hotel, terrain, bureau, entrepot,
   voiture, moto, camion, equipement, autre
 }
 
@@ -17,10 +17,11 @@ class UserModel {
   final String telephone;
   final String? avatarUrl;
   final bool isVerified;
+  final bool isActive; // false = compte suspendu par un administrateur
   final double rating;
   final int totalAvis;
   final DateTime createdAt;
-  final String role; // 'proprietaire', 'client', 'admin'
+  final String role; // 'client', 'proprietaire', 'admin', 'demarcheur', 'agent_entretien'
   final bool isPremium;
   final String? countryCode; // Code ISO 2 lettres ex: 'TG', 'FR', 'US'
   final String? countryName; // Nom du pays ex: 'Togo', 'France'
@@ -39,6 +40,7 @@ class UserModel {
     required this.telephone,
     this.avatarUrl,
     this.isVerified = false,
+    this.isActive = true,
     this.rating = 0.0,
     this.totalAvis = 0,
     required this.createdAt,
@@ -53,6 +55,20 @@ class UserModel {
     this.followingCount = 0,
     this.isFollowedByMe = false,
   });
+
+  // ── Comptes créés uniquement par l'équipe VelQix / l'administrateur ──────
+  bool get isDemarcheur => role == 'demarcheur';
+  bool get isAgentEntretien => role == 'agent_entretien';
+  bool get isStaff => isDemarcheur || isAgentEntretien;
+  String get roleLabel {
+    switch (role) {
+      case 'demarcheur':      return 'Démarcheur';
+      case 'agent_entretien': return "Agent d'entretien";
+      case 'admin':           return 'Administrateur';
+      case 'proprietaire':    return 'Propriétaire';
+      default:                return 'Client';
+    }
+  }
 
   String get fullName {
   return "$prenom $nom".trim();
@@ -75,6 +91,7 @@ String get initials {
     telephone: json['telephone'] ?? '',
     avatarUrl: json['avatarUrl'],
     isVerified: json['isVerified'] ?? false,
+    isActive: json['isActive'] ?? true,
     rating: (json['rating'] ?? 0.0).toDouble(),
     totalAvis: json['totalAvis'] ?? 0,
     createdAt: DateTime.parse(json['createdAt']),
@@ -195,6 +212,7 @@ class PropertyModel {
     const labels = {
       PropertyCategory.maison: 'Maison',
       PropertyCategory.appartement: 'Appartement',
+      PropertyCategory.hotel: 'Hôtel',
       PropertyCategory.terrain: 'Terrain',
       PropertyCategory.bureau: 'Bureau',
       PropertyCategory.entrepot: 'Entrepôt',
@@ -228,6 +246,7 @@ class PropertyModel {
     switch ((json['categorie'] ?? '').toString().toLowerCase()) {
       case 'maison':      categorie = PropertyCategory.maison; break;
       case 'appartement': categorie = PropertyCategory.appartement; break;
+      case 'hotel':       categorie = PropertyCategory.hotel; break;
       case 'terrain':     categorie = PropertyCategory.terrain; break;
       case 'bureau':      categorie = PropertyCategory.bureau; break;
       case 'entrepot':    categorie = PropertyCategory.entrepot; break;

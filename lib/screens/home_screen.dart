@@ -11,6 +11,7 @@ import 'notifications_screen.dart';
 import 'premium_screen.dart';
 import 'add_listing_screen.dart';
 import 'explore_screen.dart';
+import 'staff_directory_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -39,20 +40,28 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _speechAvailable = false;
 
   // Clés de traduction des catégories (résolues dynamiquement dans build())
-  final _categoryKeys = [
-    'cat_all', 'cat_maisons', 'cat_voitures', 'cat_appartements',
-    'cat_equipements', 'cat_terrains', 'cat_bureaux', 'cat_motos', 'cat_autre'
+  // Immobilier et mobilier sont séparés : l'utilisateur choisit d'abord le type
+  // de bien, puis une catégorie propre à ce type.
+  PropertyType _selectedType = PropertyType.immobilier;
+  static const _immoCategoryKeys = [
+    'cat_all', 'cat_maisons', 'cat_appartements', 'cat_hotels',
+    'cat_terrains', 'cat_bureaux',
   ];
+  static const _mobilCategoryKeys = [
+    'cat_all', 'cat_voitures', 'cat_motos', 'cat_camions',
+  ];
+  List<String> get _categoryKeys =>
+      _selectedType == PropertyType.immobilier ? _immoCategoryKeys : _mobilCategoryKeys;
   // Correspondance clé → PropertyCategory pour le filtrage
   final _categoryFilters = {
     'cat_maisons':      PropertyCategory.maison,
-    'cat_voitures':     PropertyCategory.voiture,
     'cat_appartements': PropertyCategory.appartement,
-    'cat_equipements':  PropertyCategory.equipement,
+    'cat_hotels':       PropertyCategory.hotel,
     'cat_terrains':     PropertyCategory.terrain,
     'cat_bureaux':      PropertyCategory.bureau,
+    'cat_voitures':     PropertyCategory.voiture,
     'cat_motos':        PropertyCategory.moto,
-    'cat_autre':        PropertyCategory.autre,
+    'cat_camions':      PropertyCategory.camion,
   };
 
   // NOTE : remplace MockDataService + publishedProperties (session-local) par
@@ -138,6 +147,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }).toList();
     }
 
+    // ── Filtre par type de bien (immobilier OU mobilier, jamais les deux) ──
+    allProps = allProps.where((p) => p.type == _selectedType).toList();
+
     if (_selectedCategoryKey == 'cat_all') return allProps;
     final cat = _categoryFilters[_selectedCategoryKey];
     if (cat == null) return allProps;
@@ -145,6 +157,92 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool get _isActiveSearch => _searchQuery.trim().length >= 2;
+
+  // ─── Sélecteur Immobilier / Mobilier ─────────────────────────────────────
+  Widget _buildTypeToggle() {
+    Widget seg(PropertyType type, String label, IconData icon) {
+      final sel = _selectedType == type;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() {
+            _selectedType = type;
+            _selectedCategoryKey = 'cat_all';
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: BoxDecoration(
+              color: sel ? AppTheme.primary : Colors.transparent,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 17, color: sel ? Colors.white : AppTheme.textSecondary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(label,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, fontWeight: FontWeight.w600,
+                          color: sel ? Colors.white : AppTheme.textSecondary)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(children: [
+        seg(PropertyType.immobilier, tr('add_type_immo'), Icons.home_work_rounded),
+        seg(PropertyType.mobilier, tr('add_type_mobilier'), Icons.directions_car_rounded),
+      ]),
+    );
+  }
+
+  // ─── Accès aux démarcheurs et agents d'entretien ─────────────────────────
+  Widget _buildStaffEntry() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const StaffDirectoryScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.support_agent_rounded, color: AppTheme.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('staff_title'),
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+              Text(tr('staff_subtitle'),
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppTheme.textHint),
+        ]),
+      ),
+    );
+  }
 
   // ─── Reconnaissance vocale pour la barre de recherche ────────────────────
   Future<void> _startVoiceSearch() async {
@@ -935,6 +1033,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: SectionHeader(title: tr('home_categories'))),
                     const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildTypeToggle(),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       height: 38,
                       child: ListView.separated(
@@ -962,6 +1065,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         },
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildStaffEntry(),
                     ),
                     const SizedBox(height: 20),
                   ],

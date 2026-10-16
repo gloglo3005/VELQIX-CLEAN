@@ -1,10 +1,10 @@
 import '../services/app_translations.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' show localeNotifier, countryCodeToLocale;
 import '../widgets/widgets.dart';
+import '../widgets/animated_brand_background.dart';
 import 'legal_screen.dart';
 import '../services/auth_service.dart';
 import 'main_shell.dart';
@@ -192,79 +192,6 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
   }
 
-  // ─── Google Sign-In ──────────────────────────────────────────────────────
-  void _loginWithGoogle() async {
-    setState(() => _loading = true);
-    final error = await AuthService.instance.loginWithGoogle();
-    if (!mounted) return;
-
-    // Effacer tout SnackBar résiduel
-    ScaffoldMessenger.of(context).clearSnackBars();
-    setState(() => _loading = false);
-
-    // Si erreur annulation → afficher et stop
-    if (error != null && error.contains('annulée')) {
-      _showError(error);
-      return;
-    }
-
-    // Si connecté → naviguer
-    if (AuthService.instance.isLoggedIn) {
-      localeNotifier.value = countryCodeToLocale(AuthService.instance.currentUserOrEmpty.countryCode);
-      final dest = AuthService.instance.currentUserOrEmpty.role == 'admin'
-          ? const AdminDashboardScreen()
-          : MainShell(username: AuthService.instance.loggedUsername);
-      if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
-      return;
-    }
-
-    // Dernier recours : vérifier encore après un bref délai (Android)
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    if (AuthService.instance.isLoggedIn) {
-      final dest = AuthService.instance.currentUserOrEmpty.role == 'admin'
-          ? const AdminDashboardScreen()
-          : MainShell(username: AuthService.instance.loggedUsername);
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
-    }
-  }
-
-  // ─── Facebook Login ───────────────────────────────────────────────────────
-  void _loginWithFacebook() async {
-    // Sur web, Facebook Auth n'est pas disponible sans SDK JS
-    // Afficher un message informatif
-    setState(() => _loading = true);
-    final error = await AuthService.instance.loginWithFacebook();
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if (error != null) {
-      if (error.contains('non disponible sur le web')) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text("Facebook disponible uniquement sur l'app mobile.",
-                style: TextStyle(color: Colors.white, fontSize: 13))),
-          ]),
-          backgroundColor: const Color(0xFF1877F2),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 3),
-        ));
-        return;
-      }
-      _showError(error); return;
-    }
-
-    // ✅ CORRECTIF : locale après Facebook login
-    localeNotifier.value = countryCodeToLocale(AuthService.instance.currentUserOrEmpty.countryCode);
-
-    Navigator.pushReplacement(context, MaterialPageRoute(
-      builder: (_) => MainShell(username: AuthService.instance.loggedUsername),
-    ));
-  }
-
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [
@@ -279,228 +206,197 @@ class _LoginScreenState extends State<LoginScreen> {
     ));
   }
 
+  // ─── Mise en page adaptative ─────────────────────────────────────────────
+  // • Large écran (tablette / web) : panneau de marque à gauche + formulaire
+  // • Petit écran (téléphone)      : formulaire dans une carte centrée
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Center(
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/images/logo.png',
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.contain,
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width >= 900;
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Row(
+          children: [
+            Expanded(flex: 11, child: _buildBrandPanel()),
+            Expanded(
+              flex: 9,
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: _buildForm(context),
                     ),
-                    const SizedBox(height: 8),
-                    Text('Louez. Achetez. Gérez.', style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              Text('Connexion', style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-              Text('Bienvenue ! Connectez-vous à votre compte.', style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
-              const SizedBox(height: 28),
-              AppTextField(
-                label: "Nom d'utilisateur",
-                hint: 'ama_kofi',
-                controller: _usernameCtrl,
-                prefixIcon: Icons.alternate_email_rounded,
-                keyboardType: TextInputType.text,
-              ),
-              const SizedBox(height: 16),
-              AppTextField(
-                label: tr('auth_password'),
-                hint: '••••••••',
-                controller: _passCtrl,
-                prefixIcon: Icons.lock_outline_rounded,
-                obscureText: _obscure,
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20, color: AppTheme.textHint),
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())), child: Text('Mot de passe oublié ?', style: GoogleFonts.poppins(fontSize: 13))),
-              ),
-              const SizedBox(height: 8),
-              PrimaryButton(label: 'Se connecter', isLoading: _loading, onPressed: _login),
-              const SizedBox(height: 20),
-              Row(children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('ou', style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
-                ),
-                const Expanded(child: Divider()),
-              ]),
-              const SizedBox(height: 20),
-              _SocialButton(provider: 'google', onTap: _loginWithGoogle),
-              const SizedBox(height: 12),
-              _SocialButton(provider: 'facebook', onTap: _loginWithFacebook),
-              const SizedBox(height: 28),
-              Center(
-                child: RichText(
-                  text: TextSpan(
-                    text: 'Pas encore de compte ? ',
-                    style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
-                    children: [
-                      WidgetSpan(child: GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                        child: Text("S'inscrire", style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.primary, fontWeight: FontWeight.w600)),
-                      )),
-                    ],
                   ),
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final hPad = width < 380 ? 16.0 : 24.0;
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildLogo(size: 96),
+                  const SizedBox(height: 10),
+                  Text('Louez. Achetez. Gérez.',
+                      style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: EdgeInsets.all(width < 380 ? 20 : 28),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(AppTheme.isDark ? 0.25 : 0.07),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: _buildForm(context),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-class _SocialButton extends StatelessWidget {
-  final String provider; // 'google' ou 'facebook'
-  final VoidCallback onTap;
-  const _SocialButton({required this.provider, required this.onTap});
+  Widget _buildLogo({required double size}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.22),
+      child: Image.asset('assets/images/logo.png', width: size, height: size, fit: BoxFit.contain),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final isGoogle = provider == 'google';
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isGoogle ? Colors.white : const Color(0xFF1877F2),
-          borderRadius: BorderRadius.circular(14),
-          border: isGoogle ? Border.all(color: const Color(0xFFDADCE0), width: 1.5) : null,
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(isGoogle ? 0.10 : 0.07), blurRadius: isGoogle ? 8 : 6, offset: const Offset(0, 2))],
-        ),
-        child: Row(
+  Widget _buildBrandPanel() {
+    Widget point(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(text,
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.92))),
+            ),
+          ]),
+        );
+
+    return AnimatedBrandBackground(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: SafeArea(
+        child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isGoogle) ...[
-              _GoogleIcon(),
-              const SizedBox(width: 10),
-              Text(tr('auth_google'),
-                  style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w500,
-                      color: const Color(0xFF3C4043))),
-            ] else ...[
-              _FacebookIcon(),
-              const SizedBox(width: 10),
-              Text(tr('auth_facebook'),
-                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-            ],
+            _buildLogo(size: 84),
+            const SizedBox(height: 28),
+            Text('Louez. Achetez. Gérez.',
+                style: GoogleFonts.poppins(
+                    fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
+            const SizedBox(height: 12),
+            Text('La plateforme de référence pour vos biens immobiliers et vos véhicules.',
+                style: GoogleFonts.poppins(
+                    fontSize: 15, color: Colors.white.withOpacity(0.85), height: 1.6)),
+            const SizedBox(height: 36),
+            point(Icons.home_work_rounded, 'Maisons, appartements, hôtels et terrains'),
+            point(Icons.directions_car_rounded, 'Voitures, motos et camions'),
+            point(Icons.support_agent_rounded, "Démarcheurs et agents d'entretien à votre service"),
           ],
+        ),
         ),
       ),
     );
   }
-}
 
-// ─── Icône Google officielle ──────────────────────────────────────────────────
-class _GoogleIcon extends StatelessWidget {
-  const _GoogleIcon();
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22, height: 22,
-      child: CustomPaint(painter: _GoogleSvgPainter()),
-    );
-  }
-}
-
-class _GoogleSvgPainter extends CustomPainter {
-  static const double _deg = 3.14159265358979 / 180.0;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    final cy = h / 2;
-
-    // Rayon extérieur et épaisseur du trait du "G"
-    final outerR = w * 0.46;
-    final thickness = w * 0.30;
-    final innerR = outerR - thickness;
-
-    // Dessine un segment d'anneau coloré
-    void arc(Color color, double startDeg, double sweepDeg) {
-      final start = startDeg * _deg;
-      final sweep = sweepDeg * _deg;
-      final outer = Rect.fromCircle(center: Offset(cx, cy), radius: outerR);
-      final inner = Rect.fromCircle(center: Offset(cx, cy), radius: innerR);
-      final path = Path()
-        ..arcTo(outer, start, sweep, false)
-        ..arcTo(inner, start + sweep, -sweep, false)
-        ..close();
-      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true);
-    }
-
-    // Angles exacts du logo Google G
-    arc(const Color(0xFFEA4335), -90, 150);  // Rouge  : haut → droite-bas
-    arc(const Color(0xFFFBBC05),  60,  30);  // Jaune  : petit segment bas-droite
-    arc(const Color(0xFF34A853),  90, 120);  // Vert   : bas → gauche
-    arc(const Color(0xFF4285F4), 210,  60);  // Bleu   : gauche → haut-gauche
-    arc(const Color(0xFFEA4335), 270,  60);  // Rouge  : haut-gauche → haut (fermeture)
-
-    // Barre horizontale bleue (la traverse du "G")
-    final barH = thickness;
-    final barTop    = cy - barH / 2;
-    final barBottom = cy + barH / 2;
-    // D'abord effacer la zone avec du blanc
-    canvas.drawRect(
-      Rect.fromLTRB(cx, barTop, cx + outerR + 1, barBottom),
-      Paint()..color = Colors.white..style = PaintingStyle.fill,
-    );
-    // Puis dessiner la barre bleue seulement sur la moitié droite de l'anneau
-    canvas.drawRect(
-      Rect.fromLTRB(cx, barTop, cx + outerR + 1, barBottom),
-      Paint()..color = const Color(0xFF4285F4)..style = PaintingStyle.fill..isAntiAlias = true,
-    );
-
-    // Trou blanc central
-    canvas.drawCircle(
-      Offset(cx, cy), innerR,
-      Paint()..color = Colors.white..style = PaintingStyle.fill,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
-}
-
-// ─── Icône Facebook ───────────────────────────────────────────────────────────
-class _FacebookIcon extends StatelessWidget {
-  const _FacebookIcon();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22, height: 22,
-      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: const Text('f',
-          style: TextStyle(
-            color: Color(0xFF1877F2),
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-            fontFamily: 'Georgia',
-            height: 1.15,
-          )),
+  Widget _buildForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Connexion',
+            style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+        const SizedBox(height: 2),
+        Text('Bienvenue ! Connectez-vous à votre compte.',
+            style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
+        const SizedBox(height: 24),
+        AppTextField(
+          label: "Nom d'utilisateur",
+          hint: 'ama_kofi',
+          controller: _usernameCtrl,
+          prefixIcon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.text,
+        ),
+        const SizedBox(height: 16),
+        AppTextField(
+          label: tr('auth_password'),
+          hint: '••••••••',
+          controller: _passCtrl,
+          prefixIcon: Icons.lock_outline_rounded,
+          obscureText: _obscure,
+          suffix: IconButton(
+            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                size: 20, color: AppTheme.textHint),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
+            child: Text('Mot de passe oublié ?', style: GoogleFonts.poppins(fontSize: 13)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        PrimaryButton(label: 'Se connecter', isLoading: _loading, onPressed: _login),
+        const SizedBox(height: 24),
+        Center(
+          child: RichText(
+            text: TextSpan(
+              text: 'Pas encore de compte ? ',
+              style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
+              children: [
+                WidgetSpan(
+                  child: GestureDetector(
+                    onTap: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                    child: Text("S'inscrire",
+                        style: GoogleFonts.poppins(
+                            fontSize: 14, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1014,8 +910,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: CustomAppBar(title: 'Créer un compte'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: SingleChildScrollView(
+        padding: EdgeInsets.all(MediaQuery.of(context).size.width < 380 ? 16 : 24),
         child: Form(
           key: _formKey,
           child: Column(
@@ -1391,6 +1291,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 20),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );

@@ -38,15 +38,16 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool _pickingVideo   = false;
   bool _showPhotoError = false;
 
+  // Seuls les biens immobiliers (maisons, appartements, hôtels, terrains…) et
+  // les véhicules sont acceptés : plus de matériel, d'ustensiles, etc.
   final _immoCats = [
     PropertyCategory.maison, PropertyCategory.appartement,
-    PropertyCategory.terrain, PropertyCategory.bureau,
-    PropertyCategory.entrepot, PropertyCategory.autre,
+    PropertyCategory.hotel, PropertyCategory.terrain,
+    PropertyCategory.bureau, PropertyCategory.entrepot,
   ];
   final _mobilCats = [
     PropertyCategory.voiture, PropertyCategory.moto,
-    PropertyCategory.camion, PropertyCategory.equipement,
-    PropertyCategory.autre,
+    PropertyCategory.camion,
   ];
 
   List<PropertyCategory> get _currentCats =>
@@ -56,6 +57,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   Map<PropertyCategory, String> get catLabels => {
     PropertyCategory.maison:      tr('add_cat_maison'),
     PropertyCategory.appartement: tr('add_cat_appartement'),
+    PropertyCategory.hotel:       tr('add_cat_hotel'),
     PropertyCategory.terrain:     tr('add_cat_terrain'),
     PropertyCategory.bureau:      tr('add_cat_bureau'),
     PropertyCategory.entrepot:    tr('add_cat_entrepot'),
@@ -81,6 +83,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
       _type        = p.type;
       _listingType = p.listingType;
       _category    = p.categorie;
+      // Anciennes annonces (équipement / autre) : on se rabat sur une catégorie valide
+      if (!_currentCats.contains(_category)) _category = _currentCats.first;
       _selectedPhotos.addAll(p.images.take(2));
       if (p.videoUrl != null && p.videoUrl!.isNotEmpty) _selectedVideos.add(p.videoUrl!);
     }
@@ -427,6 +431,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
     const imgs = {
       PropertyCategory.maison:      'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800',
       PropertyCategory.appartement: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
+      PropertyCategory.hotel:       'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
       PropertyCategory.terrain:     'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800',
       PropertyCategory.bureau:      'https://images.unsplash.com/photo-1497366216548-37526070297c?w=800',
       PropertyCategory.entrepot:    'https://images.unsplash.com/photo-1553413077-190dd305871c?w=800',

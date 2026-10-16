@@ -127,6 +127,7 @@ const _translations = <String, Map<String, String>>{
   'add_cat_bureau':       {'fr': 'Bureau',                'en': 'Office',             'es': 'Oficina',            'pt': 'Escritório',         'de': 'Büro',               'ar': 'مكتب'},
   'add_cat_entrepot':     {'fr': 'Entrepôt',              'en': 'Warehouse',          'es': 'Almacén',            'pt': 'Armazém',            'de': 'Lager',              'ar': 'مستودع'},
   'add_cat_autre':        {'fr': 'Autre',                 'en': 'Other',              'es': 'Otro',               'pt': 'Outro',              'de': 'Sonstige',           'ar': 'أخرى'},
+  'add_cat_hotel':        {'fr': 'Hôtel',                 'en': 'Hotel',              'es': 'Hotel',              'pt': 'Hotel',              'de': 'Hotel',              'ar': 'فندق'},
   'add_lt_location':      {'fr': 'Location',              'en': 'Rental',             'es': 'Alquiler',           'pt': 'Aluguel',            'de': 'Miete',              'ar': 'إيجار'},
   'add_lt_location_sub':  {'fr': 'Louer votre bien',      'en': 'Rent your property', 'es': 'Alquilar tu bien',   'pt': 'Alugar seu imóvel',  'de': 'Ihr Objekt vermieten','ar': 'تأجير عقارك'},
   'add_lt_vente':         {'fr': 'Vente',                 'en': 'Sale',               'es': 'Venta',              'pt': 'Venda',              'de': 'Verkauf',            'ar': 'بيع'},
@@ -314,6 +315,15 @@ const _translations = <String, Map<String, String>>{
   'cat_bureaux':      {'fr': 'Bureaux',       'en': 'Offices',       'es': 'Oficinas',      'pt': 'Escritórios',   'de': 'Büros',         'ar': 'مكاتب'},
   'cat_motos':        {'fr': 'Motos',         'en': 'Motorcycles',   'es': 'Motos',         'pt': 'Motos',         'de': 'Motorräder',    'ar': 'دراجات'},
   'cat_autre':        {'fr': 'Autre',         'en': 'Other',         'es': 'Otro',          'pt': 'Outro',         'de': 'Sonstige',      'ar': 'أخرى'},
+  'cat_hotels':       {'fr': 'Hôtels',        'en': 'Hotels',        'es': 'Hoteles',       'pt': 'Hotéis',        'de': 'Hotels',        'ar': 'فنادق'},
+  'cat_camions':      {'fr': 'Camions',       'en': 'Trucks',        'es': 'Camiones',      'pt': 'Caminhões',     'de': 'LKW',           'ar': 'شاحنات'},
+  'staff_title':      {'fr': 'Démarcheurs & entretien', 'en': 'Agents & maintenance', 'es': 'Agentes y mantenimiento', 'pt': 'Agentes e manutenção', 'de': 'Makler & Wartung', 'ar': 'الوسطاء والصيانة'},
+  'staff_subtitle':   {'fr': 'Contactez-les en cas de besoin', 'en': 'Contact them when you need help', 'es': 'Contáctalos cuando los necesites', 'pt': 'Contacte-os quando precisar', 'de': 'Kontaktieren Sie sie bei Bedarf', 'ar': 'تواصل معهم عند الحاجة'},
+  'staff_demarcheurs':{'fr': 'Démarcheurs',   'en': 'Field agents',  'es': 'Agentes',       'pt': 'Agentes',       'de': 'Vermittler',    'ar': 'الوسطاء'},
+  'staff_agents':     {'fr': "Agents d'entretien", 'en': 'Maintenance staff', 'es': 'Personal de mantenimiento', 'pt': 'Equipe de manutenção', 'de': 'Wartungspersonal', 'ar': 'عمال الصيانة'},
+  'staff_empty':      {'fr': 'Aucun profil disponible pour le moment.', 'en': 'No profiles available yet.', 'es': 'Aún no hay perfiles disponibles.', 'pt': 'Ainda não há perfis disponíveis.', 'de': 'Noch keine Profile verfügbar.', 'ar': 'لا توجد ملفات متاحة حاليًا.'},
+  'staff_message':    {'fr': 'Message',       'en': 'Message',       'es': 'Mensaje',       'pt': 'Mensagem',      'de': 'Nachricht',     'ar': 'رسالة'},
+  'staff_call':       {'fr': 'Appeler',       'en': 'Call',          'es': 'Llamar',        'pt': 'Ligar',         'de': 'Anrufen',       'ar': 'اتصال'},
   'home_listings':    {'fr': 'biens',         'en': 'listings',      'es': 'bienes',        'pt': 'imóveis',       'de': 'Objekte',       'ar': 'عقارات'},
 
   // ── Premium features ─────────────────────────────────────────────────────
