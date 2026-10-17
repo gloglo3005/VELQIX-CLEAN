@@ -198,7 +198,21 @@ class _LoginScreenState extends State<LoginScreen> {
     final dest = AuthService.instance.currentUserOrEmpty.role == 'admin'
         ? const AdminDashboardScreen()
         : MainShell(username: AuthService.instance.loggedUsername);
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => dest));
+    // Remplace TOUTE la pile (y compris l'accueil invité qui a ouvert cet écran)
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => dest), (_) => false);
+  }
+
+  /// Entrer dans l'app sans compte (consultation des annonces).
+  void _continueAsGuest() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const MainShell(username: '')),
+      (_) => false,
+    );
   }
 
   /// Dialogue non fermable : l'utilisateur doit remplacer son mot de passe temporaire.
@@ -471,6 +485,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: TextButton(
+            onPressed: _continueAsGuest,
+            child: Text('Continuer sans compte',
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
           ),
         ),
       ],

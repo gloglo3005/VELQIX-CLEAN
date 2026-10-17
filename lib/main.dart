@@ -13,10 +13,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
+import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
+
+/// Clé de navigation globale (redirection quand la session expire).
+final navigatorKey = GlobalKey<NavigatorState>();
 
 /// ===============================================================
 /// GLOBAL SETTINGS
@@ -177,7 +181,9 @@ Future<void> main() async {
   /// DATE FORMATTING
   /// =============================================================
 
-  await initializeDateFormatting();
+  // Seulement les langues de l'app (avant : toutes les locales du monde)
+  await initializeDateFormatting('fr');
+  await initializeDateFormatting('en');
 
   /// =============================================================
   /// DEVICE ORIENTATION
@@ -227,46 +233,39 @@ Future<void> main() async {
   runApp(const VelQixApp());
 }
 
-/// Connexion automatique + services dépendant de l'utilisateur.
-/// Retourne true si l'utilisateur est déjà connecté.
+/// Démarrage RAPIDE : la session est restaurée depuis le cache local (quelques
+/// millisecondes), puis validée auprès du serveur EN ARRIÈRE-PLAN. Retourne
+/// true si un utilisateur est déjà connecté ; sinon l'app s'ouvre en mode invité.
 Future<bool> _startup() async {
   bool alreadyLoggedIn = false;
 
   try {
-    alreadyLoggedIn = await AuthService.instance.tryAutoLogin();
+    alreadyLoggedIn = await AuthService.instance.restoreSessionFast();
   } catch (e, stackTrace) {
-    debugPrint('Auto login error: $e');
+    debugPrint('Session restore error: $e');
     debugPrint('$stackTrace');
-    alreadyLoggedIn = false;
   }
 
   if (alreadyLoggedIn) {
     try {
       final user = AuthService.instance.currentUserOrEmpty;
       localeNotifier.value = countryCodeToLocale(user.countryCode);
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('Locale loading error: $e');
-      debugPrint('$stackTrace');
     }
-  }
 
-  try {
-    await NotificationService.instance.initializeLocalNotifications();
-  } catch (e, stackTrace) {
-    debugPrint('Local notification initialization error: $e');
-    debugPrint('$stackTrace');
-  }
-
-  // Push : initialisé ici si déjà connecté. Après une connexion manuelle,
-  // c'est fait dans MainShell.
-  if (alreadyLoggedIn) {
-    try {
-      await PushNotificationService.instance.initialize();
-    } catch (e, stackTrace) {
+    // Validation serveur + socket + push : plus rien ne bloque l'affichage
+    AuthService.instance.validateSession().catchError((e) {
+      debugPrint('Session validation error: $e');
+    });
+    PushNotificationService.instance.initialize().catchError((e) {
       debugPrint('Push notification initialization error: $e');
-      debugPrint('$stackTrace');
-    }
+    });
   }
+
+  NotificationService.instance.initializeLocalNotifications().catchError((e) {
+    debugPrint('Local notification initialization error: $e');
+  });
 
   return alreadyLoggedIn;
 }
@@ -341,6 +340,36 @@ class _VelQixAppState extends State<VelQixApp> {
   // la connexion automatique.
   late final Future<bool> _startupFuture = _startup();
 
+  @override
+  void initState() {
+    super.initState();
+    ApiService.instance.sessionExpiredNotifier.addListener(_onSessionExpired);
+  }
+
+  @override
+  void dispose() {
+    ApiService.instance.sessionExpiredNotifier.removeListener(_onSessionExpired);
+    super.dispose();
+  }
+
+  /// Session expirée / compte banni : retour à l'accueil en mode invité.
+  void _onSessionExpired() {
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainShell(username: '')),
+      (_) => false,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx == null) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Session expirée. Reconnectez-vous pour continuer.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    });
+  }
+
   /// Écran d'accueil d'un utilisateur déjà connecté : l'admin va sur son
   /// dashboard, les autres sur MainShell.
   Widget _homeForLoggedUser() {
@@ -366,6 +395,7 @@ class _VelQixAppState extends State<VelQixApp> {
             return MaterialApp(
               title: 'VELQIX',
               debugShowCheckedModeBanner: false,
+              navigatorKey: navigatorKey,
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: themeMode,
@@ -399,9 +429,11 @@ class _VelQixAppState extends State<VelQixApp> {
                   if (snapshot.connectionState != ConnectionState.done) {
                     return const _SplashScreen();
                   }
+                  // Connecté → son espace ; sinon → accueil en mode invité
+                  // (la connexion n'est demandée que pour les actions qui l'exigent).
                   return snapshot.data == true
                       ? _homeForLoggedUser()
-                      : const LoginScreen();
+                      : const MainShell(username: '');
                 },
               ),
             );

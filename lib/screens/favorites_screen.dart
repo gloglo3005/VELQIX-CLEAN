@@ -1,6 +1,7 @@
 import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
+import '../utils/image_url.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/property_service.dart';
@@ -193,7 +194,7 @@ class _FavoriteCard extends StatelessWidget {
             ClipRRect(
               borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
-              child: Image.network(p.firstImage,
+              child: Image.network(optimizeImageUrl(p.firstImage, displayWidth: 110),
                   width: 110, height: 110, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) =>
                       Container(width: 110, height: 110, color: AppTheme.divider)),

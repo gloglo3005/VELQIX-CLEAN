@@ -94,55 +94,52 @@ class AuthService {
   // AUTO LOGIN
   // ═══════════════════════════════════════════════════════════════════
 
-  Future<bool> tryAutoLogin() async {
+  /// Restauration INSTANTANÉE de la session depuis le cache local (aucun appel
+  /// réseau) : l'app s'ouvre tout de suite, même si le serveur dort encore.
+  Future<bool> restoreSessionFast() async {
     final prefs = await SharedPreferences.getInstance();
-
-    if (!(prefs.getBool(_kLoggedIn) ?? false)) {
-      return false;
-    }
-
+    if (!(prefs.getBool(_kLoggedIn) ?? false)) return false;
     _currentUser = _userFromPrefs(prefs);
+    return _currentUser != null;
+  }
 
-    if (_currentUser == null) {
-      return false;
-    }
+  /// Vérifie la session auprès du serveur, en arrière-plan. Si elle n'est plus
+  /// valide, l'utilisateur est déconnecté et ramené à l'accueil invité.
+  Future<void> validateSession() async {
+    if (_currentUser == null) return;
+    final prefs = await SharedPreferences.getInstance();
 
     final res = await _api.get('/auth/me', auth: true);
 
     if (res['success'] == true) {
       _currentUser = _userFromJson(res['data']);
-
       await _cacheUser(
         _currentUser!,
         method: prefs.getString(_kAuthMethod) ?? 'email',
       );
-
       notifyUserChanged();
-
       // Connecter le socket maintenant que l'utilisateur est authentifié.
       await _onAuthenticated();
-
-      return true;
+      return;
     }
 
     // Session réellement invalide → déconnexion.
-    if (_kSessionErrors.contains(res['error'])) {
+    if (_kSessionErrors.contains(res['error']) || await _api.getToken() == null) {
       await logout();
-      return false;
+      _api.sessionExpiredNotifier.value++;
+      return;
     }
 
-    // Panne réseau / serveur :
-    // on conserve la session locale.
-    if (await _api.getToken() == null) {
-      await logout();
-      return false;
-    }
-
+    // Panne réseau / serveur : on conserve la session locale.
     notifyUserChanged();
-
     await _onAuthenticated();
+  }
 
-    return true;
+  /// Ancienne API (restauration + validation). Conservée pour compatibilité.
+  Future<bool> tryAutoLogin() async {
+    if (!await restoreSessionFast()) return false;
+    await validateSession();
+    return _currentUser != null;
   }
 
   // ═══════════════════════════════════════════════════════════════════

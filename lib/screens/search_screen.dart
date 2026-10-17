@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../utils/image_url.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
@@ -389,7 +390,7 @@ class _PropertyCard extends StatelessWidget {
             child: SizedBox(
               width: 100, height: 100,
               child: firstImg != null
-                  ? Image.network(firstImg, fit: BoxFit.cover,
+                  ? Image.network(optimizeImageUrl(firstImg, displayWidth: 100), fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => _imgFallback())
                   : _imgFallback(),
             ),

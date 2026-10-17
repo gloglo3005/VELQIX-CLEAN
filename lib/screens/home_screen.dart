@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/listings_cache.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -70,13 +71,28 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loadingProps = true;
 
   Future<void> _loadProperties() async {
-    if (mounted) setState(() => _loadingProps = true);
+    // 1) Affichage INSTANTANÉ : dernières annonces connues (cache local)
+    if (_serverProps.isEmpty) {
+      final cached = await ListingsCache.read();
+      if (!mounted) return;
+      if (cached != null && cached.isNotEmpty) {
+        try {
+          _serverProps = cached.map(PropertyModel.fromJson).toList();
+          setState(() => _loadingProps = false);
+        } catch (_) {}
+      }
+    }
+    if (mounted && _serverProps.isEmpty) setState(() => _loadingProps = true);
+
+    // 2) Mise à jour depuis le serveur (peut être lent s'il dormait)
     final res = await ApiService.instance.get('/properties');
     if (!mounted) return;
     if (res['success'] == true) {
-      _serverProps = (res['data'] as List)
+      final raw = res['data'] as List;
+      _serverProps = raw
           .map((j) => PropertyModel.fromJson(j as Map<String, dynamic>))
           .toList();
+      ListingsCache.write(raw);
     }
     setState(() => _loadingProps = false);
   }

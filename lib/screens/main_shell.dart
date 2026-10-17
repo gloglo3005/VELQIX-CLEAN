@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/premium_plan_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ai_assistant_widget.dart';
+import '../widgets/auth_gate.dart';
 import 'add_listing_screen.dart';
 import 'home_screen.dart';
 import 'incoming_call_screen.dart';
@@ -63,21 +65,35 @@ class _MainShellState
       HomeScreen(username: widget.username),
       const SearchScreen(),
       const SizedBox.shrink(), // emplacement du bouton "Publier"
-      const MessagesScreen(),
-      const ProfileScreen(),
+      const AuthGuard(
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'Vos messages',
+        message: "Connectez-vous pour discuter avec les propriétaires, démarcheurs et agents d'entretien.",
+        child: MessagesScreen(),
+      ),
+      const AuthGuard(
+        icon: Icons.person_outline_rounded,
+        title: 'Votre profil',
+        message: 'Connectez-vous pour gérer votre compte, vos annonces et vos favoris.',
+        child: ProfileScreen(),
+      ),
     ];
 
-    /// Enregistre le token push (sans effet s'il est déjà initialisé).
-    unawaited(
-      PushNotificationService.instance
-          .initialize(),
-    );
+    /// Push + notifications : uniquement pour un utilisateur connecté
+    /// (un invité n'a pas de compte auquel les rattacher).
+    if (AuthService.instance.isLoggedIn) {
+      /// Enregistre le token push (sans effet s'il est déjà initialisé).
+      unawaited(
+        PushNotificationService.instance
+            .initialize(),
+      );
 
-    /// Charger les notifications existantes.
-    unawaited(
-      NotificationService.instance
-          .loadNotifications(),
-    );
+      /// Charger les notifications existantes.
+      unawaited(
+        NotificationService.instance
+            .loadNotifications(),
+      );
+    }
 
     /// Tarif Premium (source unique : le backend, repli local sinon).
     unawaited(PremiumPlanService.instance.load());
@@ -105,8 +121,11 @@ class _MainShellState
   /// NAVIGATION
   /// =============================================================
 
-  void _onTabTap(int index) {
+  Future<void> _onTabTap(int index) async {
     if (index == _publishIndex) {
+      // Publier une annonce nécessite un compte
+      if (!await requireLogin(context, reason: 'publier une annonce')) return;
+      if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) =>

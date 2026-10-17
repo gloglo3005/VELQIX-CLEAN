@@ -1,6 +1,7 @@
 import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
+import '../utils/image_url.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -335,7 +336,7 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                   borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
                   child: ColorFiltered(
                     colorFilter: _active ? const ColorFilter.mode(Colors.transparent, BlendMode.color) : const ColorFilter.mode(Colors.grey, BlendMode.saturation),
-                    child: Image.network(p.firstImage, width: 100, height: 100, fit: BoxFit.cover,
+                    child: Image.network(optimizeImageUrl(p.firstImage, displayWidth: 100), width: 100, height: 100, fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(width: 100, height: 100, color: AppTheme.divider)),
                   ),
                 ),
@@ -489,7 +490,7 @@ class _PendingPropertyCard extends StatelessWidget {
               child: SizedBox(
                 width: 64, height: 64,
                 child: p.images.isNotEmpty && p.images.first.startsWith('http')
-                    ? Image.network(p.images.first, fit: BoxFit.cover,
+                    ? Image.network(optimizeImageUrl(p.images.first, displayWidth: 300), fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                             color: AppTheme.divider,
                             child: Icon(Icons.image_rounded, color: AppTheme.textHint)))

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../widgets/auth_gate.dart';
+import '../utils/image_url.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -144,9 +146,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     final ownerId = widget.property.proprietaire.id;
     final currentUserId = AuthService.instance.currentUser?.id;
     if (currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connecte-toi pour suivre ce propriétaire.')),
-      );
+      await requireLogin(context, reason: 'suivre ce propriétaire');
       return;
     }
 
@@ -191,9 +191,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   Future<void> _toggleFav() async {
     if (_favBusy) return;
     if (!AuthService.instance.isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connecte-toi pour ajouter aux favoris.')),
-      );
+      await requireLogin(context, reason: 'ajouter cette annonce à vos favoris');
       return;
     }
     final id = widget.property.id;
@@ -476,7 +474,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     onPageChanged: (i) => setState(() => _imgIndex = i),
                     itemBuilder: (_, i) {
                       final url = p.images[i];
-                      final Widget img = Image.network(url, fit: BoxFit.cover,
+                      final Widget img = Image.network(optimizeImageUrl(url, displayWidth: 900), fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(color: AppTheme.divider));
                       return GestureDetector(
                         onTap: () => _openFullscreen(context, p.images, i),
@@ -760,9 +758,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             const SizedBox(width: 10),
                             // Bouton chat
                             GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
-                              )),
+                              onTap: () async {
+                                if (!await requireLogin(context, reason: 'contacter le propriétaire')) return;
+                                if (!context.mounted) return;
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
+                                ));
+                              },
                               child: Container(
                                 width: 46, height: 46,
                                 decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)),
@@ -849,9 +851,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
-            )),
+            onPressed: () async {
+              if (!await requireLogin(context, reason: 'contacter le propriétaire')) return;
+              if (!context.mounted) return;
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
+              ));
+            },
             icon: const Icon(Icons.chat_bubble_rounded, size: 18),
             label: Text(tr('detail_contact_owner')),
             style: ElevatedButton.styleFrom(
@@ -1273,7 +1279,7 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
               onPageChanged: (i) => setState(() => _index = i),
               itemBuilder: (_, i) {
                 final url = widget.images[i];
-                final Widget img = Image.network(url, fit: BoxFit.contain,
+                final Widget img = Image.network(optimizeImageUrl(url, displayWidth: 1400), fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white, size: 60));
                 return InteractiveViewer(
                   minScale: 0.5,

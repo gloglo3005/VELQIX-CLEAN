@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'auth_gate.dart';
+import '../utils/image_url.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -63,7 +65,7 @@ Widget _smartImage({
     return fallback?.call() ?? Container(width: width, height: height, color: AppTheme.divider);
   }
   return Image.network(
-    url,
+    optimizeImageUrl(url, displayWidth: width), // version allégée (Cloudinary)
     width: width,
     height: height,
     fit: fit,
@@ -398,6 +400,8 @@ class _FavoriteButtonState extends State<FavoriteButton> {
   // avec mise à jour optimiste de l'UI et annulation si l'appel échoue.
   Future<void> _toggle() async {
     if (_busy) return;
+    if (!await requireLogin(context, reason: 'ajouter cette annonce à vos favoris')) return;
+    if (!mounted) return;
     final wasFav = _isFav;
     setState(() {
       _busy = true;
