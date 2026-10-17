@@ -34,6 +34,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
   ListingType      _listingType = ListingType.location;
   PropertyCategory _category    = PropertyCategory.appartement;
   bool _loading       = false;
+  String? _uploadStatus;      // « Envoi des médias… 1/3 »
+  double? _uploadProgress;
   int  _currentStep   = 0;
 
   final List<String> _selectedPhotos = [];
@@ -77,6 +79,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
   @override
   void initState() {
     super.initState();
+    // Réveille le serveur (hébergement gratuit lent au démarrage) et rafraîchit le
+    // jeton pendant que l'utilisateur remplit le formulaire : la publication
+    // n'attendra plus ce démarrage à froid.
+    ApiService.instance.get('/auth/me', auth: true);
     final p = widget.editing;
     if (p != null) {
       _titreCtrl.text = p.titre;
@@ -318,42 +324,76 @@ class _AddListingScreenState extends State<AddListingScreen> {
         ) ??
         0;
 
-    // ── Étape 1 : uploader chaque photo (base64 → Cloudinary) avant le JSON ──
-    final List<String> uploadedImages = [];
-    for (var i = 0; i < _selectedPhotos.length; i++) {
-      final photo = _selectedPhotos[i];
-      if (photo.startsWith('http://') || photo.startsWith('https://')) {
-        uploadedImages.add(photo);
-      } else {
-        final url = await _uploadDataUri(photo, i);
-        if (url != null) uploadedImages.add(url);
+    // ── Étape 1 : photos ET vidéo envoyées EN PARALLÈLE (3 à la fois) ──
+    // Avant : une photo après l'autre, puis la vidéo : les temps s'additionnaient.
+    final hasNewVideo =
+        _selectedVideos.isNotEmpty && !_selectedVideos.first.startsWith('http');
+    final newPhotos =
+        _selectedPhotos.where((p) => !p.startsWith('http')).length;
+    final totalUploads = newPhotos + (hasNewVideo ? 1 : 0);
+    var doneUploads = 0;
+    void tick() {
+      doneUploads++;
+      if (!mounted) return;
+      setState(() {
+        _uploadProgress = totalUploads == 0 ? null : doneUploads / totalUploads;
+        _uploadStatus = 'Envoi des médias… $doneUploads/$totalUploads';
+      });
+    }
+    if (totalUploads > 0) {
+      setState(() {
+        _uploadProgress = 0;
+        _uploadStatus = 'Envoi des médias… 0/$totalUploads';
+      });
+    }
+
+    final uploadedByIndex = List<String?>.filled(_selectedPhotos.length, null);
+    var nextPhoto = 0;
+    Future<void> photoWorker() async {
+      while (true) {
+        final i = nextPhoto++;
+        if (i >= _selectedPhotos.length) return;
+        final photo = _selectedPhotos[i];
+        if (photo.startsWith('http://') || photo.startsWith('https://')) {
+          uploadedByIndex[i] = photo;
+        } else {
+          uploadedByIndex[i] = await _uploadDataUri(photo, i);
+          tick();
+        }
       }
     }
+
+    final Future<({String? url, String? error})> videoJob = _selectedVideos.isNotEmpty
+        ? _uploadVideo(_selectedVideos.first).then((v) {
+            if (hasNewVideo) tick();
+            return v;
+          })
+        : Future.value((url: null, error: null));
+
+    await Future.wait<Object?>([photoWorker(), photoWorker(), photoWorker(), videoJob]);
+    final uploadedImages = uploadedByIndex.whereType<String>().toList();
 
     if (!mounted) return;
     // Avant : si une photo sur deux échouait, l'annonce partait quand même
     // avec une seule photo, sans prévenir. On bloque maintenant.
     if (uploadedImages.length != _selectedPhotos.length) {
-      setState(() => _loading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Échec de l\'envoi des photos. Réessaie.'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ));
-      }
+      setState(() { _loading = false; _uploadStatus = null; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Échec de l\'envoi des photos. Réessaie.'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
       return;
     }
 
-    // ── Étape 1b : uploader la vidéo (optionnelle) ──
-    // Avant : la vidéo choisie n'était ni envoyée ni enregistrée.
+    // ── Étape 1b : résultat de la vidéo (optionnelle) ──
     String? videoUrl;
     if (_selectedVideos.isNotEmpty) {
-      final v = await _uploadVideo(_selectedVideos.first);
+      final v = await videoJob;
       if (!mounted) return;
       if (v.url == null) {
-        setState(() => _loading = false);
+        setState(() { _loading = false; _uploadStatus = null; });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(v.error ?? 'Échec de l\'envoi de la vidéo.'),
           backgroundColor: AppTheme.error,
@@ -364,6 +404,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
       }
       videoUrl = v.url;
     }
+
+    setState(() {
+      _uploadProgress = null; // barre indéterminée
+      _uploadStatus = _isEdit ? 'Enregistrement…' : "Création de l'annonce…";
+    });
 
     final images = uploadedImages.isNotEmpty
         ? uploadedImages
@@ -390,7 +435,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         : await ApiService.instance.post('/properties', payload, auth: true);
 
     if (!mounted) return;
-    setState(() => _loading = false);
+    setState(() { _loading = false; _uploadStatus = null; });
 
     if (res['success'] != true) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -508,6 +553,20 @@ class _AddListingScreenState extends State<AddListingScreen> {
             ),
           ),
         ),
+        // Progression de l'envoi
+        if (_uploadStatus != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(value: _uploadProgress, minHeight: 6),
+              ),
+              const SizedBox(height: 6),
+              Text(_uploadStatus!,
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+            ]),
+          ),
         // Navigation
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),

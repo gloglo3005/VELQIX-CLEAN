@@ -20,8 +20,11 @@
   <meta name="google-signin-client_id" content="330595771551-209on5g1r101munca38unkks8kogbgql.apps.googleusercontent.com">
 </head>
 <body>
-  <!-- Requis par agora_rtc_engine (web) : bridge JS vers le SDK Agora Web -->
-  <script src="https://download.agora.io/sdk/release/iris-web-rtc_n450_w4220_0.8.6.js"></script>
+  <!-- L'app Flutter démarre en premier -->
   <script src="flutter_bootstrap.js" async></script>
+  <!-- Requis par agora_rtc_engine (web) : bridge JS vers le SDK Agora Web.
+       Chargé en arrière-plan (async) : il ne bloque plus le démarrage de l'app,
+       et n'est utilisé que lorsqu'un appel audio / vidéo est lancé. -->
+  <script src="https://download.agora.io/sdk/release/iris-web-rtc_n450_w4220_0.8.6.js" async></script>
 </body>
 </html>

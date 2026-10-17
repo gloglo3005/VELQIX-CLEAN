@@ -63,7 +63,9 @@ class ApiService {
   Future<Map<String, String>> _headers({bool auth = false}) async {
     final headers = {'Content-Type': 'application/json'};
     if (auth) {
-      final token = await getToken();
+      // Token rafraîchi AVANT l'envoi s'il est (presque) expiré : évite un aller-retour
+      // 401 + nouvel essai pour chaque requête lancée au démarrage.
+      final token = await getValidToken();
       if (token != null) headers['Authorization'] = 'Bearer $token';
     }
     return headers;

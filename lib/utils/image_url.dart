@@ -1,7 +1,7 @@
 // lib/utils/image_url.dart
 // Réduit le poids des photos Cloudinary : au lieu de télécharger l'original
 // (souvent 3-8 Mo), on demande une version redimensionnée, compressée et au
-// meilleur format (WebP/AVIF) pour l'appareil. Les autres URL sont inchangées.
+// format JPEG universel (les formats AVIF/WebP automatiques peuvent poser des problèmes de décodage sur le web). Les autres URL sont inchangées.
 
 String optimizeImageUrl(String url, {double? displayWidth}) {
   if (!url.contains('res.cloudinary.com') || !url.contains('/upload/')) return url;
@@ -16,5 +16,5 @@ String optimizeImageUrl(String url, {double? displayWidth}) {
   final w = (displayWidth != null && displayWidth.isFinite)
       ? (displayWidth * 2).clamp(200, 1600).round() // ×2 pour les écrans haute densité
       : 800;
-  return url.replaceFirst('/upload/', '/upload/f_auto,q_auto,w_$w,c_limit/');
+  return url.replaceFirst('/upload/', '/upload/f_jpg,q_auto,w_$w,c_limit/');
 }

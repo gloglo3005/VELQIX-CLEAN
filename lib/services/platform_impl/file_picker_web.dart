@@ -19,6 +19,41 @@ Future<String> _readFileAsDataUrl(html.File file) async {
   return completer.future;
 }
 
+/// Photo réduite (1600 px max, JPEG 82 %) : une photo de téléphone de 4-8 Mo
+/// devient ~300-500 Ko, donc 10 à 20 fois plus rapide à envoyer. Les petits
+/// fichiers et tout échec de conversion retombent sur l'original.
+Future<String> _readImageDownscaled(html.File file, {int maxDim = 1600, double quality = 0.82}) async {
+  if (file.size < 500 * 1024) return _readFileAsDataUrl(file);
+  final url = html.Url.createObjectUrl(file);
+  try {
+    final img = html.ImageElement(src: url);
+    await Future.any<void>([
+      img.onLoad.first,
+      img.onError.first.then((_) => throw 'image illisible'),
+    ]).timeout(const Duration(seconds: 20));
+    final w = img.naturalWidth;
+    final h = img.naturalHeight;
+    if (w == 0 || h == 0) return _readFileAsDataUrl(file);
+    final longest = w > h ? w : h;
+    final scale = longest > maxDim ? maxDim / longest : 1.0;
+    final cw = (w * scale).round();
+    final ch = (h * scale).round();
+    final canvas = html.CanvasElement(width: cw, height: ch);
+    final ctx = canvas.context2D;
+    ctx.fillStyle = '#ffffff'; // fond blanc (PNG transparents)
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImageScaled(img, 0, 0, cw, ch);
+    final out = canvas.toDataUrl('image/jpeg', quality);
+    // Si la version réduite n'est pas plus légère, on garde l'original
+    if (out.length > file.size * 1.37) return _readFileAsDataUrl(file);
+    return out;
+  } catch (_) {
+    return _readFileAsDataUrl(file);
+  } finally {
+    html.Url.revokeObjectUrl(url);
+  }
+}
+
 /// Lit les bytes bruts d'un fichier HTML (pour Image.memory)
 Future<Uint8List> _readFileBytes(html.File file) async {
   final completer = Completer<Uint8List>();
@@ -74,7 +109,7 @@ Future<List<String>> pickMultipleImagesWeb({int maxCount = 10}) async {
   final results = <String>[];
   for (final f in htmlFiles) {
     try {
-      results.add(await _readFileAsDataUrl(f));
+      results.add(await _readImageDownscaled(f));
     } catch (_) {
       results.add(_createObjectUrl(f));
     }
@@ -108,7 +143,7 @@ Future<String?> _pickWithInput({required bool capture}) async {
 
   if (htmlFile == null) return null;
   try {
-    return await _readFileAsDataUrl(htmlFile);
+    return await _readImageDownscaled(htmlFile);
   } catch (_) {
     return _createObjectUrl(htmlFile);
   }
