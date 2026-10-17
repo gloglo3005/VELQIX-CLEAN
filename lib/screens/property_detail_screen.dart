@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/auth_gate.dart';
+import '../widgets/net_image.dart';
 import '../utils/image_url.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
@@ -474,8 +475,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     onPageChanged: (i) => setState(() => _imgIndex = i),
                     itemBuilder: (_, i) {
                       final url = p.images[i];
-                      final Widget img = Image.network(optimizeImageUrl(url, displayWidth: 900), fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(color: AppTheme.divider));
+                      final Widget img = NetImage(url: url, displayWidth: 900, fit: BoxFit.cover);
                       return GestureDetector(
                         onTap: () => _openFullscreen(context, p.images, i),
                         child: img,

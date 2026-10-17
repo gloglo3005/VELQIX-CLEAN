@@ -50,6 +50,7 @@ dependencies:
   firebase_messaging: ^16.7.0
   flutter_local_notifications: ^22.3.1
   video_player: ^2.11.1
+  cached_network_image: ^3.4.1   # cache disque des photos (hors connexion)
 
 dev_dependencies:
   flutter_test:

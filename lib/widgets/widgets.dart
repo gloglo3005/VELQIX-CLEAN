@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'auth_gate.dart';
-import '../utils/image_url.dart';
+import 'net_image.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -64,15 +64,8 @@ Widget _smartImage({
   if (url.isEmpty) {
     return fallback?.call() ?? Container(width: width, height: height, color: AppTheme.divider);
   }
-  return Image.network(
-    optimizeImageUrl(url, displayWidth: width), // version allégée (Cloudinary)
-    width: width,
-    height: height,
-    fit: fit,
-    errorBuilder: (_, __, ___) =>
-        fallback?.call() ?? Container(width: width, height: height, color: AppTheme.divider,
-            child: Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
-  );
+  // Cache disque (visible hors connexion) + version allégée Cloudinary
+  return NetImage(url: url, width: width, height: height, fit: fit, fallback: fallback);
 }
 
 // ─── Property Card ────────────────────────────────────────────────────────────

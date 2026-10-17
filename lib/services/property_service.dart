@@ -1,6 +1,7 @@
 import 'dart:io';
 import '../models/models.dart';
 import 'api_service.dart';
+import 'listings_cache.dart';
 
 class PropertyService {
   PropertyService._();
@@ -36,7 +37,13 @@ class PropertyService {
         : '';
 
     final res = await _api.get('/properties$query');
-    if (res['success'] != true) return [];
+    if (res['success'] != true) {
+      // Hors connexion / serveur injoignable : dernières annonces enregistrées
+      final cached = await ListingsCache.read();
+      if (cached == null) return [];
+      return cached.map(_fromJson).toList();
+    }
+    if (query.isEmpty) ListingsCache.write(res['data'] as List<dynamic>);
 
     final list = res['data'] as List<dynamic>;
     return list.map((item) => _fromJson(item as Map<String, dynamic>)).toList();

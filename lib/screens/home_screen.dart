@@ -69,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // les vraies annonces approuvées, chargées depuis GET /properties.
   List<PropertyModel> _serverProps = [];
   bool _loadingProps = true;
+  bool _offline = false; // serveur injoignable : on affiche les annonces enregistrées
 
   Future<void> _loadProperties() async {
     // 1) Affichage INSTANTANÉ : dernières annonces connues (cache local)
@@ -87,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2) Mise à jour depuis le serveur (peut être lent s'il dormait)
     final res = await ApiService.instance.get('/properties');
     if (!mounted) return;
+    _offline = res['success'] != true;
     if (res['success'] == true) {
       final raw = res['data'] as List;
       _serverProps = raw
@@ -173,6 +175,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool get _isActiveSearch => _searchQuery.trim().length >= 2;
+
+  // ─── Bandeau « hors connexion » ──────────────────────────────────────────
+  Widget _buildOfflineBanner() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warning.withOpacity(0.35)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.wifi_off_rounded, size: 18, color: AppTheme.warning),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text('Hors connexion : dernières annonces enregistrées.',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary)),
+        ),
+        TextButton(
+          onPressed: _loadProperties,
+          child: Text('Réessayer', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
+      ]),
+    );
+  }
 
   // ─── Sélecteur Immobilier / Mobilier ─────────────────────────────────────
   Widget _buildTypeToggle() {
@@ -1049,6 +1075,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: SectionHeader(title: tr('home_categories'))),
                     const SizedBox(height: 12),
+                    if (_offline) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _buildOfflineBanner(),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _buildTypeToggle(),

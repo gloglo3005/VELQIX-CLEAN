@@ -310,7 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Row(
           children: [
-            Expanded(flex: 11, child: _buildBrandPanel()),
+            const Expanded(flex: 11, child: AuthBrandPanel()),
             Expanded(
               flex: 9,
               child: SafeArea(
@@ -375,54 +375,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(size * 0.22),
       child: Image.asset('assets/images/logo.png', width: size, height: size, fit: BoxFit.contain),
-    );
-  }
-
-  Widget _buildBrandPanel() {
-    Widget point(IconData icon, String text) => Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(text,
-                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.92))),
-            ),
-          ]),
-        );
-
-    return VideoBrandBackground(
-      child: Padding(
-        padding: const EdgeInsets.all(48),
-        child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildLogo(size: 84),
-            const SizedBox(height: 28),
-            Text('Louez. Achetez. Gérez.',
-                style: GoogleFonts.poppins(
-                    fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
-            const SizedBox(height: 12),
-            Text('La plateforme de référence pour vos biens immobiliers et vos véhicules.',
-                style: GoogleFonts.poppins(
-                    fontSize: 15, color: Colors.white.withOpacity(0.85), height: 1.6)),
-            const SizedBox(height: 36),
-            point(Icons.home_work_rounded, 'Maisons, appartements, hôtels et terrains'),
-            point(Icons.directions_car_rounded, 'Voitures, motos et camions'),
-            point(Icons.support_agent_rounded, "Démarcheurs et agents d'entretien à votre service"),
-          ],
-        ),
-        ),
-      ),
     );
   }
 
@@ -499,6 +451,96 @@ class _LoginScreenState extends State<LoginScreen> {
       ],
     );
   }
+}
+
+// ─── Panneau de marque (vidéo + slogan) : connexion ET inscription ───────────
+class AuthBrandPanel extends StatelessWidget {
+  const AuthBrandPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget point(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(text,
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.92))),
+            ),
+          ]),
+        );
+
+    return VideoBrandBackground(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(84 * 0.22),
+              child: Image.asset('assets/images/logo.png', width: 84, height: 84, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 28),
+            Text('Louez. Achetez. Gérez.',
+                style: GoogleFonts.poppins(
+                    fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
+            const SizedBox(height: 12),
+            Text('La plateforme de référence pour vos biens immobiliers et vos véhicules.',
+                style: GoogleFonts.poppins(
+                    fontSize: 15, color: Colors.white.withOpacity(0.85), height: 1.6)),
+            const SizedBox(height: 36),
+            point(Icons.home_work_rounded, 'Maisons, appartements, hôtels et terrains'),
+            point(Icons.directions_car_rounded, 'Voitures, motos et camions'),
+            point(Icons.support_agent_rounded, "Démarcheurs et agents d'entretien à votre service"),
+          ],
+        ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Écran large (≥ 900 px) : panneau de marque à gauche + formulaire à droite,
+/// comme l'écran de connexion. Petit écran : le formulaire seul.
+Widget _splitAuthLayout(BuildContext context, String title, Widget form) {
+  if (MediaQuery.of(context).size.width < 900) return form;
+  return Row(
+    children: [
+      const Expanded(flex: 11, child: AuthBrandPanel()),
+      Expanded(
+        flex: 9,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(title,
+                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                ]),
+              ),
+              Expanded(child: form),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 // ─── Register Screen ──────────────────────────────────────────────────────────
@@ -1009,8 +1051,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: CustomAppBar(title: 'Créer un compte'),
-      body: Align(
+      appBar: MediaQuery.of(context).size.width >= 900 ? null : CustomAppBar(title: 'Créer un compte'),
+      body: _splitAuthLayout(context, 'Créer un compte', Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -1394,7 +1436,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
         ),
-      ),
+      )),
     );
   }
 }
