@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/admin_dashboard_screen.dart';
 import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
+import 'screens/role_home.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -373,15 +374,8 @@ class _VelQixAppState extends State<VelQixApp> {
   /// Écran d'accueil d'un utilisateur déjà connecté : l'admin va sur son
   /// dashboard, les autres sur MainShell.
   Widget _homeForLoggedUser() {
-    final user = AuthService.instance.currentUserOrEmpty;
-
-    if (user.role == 'admin') {
-      return const AdminDashboardScreen();
-    }
-
-    return MainShell(
-      username: AuthService.instance.loggedUsername,
-    );
+    // admin → tableau de bord, démarcheur → espace démarcheur, autres → app
+    return roleHome();
   }
 
   @override

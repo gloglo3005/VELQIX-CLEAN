@@ -54,6 +54,7 @@ class AdminService {
     AdminPermission('roles.manage',        'Gérer les rôles et permissions',   'Utilisateurs'),
     AdminPermission('properties.create',   'Publier des annonces',             'Annonces'),
     AdminPermission('properties.moderate', 'Approuver / rejeter des annonces', 'Annonces'),
+    AdminPermission('properties.verify_field', 'Vérifier les biens sur le terrain', 'Annonces'),
     AdminPermission('properties.edit',     "Modifier les annonces d'autrui",   'Annonces'),
     AdminPermission('properties.delete',   "Supprimer les annonces d'autrui",  'Annonces'),
     AdminPermission('disputes.manage',     'Gérer les litiges',                'Support'),
@@ -64,7 +65,7 @@ class AdminService {
   static Map<String, Set<String>> defaultMatrix() => {
         'client': {'chat.use'},
         'proprietaire': {'chat.use', 'properties.create'},
-        'demarcheur': {'chat.use', 'properties.create'},
+        'demarcheur': {'chat.use', 'properties.create', 'properties.verify_field'},
         'agent_entretien': {'chat.use'},
         'admin': permissions.map((p) => p.key).toSet(),
       };

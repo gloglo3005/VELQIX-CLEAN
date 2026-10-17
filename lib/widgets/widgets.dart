@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'auth_gate.dart';
 import 'net_image.dart';
+import 'trust_widgets.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -130,6 +131,10 @@ class _VerticalCard extends StatelessWidget {
                     ),
                   ),
                 Positioned(
+                  bottom: 10, left: 10,
+                  child: TrustBadge(property: property),
+                ),
+                Positioned(
                   bottom: 10, right: 10,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -258,6 +263,8 @@ class _HorizontalCard extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(property.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
                     ]),
+                    const SizedBox(height: 5),
+                    TrustBadge(property: property),
                   ],
                 ),
               ),

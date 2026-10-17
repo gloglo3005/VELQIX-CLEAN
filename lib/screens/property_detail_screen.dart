@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/auth_gate.dart';
 import '../widgets/net_image.dart';
+import '../widgets/trust_widgets.dart';
 import '../utils/image_url.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
@@ -569,6 +570,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     Text('${_rating.toStringAsFixed(1)} ($_totalAvis ${tr("detail_reviews")})', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
                   ]),
 
+                  // Approuvée par VelQix / non approuvée (annoncé clairement)
+                  const SizedBox(height: 14),
+                  TrustInfoCard(property: p),
+
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -761,6 +766,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               onTap: () async {
                                 if (!await requireLogin(context, reason: 'contacter le propriétaire')) return;
                                 if (!context.mounted) return;
+                                // Les 2 types d'annonces, avant de discuter avec le propriétaire
+                                if (!await confirmTrustBeforeChat(context, p)) return;
+                                if (!context.mounted) return;
                                 Navigator.push(context, MaterialPageRoute(
                                   builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),
                                 ));
@@ -853,6 +861,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           child: ElevatedButton.icon(
             onPressed: () async {
               if (!await requireLogin(context, reason: 'contacter le propriétaire')) return;
+              if (!context.mounted) return;
+              // Les 2 types d'annonces, avant de discuter avec le propriétaire
+              if (!await confirmTrustBeforeChat(context, p)) return;
               if (!context.mounted) return;
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => ChatScreen(user: p.proprietaire, propertyTitre: p.titre),

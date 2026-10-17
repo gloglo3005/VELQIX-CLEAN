@@ -108,3 +108,35 @@ Pour que la vidéo apparaisse sur la plateforme, l'API doit :
   `GET /admin/properties/pending` et `GET /admin/properties` ;
 - accepter les formats mp4, mov, webm, 3gp, m4v (taille max 30 Mo côté app).
 Si le serveur ne renvoie pas `videoUrl` après la création, l'app affiche maintenant un avertissement.
+
+---
+
+# Annonces « approuvées par VelQix » vs « non approuvées »
+
+Règle métier :
+- **Approuvée par VelQix** = le propriétaire est **Premium** OU un **démarcheur VelQix** a vérifié le bien
+  sur le terrain. En cas de fraude, VelQix s'en charge.
+- **Non approuvée** = tout le reste. En cas de fraude, VelQix ne s'en mêle pas.
+(À ne pas confondre avec `status` : `en_attente / approuve / rejete` = modération admin avant publication.)
+
+L'app calcule `isVelqixApproved = fieldVerified || proprietaire.isPremium`.
+
+## Champs à renvoyer dans toutes les réponses d'annonces
+`fieldVerified` (bool), `fieldVerifiedAt` (ISO), `fieldVerifiedByName` (string, nom du démarcheur),
+`verificationRequested` (bool). `proprietaire.isPremium` doit être présent et à jour (Premium expiré = plus approuvé).
+
+## Routes
+| Route | Qui | Rôle |
+|---|---|---|
+| `POST /properties/:id/verification-request` | propriétaire du bien | Demande la vérification terrain (`verificationRequested = true`). |
+| `GET /demarcheur/verifications?scope=requested\|all\|mine` | demarcheur, admin | `requested` : demandes des propriétaires ; `all` : annonces non vérifiées ; `mine` : vérifiées par l'appelant. Renvoie des annonces avec `proprietaire.telephone`. |
+| `POST /demarcheur/properties/:id/verify` | demarcheur, admin | Body `{ checklist: { exists, photosMatch, ownerIdentified }, note? }`. Les 3 cases doivent être `true`. Met `fieldVerified = true`, `fieldVerifiedAt`, enregistre le démarcheur et la note. |
+
+Permission : `properties.verify_field` (accordée au rôle `demarcheur` par défaut).
+
+## Recommandations
+- Journaliser chaque vérification (démarcheur, date, note, checklist) : preuve en cas de litige.
+- Si le propriétaire modifie l'adresse ou les photos d'un bien vérifié, remettre `fieldVerified = false`.
+- Prévoir une route admin pour **révoquer** une vérification (ex. `PUT /admin/properties/:id` avec `fieldVerified: false`).
+- Définir dans les CGU les conditions exactes de la prise en charge en cas de fraude : l'app l'annonce
+  telle quelle (« En cas de fraude, VelQix s'en charge »).

@@ -153,6 +153,14 @@ class PropertyModel {
   final Map<String, List<String>>? caracteristiquesTranslations;
   final DateTime? updatedAt;
 
+  // ── Approbation VelQix ───────────────────────────────────────────────────
+  // Un bien est « approuvé par VelQix » si son propriétaire est Premium OU si
+  // un démarcheur VelQix l'a vérifié sur le terrain. Sinon : non approuvé.
+  final bool fieldVerified;            // vérifié sur place par un démarcheur
+  final DateTime? fieldVerifiedAt;
+  final String? fieldVerifiedByName;   // nom du démarcheur
+  final bool verificationRequested;    // le propriétaire a demandé la vérification
+
   PropertyModel({
     required this.id,
     required this.titre,
@@ -181,7 +189,15 @@ class PropertyModel {
     this.descriptionTranslations,
     this.caracteristiquesTranslations,
     this.updatedAt,
+    this.fieldVerified = false,
+    this.fieldVerifiedAt,
+    this.fieldVerifiedByName,
+    this.verificationRequested = false,
   });
+
+  /// Approuvé par VelQix (Premium ou vérifié terrain) — VelQix prend en charge
+  /// les cas de fraude. Sinon VelQix n'intervient pas.
+  bool get isVelqixApproved => fieldVerified || proprietaire.isPremium;
 
   /// Statut normalisé : accepte les variantes (pending / approved / rejected…).
   static String _normalizeStatus(dynamic raw) {
@@ -204,6 +220,9 @@ class PropertyModel {
         descriptionTranslations: descriptionTranslations,
         caracteristiquesTranslations: caracteristiquesTranslations,
         updatedAt: DateTime.now(),
+        fieldVerified: fieldVerified, fieldVerifiedAt: fieldVerifiedAt,
+        fieldVerifiedByName: fieldVerifiedByName,
+        verificationRequested: verificationRequested,
       );
 
   /// Lien de partage vers la page du bien (deep link web)
@@ -361,6 +380,12 @@ class PropertyModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'])
           : null,
+      fieldVerified: json['fieldVerified'] == true,
+      fieldVerifiedAt: json['fieldVerifiedAt'] != null
+          ? DateTime.tryParse(json['fieldVerifiedAt'].toString())
+          : null,
+      fieldVerifiedByName: json['fieldVerifiedByName']?.toString(),
+      verificationRequested: json['verificationRequested'] == true,
     );
   }
 

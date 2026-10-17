@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../main.dart' show localeNotifier, countryCodeToLocale;
 import '../widgets/widgets.dart';
 import '../widgets/video_brand_background.dart';
+import 'role_home.dart';
 import 'legal_screen.dart';
 import '../services/auth_service.dart';
 import 'main_shell.dart';
@@ -195,9 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     // ✅ Redirige admin vers le dashboard, utilisateur normal vers MainShell
-    final dest = AuthService.instance.currentUserOrEmpty.role == 'admin'
-        ? const AdminDashboardScreen()
-        : MainShell(username: AuthService.instance.loggedUsername);
+    final dest = roleHome();
     // Remplace TOUTE la pile (y compris l'accueil invité qui a ouvert cet écran)
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => dest), (_) => false);
   }
@@ -1037,12 +1036,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) {
-        final role = AuthService.instance.currentUserOrEmpty.role;
-        return role == 'admin'
-            ? const AdminDashboardScreen()
-            : MainShell(username: AuthService.instance.loggedUsername);
-      }),
+      MaterialPageRoute(builder: (_) => roleHome()),
       (_) => false,
     );
   }

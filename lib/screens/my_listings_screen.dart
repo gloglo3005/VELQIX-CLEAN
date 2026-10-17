@@ -2,6 +2,8 @@ import '../services/app_translations.dart';
 import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import '../utils/image_url.dart';
+import '../services/verification_service.dart';
+import '../widgets/trust_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -305,6 +307,55 @@ class _ListingManageCard extends StatefulWidget {
 
 class _ListingManageCardState extends State<_ListingManageCard> {
   late bool _active = widget.property.isAvailable;
+  late bool _requested = widget.property.verificationRequested;
+  bool _requesting = false;
+
+  Future<void> _requestVerification() async {
+    setState(() => _requesting = true);
+    final err = await VerificationService.instance.requestVerification(widget.property.id);
+    if (!mounted) return;
+    setState(() {
+      _requesting = false;
+      if (err == null) _requested = true;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(err ?? 'Demande envoyée : un démarcheur VelQix va se rendre sur place.'),
+      backgroundColor: err == null ? null : AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Widget _buildApprovalRow(PropertyModel p) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.warning.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(trustUnapprovedTitle(),
+            style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+        const SizedBox(height: 2),
+        Text(
+          'Pour rassurer les acheteurs : passez Premium, ou demandez à un démarcheur VelQix de vérifier le bien sur place.',
+          style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: (_requested || _requesting) ? null : _requestVerification,
+            icon: _requesting
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(_requested ? Icons.hourglass_top_rounded : Icons.verified_outlined, size: 16),
+            label: Text(_requested ? 'Vérification demandée' : 'Demander une vérification terrain'),
+          ),
+        ),
+      ]),
+    );
+  }
 
   @override
   void didUpdateWidget(covariant _ListingManageCard oldWidget) {
@@ -359,6 +410,8 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                             ),
                           ),
                         ],
+                        const SizedBox(height: 4),
+                        TrustBadge(property: p),
                         const SizedBox(height: 6),
                         Row(children: [
                           Icon(Icons.remove_red_eye_outlined, size: 13, color: AppTheme.textHint),
@@ -377,6 +430,11 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                 ),
               ],
             ),
+            if (p.status == 'approuve' && !p.isVelqixApproved)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: _buildApprovalRow(p),
+              ),
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
