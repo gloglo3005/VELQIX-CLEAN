@@ -6,7 +6,7 @@
   ],
   "headers": [
     {
-      "source": "/(index.html|flutter_bootstrap.js|flutter_service_worker.js|version.json|manifest.json)",
+      "source": "/(index.html|flutter_bootstrap.js|flutter_service_worker.js|velqix_sw.js|version.json|manifest.json)",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
       ]

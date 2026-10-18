@@ -6,4 +6,9 @@ export PATH="$PATH:$(pwd)/flutter-sdk/bin"
 
 flutter doctor
 flutter pub get
-flutter build web --release
+# CanvasKit hébergé avec l'app (et non sur le CDN de Google) : indispensable
+# pour que l'app puisse s'ouvrir hors connexion.
+flutter build web --release --no-web-resources-cdn
+
+# Nouvelle version du cache hors connexion à chaque déploiement
+sed -i "s/__BUILD_ID__/$(date +%s)/" build/web/velqix_sw.js

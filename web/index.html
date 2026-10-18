@@ -22,6 +22,16 @@
 <body>
   <!-- L'app Flutter démarre en premier -->
   <script src="flutter_bootstrap.js" async></script>
+  <!-- Fonctionnement hors connexion (service worker VelQix). Désactivé en local
+       (flutter run) pour ne pas mettre en cache les versions de développement. -->
+  <script>
+    if ('serviceWorker' in navigator &&
+        location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('velqix_sw.js').catch(function () {});
+      });
+    }
+  </script>
   <!-- Requis par agora_rtc_engine (web) : bridge JS vers le SDK Agora Web.
        Chargé en arrière-plan (async) : il ne bloque plus le démarrage de l'app,
        et n'est utilisé que lorsqu'un appel audio / vidéo est lancé. -->
