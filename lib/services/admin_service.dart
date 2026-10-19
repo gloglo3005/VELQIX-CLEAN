@@ -58,6 +58,11 @@ class AdminService {
     AdminPermission('properties.edit',     "Modifier les annonces d'autrui",   'Annonces'),
     AdminPermission('properties.delete',   "Supprimer les annonces d'autrui",  'Annonces'),
     AdminPermission('disputes.manage',     'Gérer les litiges',                'Support'),
+    AdminPermission('missions.manage',     'Suivre, valider les missions terrain', 'Opérations'),
+    AdminPermission('pricing.manage',      'Modifier les tarifs et rémunérations', 'Opérations'),
+    AdminPermission('finance.view',        'Voir les finances',                'Finances'),
+    AdminPermission('finance.payouts',     'Verser les agents',                'Finances'),
+    AdminPermission('audit.view',          "Consulter le journal d'activité",  'Finances'),
     AdminPermission('chat.use',            'Utiliser la messagerie',           'Communication'),
   ];
 

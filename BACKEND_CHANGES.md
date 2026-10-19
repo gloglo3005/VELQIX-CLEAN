@@ -140,3 +140,89 @@ Permission : `properties.verify_field` (accordée au rôle `demarcheur` par déf
 - Prévoir une route admin pour **révoquer** une vérification (ex. `PUT /admin/properties/:id` avec `fieldVerified: false`).
 - Définir dans les CGU les conditions exactes de la prise en charge en cas de fraude : l'app l'annonce
   telle quelle (« En cas de fraude, VelQix s'en charge »).
+
+---
+
+# Cahier des charges « Velqix — modèle économique et interfaces » : phase 1
+
+Principe : la publication d'annonces reste gratuite ; vérifications, visites accompagnées et entretien
+sont des **missions payantes à la prestation**, séparées de l'abonnement. Toute règle (prix, droits,
+paiement, rémunération) est appliquée **côté serveur** ; l'app ne fait qu'afficher.
+
+> Cette section REMPLACE les routes de vérification décrites plus haut
+> (`/properties/:id/verification-request`, `/demarcheur/verifications`, `/demarcheur/properties/:id/verify`) :
+> une vérification terrain est maintenant une mission de type `verification`. Quand elle est **validée**,
+> le serveur met `fieldVerified = true`, `fieldVerifiedAt`, `fieldVerifiedByName` sur l'annonce.
+
+## Tables (base de données)
+| Table | Contenu |
+|---|---|
+| `plans` | offres Freemium / Premium par profil : prix, durée, limites (annonces, photos, crédits de mise en avant) |
+| `subscriptions` | formule active d'un utilisateur : dates, statut |
+| `payments` | tous les paiements : référence UNIQUE, montant, frais, statut, échec, remboursement, `purpose` (`premium` / `mission`) |
+| `missions` | type, statut, client, bien, adresse, zone, `price`, `agentPay`, `transport`, `paymentStatus`, `payoutStatus`, agent, `details`, `notes`, `evidence[]`, `reportNote`, dates |
+| `agent_payouts` | sommes dues aux agents : mission, agent, montant, statut (`en_attente` → `du` → `paye`), corrections |
+| `audit_logs` | qui / quoi / quand / détails : changement de tarif, validation manuelle de paiement, remboursement, changement de rémunération, versement |
+| `settings` (ou `pricing`) | tarifs et commissions modifiables depuis l'admin (voir `/admin/pricing`) |
+
+## Statuts d'une mission
+`devis` → `devis_propose` → `attente_paiement` → `disponible` → `acceptee` → `rapport_soumis` → `validee`
+(+ `contestee`, `rejetee` = rapport refusé, à corriger, `annulee`). Vérification : prix fixe → démarre à
+`attente_paiement`. Visite / entretien : démarre à `devis` ; l'admin fixe le devis ; le client l'accepte en payant.
+
+## Routes client (utilisateur connecté)
+| Route | Rôle |
+|---|---|
+| `GET /pricing` (public) | `{ verification: {price, agentPay, transport}, visite: {}, entretien: {} }` — `price` absent = « sur devis » |
+| `POST /missions` | `{ type, propertyId?, address?, notes?, details? }` → mission (avec `price` pour une vérification) |
+| `GET /missions/mine` | demandes du client |
+| `POST /missions/:id/checkout` | accepte le devis si besoin et renvoie `{ checkoutUrl }` (FedaPay, comme `/premium/checkout`) |
+| `POST /missions/:id/cancel` | annulation tant que non payée |
+| `POST /missions/:id/confirm` | le client valide la prestation d'entretien |
+| `POST /missions/:id/dispute` | `{ reason }` → statut `contestee` |
+
+Le **montant est toujours recalculé par le serveur** (jamais pris dans la requête). Remise Premium éventuelle
+(`premiumDiscountPercent`) à appliquer ici, seulement si la marge reste suffisante.
+
+## Routes démarcheur / agent d'entretien (`role` = `demarcheur` ou `agent_entretien`)
+| Route | Rôle |
+|---|---|
+| `GET /agent/missions?scope=available\|mine\|done` | `available` : missions payées, non assignées, dans les zones/disponibilité de l'agent, **du bon type pour son rôle** (démarcheur : verification + visite ; agent d'entretien : entretien). `mine` : missions de l'agent |
+| `POST /agent/missions/:id/accept` | assignation atomique (refuser si déjà prise) |
+| `POST /agent/missions/:id/report` | `{ checklist, evidence[] (URLs de photos), note? }` → `rapport_soumis` |
+| `GET /agent/earnings` | `{ pending, due, paid, items:[{ title, amount, status: en_attente\|du\|paye, date }] }` |
+| `GET/PUT /agent/availability` | `{ available, zones, hours }` |
+
+- **Rémunération** (`agentPay`, `transport`) visible avant l'acceptation. Ne PAS renvoyer les coordonnées du
+  client / propriétaire (`contactName`, `contactPhone`) tant que la mission n'est pas acceptée par cet agent.
+- Aucun abonnement requis pour un agent.
+
+## Routes admin (permissions `missions.manage`, `pricing.manage`, `finance.view`, `finance.payouts`, `audit.view`)
+| Route | Rôle |
+|---|---|
+| `GET /admin/missions?status=` | toutes les missions (avec `evidence`, `reportNote`, `clientName`) |
+| `PUT /admin/missions/:id/quote` | `{ price, agentPay, transport }` → `devis_propose` |
+| `POST /admin/missions/:id/validate` | `validee` ; crée le `agent_payout` (statut `du`) ; vérification → met à jour l'annonce |
+| `POST /admin/missions/:id/reject` | `{ reason }` → `rejetee` (motif visible par l'agent) |
+| `GET/PUT /admin/pricing` | clés : `verificationPrice`, `verificationAgentPay`, `verificationTransport`, `supportCost`, `paymentFeePercent`, `servicesFeePercent`, `premiumDiscountPercent`, `premiumMonthly`, `premium6Months`, `premium1Year`, `freeMaxListings`, `premiumMaxListings`, `premiumFeaturedCredits` (PUT = valeurs modifiées seulement) |
+| `GET /admin/finance/summary` | `collected, missionsRevenue, subscriptionsRevenue, adsRevenue, commissions, dueToAgents, paidToAgents, refunds, profit` |
+| `GET /admin/payouts?status=du\|paye\|en_attente` | `[ { id, agentName, missionTitle, amount, status } ]` |
+| `POST /admin/payouts/:id/pay` | marque payé (action journalisée, non annulable) |
+| `GET /admin/audit-logs?limit=100` | `[ { action, actorName, createdAt, details } ]` |
+
+Chaque action de ce tableau qui modifie des tarifs ou de l'argent doit écrire dans `audit_logs`.
+
+## Règles de sécurité financière (extraites du cahier des charges)
+- Le serveur **confirme** chaque paiement auprès du prestataire (webhook + vérification), jamais sur la seule
+  foi de l'app.
+- Référence de transaction **unique** ; les notifications de paiement répétées ne créent pas de doublon
+  (idempotence).
+- Paiement d'un agent déclenché uniquement après validation ; remboursements / contestations enregistrés
+  **sans effacer** l'historique.
+- Droits vérifiés **côté serveur** sur chaque route (masquer un bouton ne suffit pas).
+- Distinguer chiffre d'affaires, sommes dues aux agents, fonds encaissés et bénéfice. Si VelQix encaisse pour
+  le compte d'agents, valider les modalités de détention / reversement avec FedaPay et la réglementation du Togo.
+
+## Rôles
+Nouveaux droits dans le catalogue : `missions.manage`, `pricing.manage`, `finance.view`, `finance.payouts`,
+`audit.view`. Un démarcheur a déjà `properties.verify_field` ; un agent d'entretien n'a besoin que de `chat.use`.

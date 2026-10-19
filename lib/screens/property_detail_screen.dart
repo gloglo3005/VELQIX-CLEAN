@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/auth_gate.dart';
 import '../widgets/net_image.dart';
 import '../widgets/trust_widgets.dart';
+import '../widgets/service_request_sheet.dart';
 import '../utils/image_url.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
@@ -573,6 +574,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   // Approuvée par VelQix / non approuvée (annoncé clairement)
                   const SizedBox(height: 14),
                   TrustInfoCard(property: p),
+                  const SizedBox(height: 10),
+                  ServiceActionsRow(property: p),
 
                   const SizedBox(height: 20),
                   const Divider(),

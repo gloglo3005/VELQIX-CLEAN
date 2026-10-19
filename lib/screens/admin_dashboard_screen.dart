@@ -12,6 +12,7 @@ import '../services/admin_service.dart';
 import 'admin_tabs/admin_users_tab.dart';
 import 'admin_tabs/admin_properties_tab.dart';
 import 'admin_tabs/admin_roles_tab.dart';
+import 'admin_tabs/admin_ops_tab.dart';
 import 'admin_tabs/admin_common.dart' show adminRoleColor;
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart' show publishedPropertiesNotifier, pendingPropertiesNotifier, StatCard, UserAvatar, AppTextField, PrimaryButton;
@@ -93,7 +94,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     // Met à jour la barre latérale (grand écran) quand l'onglet change
     _tabController.addListener(() {
       if (mounted && !_tabController.indexIsChanging) setState(() {});
@@ -259,6 +260,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             const Tab(text: 'Utilisateurs'),
             const Tab(text: 'Annonces'),
             const Tab(text: 'Équipe'),
+            const Tab(text: 'Opérations & finances'),
             const Tab(text: 'Rôles & permissions'),
             const Tab(text: 'Litiges'),
           ],
@@ -278,6 +280,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 AdminUsersTab(users: users, onRefresh: _refreshUsers),
                 const AdminPropertiesTab(),
                 _buildEquipe(),
+                const AdminOpsTab(),
                 const AdminRolesTab(),
                 _buildLitiges(),
               ],
@@ -396,6 +399,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         NavigationRailDestination(icon: icon(Icons.people_alt_rounded), label: const Text('Utilisateurs')),
         NavigationRailDestination(icon: icon(Icons.home_work_rounded), label: const Text('Annonces')),
         NavigationRailDestination(icon: icon(Icons.support_agent_rounded), label: const Text('Équipe')),
+        NavigationRailDestination(icon: icon(Icons.account_balance_wallet_rounded), label: const Text('Opérations')),
         NavigationRailDestination(icon: icon(Icons.admin_panel_settings_rounded), label: const Text('Rôles')),
         NavigationRailDestination(icon: icon(Icons.gavel_rounded), label: const Text('Litiges')),
       ],
