@@ -32,7 +32,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   PropertyType     _type        = PropertyType.immobilier;
   ListingType      _listingType = ListingType.location;
-  PropertyCategory _category    = PropertyCategory.appartement;
+  PropertyCategory _category    = PropertyCategory.chambre;
   bool _loading       = false;
   String? _uploadStatus;      // « Envoi des médias… 1/3 »
   double? _uploadProgress;
@@ -44,23 +44,38 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool _pickingVideo   = false;
   bool _showPhotoError = false;
 
-  // Seuls les biens immobiliers (maisons, appartements, hôtels, terrains…) et
-  // les véhicules sont acceptés : plus de matériel, d'ustensiles, etc.
+  // Cahier des charges §8.1 / §4.2 : le lancement se concentre sur l'immobilier
+  // (chambres, studios, maisons, appartements, terrains, locaux commerciaux,
+  // bureaux). Les véhicules ne sont plus proposés à la publication ; les
+  // annonces existantes restent lisibles et modifiables.
   final _immoCats = [
+    PropertyCategory.chambre, PropertyCategory.studio,
     PropertyCategory.maison, PropertyCategory.appartement,
-    PropertyCategory.hotel, PropertyCategory.terrain,
-    PropertyCategory.bureau, PropertyCategory.entrepot,
+    PropertyCategory.terrain, PropertyCategory.localCommercial,
+    PropertyCategory.bureau,
   ];
   final _mobilCats = [
     PropertyCategory.voiture, PropertyCategory.moto,
     PropertyCategory.camion,
   ];
 
-  List<PropertyCategory> get _currentCats =>
-      _type == PropertyType.immobilier ? _immoCats : _mobilCats;
+  /// Catégories proposées. En modification, on conserve la catégorie
+  /// historique de l'annonce (hôtel, entrepôt, véhicule…) pour ne pas la
+  /// changer silencieusement.
+  List<PropertyCategory> get _currentCats {
+    final base = _type == PropertyType.immobilier ? _immoCats : _mobilCats;
+    final existing = widget.editing?.categorie;
+    if (existing != null && widget.editing!.type == _type && !base.contains(existing)) {
+      return [...base, existing];
+    }
+    return base;
+  }
 
   // ✅ Clés de traduction (résolues dynamiquement via tr())
   Map<PropertyCategory, String> get catLabels => {
+    PropertyCategory.chambre:     tr('add_cat_chambre'),
+    PropertyCategory.studio:      tr('add_cat_studio'),
+    PropertyCategory.localCommercial: tr('add_cat_local_commercial'),
     PropertyCategory.maison:      tr('add_cat_maison'),
     PropertyCategory.appartement: tr('add_cat_appartement'),
     PropertyCategory.hotel:       tr('add_cat_hotel'),
@@ -422,7 +437,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         'images': images,
         'type': _type.name,
         'listingType': _listingType.name,
-        'categorie': _category.name,
+        'categorie': _category.apiValue,
         'adresse': _rueCtrl.text.trim(),
         'ville': _villeCtrl.text.trim(),
         'pays': AuthService.instance.currentUserOrEmpty.countryName ?? 'Togo',
@@ -499,6 +514,9 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   String _categoryImageUrl(PropertyCategory cat) {
     const imgs = {
+      PropertyCategory.chambre:     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800',
+      PropertyCategory.studio:      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
+      PropertyCategory.localCommercial: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=800',
       PropertyCategory.maison:      'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800',
       PropertyCategory.appartement: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800',
       PropertyCategory.hotel:       'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
@@ -605,10 +623,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
         Expanded(child: _TypeCard(label: tr('add_type_immo'), icon: Icons.home_work_rounded,
             value: PropertyType.immobilier, selected: _type,
             onTap: (v) => setState(() { _type = v; _category = _immoCats.first; }))),
-        const SizedBox(width: 12),
-        Expanded(child: _TypeCard(label: tr('add_type_mobilier'), icon: Icons.directions_car_rounded,
-            value: PropertyType.mobilier, selected: _type,
-            onTap: (v) => setState(() { _type = v; _category = _mobilCats.first; }))),
+        if (widget.editing?.type == PropertyType.mobilier) ...[
+          const SizedBox(width: 12),
+          Expanded(child: _TypeCard(label: tr('add_type_mobilier'), icon: Icons.directions_car_rounded,
+              value: PropertyType.mobilier, selected: _type,
+              onTap: (v) => setState(() { _type = v; _category = _mobilCats.first; }))),
+        ],
       ]),
       const SizedBox(height: 24),
       Text(tr('add_category'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),

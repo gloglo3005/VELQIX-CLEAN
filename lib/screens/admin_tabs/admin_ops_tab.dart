@@ -227,7 +227,7 @@ class _MissionsPanelState extends State<_MissionsPanel> {
     final ok = await adminConfirm(context,
         title: 'Valider cette mission ?',
         message: m.type == MissionType.verification
-            ? "Le bien deviendra « approuvé par VelQix » et ${formatFcfa(m.agentTotal)} seront dus à l'agent."
+            ? "Le bien sera marqué « vérifié sur le terrain » (date et périmètre du contrôle affichés) et ${formatFcfa(m.agentTotal)} seront dus à l'agent."
             : "${formatFcfa(m.agentTotal)} seront dus à l'agent.",
         confirmLabel: 'Valider');
     if (!ok || !mounted) return;

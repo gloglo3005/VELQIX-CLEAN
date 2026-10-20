@@ -1,9 +1,9 @@
 // lib/services/verification_service.dart
-// « Approuvée par VelQix » : vérification terrain par les démarcheurs.
+// « Vérifiée sur le terrain » : vérification terrain par les démarcheurs.
 //  • Le propriétaire demande la vérification d'un bien (requestVerification).
 //  • Le démarcheur voit les demandes, se rend sur place et valide (verify).
-// Une annonce est approuvée par VelQix si son propriétaire est Premium OU si
-// un démarcheur l'a vérifiée sur le terrain.
+// Seule une vérification terrain donne ce statut : le Premium ne le donne pas
+// (cahier des charges §10.3).
 
 import '../models/models.dart';
 import 'api_service.dart';

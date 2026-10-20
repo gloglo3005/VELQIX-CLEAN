@@ -1,9 +1,13 @@
 // lib/widgets/trust_widgets.dart
-// Les 2 types d'annonces, annoncés clairement à l'utilisateur :
-//  • APPROUVÉE par VelQix : bien vérifié sur le terrain par un démarcheur VelQix
-//    (vérification réellement effectuée et validée). En cas de fraude, VelQix s'en charge.
-//    Le Premium ne suffit PAS : il ne rend pas un bien « vérifié ».
-//  • NON APPROUVÉE : bien non vérifié. En cas de fraude, VelQix ne s'en mêle pas.
+// Niveau de vérification d'une annonce (cahier des charges §3.3, §6.4, §10.3, §14.3) :
+//  • VÉRIFIÉE SUR LE TERRAIN : un agent VelQix s'est rendu sur place. Le statut
+//    précise la date, ce qui a été contrôlé et les LIMITES du contrôle.
+//  • NON VÉRIFIÉE : aucune vérification terrain par VelQix.
+// Règles :
+//  - un paiement (Premium, mise en avant) ne donne JAMAIS le statut « vérifié » ;
+//  - une vérification n'est ni une garantie de disponibilité, ni une preuve de
+//    propriété, ni un contrôle juridique ; VelQix ne promet pas de prendre en
+//    charge les fraudes.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,30 +22,36 @@ const Color _approvedColor = Color(0xFF10B981);
 const Color _unapprovedColor = Color(0xFFF59E0B);
 
 // ─── Textes ──────────────────────────────────────────────────────────────────
-String trustApprovedTitle() => _t('Annonce approuvée par VelQix', 'Listing approved by VelQix');
-String trustUnapprovedTitle() => _t('Annonce non approuvée', 'Listing not approved');
+String trustApprovedTitle() => _t('Vérifiée sur le terrain', 'Verified on site');
+String trustUnapprovedTitle() => _t('Non vérifiée par VelQix', 'Not verified by VelQix');
 
 String trustApprovedRule() => _t(
-    "Un démarcheur VelQix s'est rendu sur le terrain et a confirmé que le bien existe réellement. En cas de fraude, VelQix s'en charge.",
-    'A VelQix agent visited the site and confirmed the property really exists. In case of fraud, VelQix takes care of it.');
+    "Un agent VelQix s'est rendu sur place à la date indiquée et a contrôlé que le bien existe et correspond aux photos et à la description. Cela ne prouve pas la propriété et ne garantit pas que le bien reste disponible.",
+    'A VelQix agent visited the site on the date shown and checked that the property exists and matches the photos and description. This is not proof of ownership and does not guarantee the property stays available.');
 
 String trustUnapprovedRule() => _t(
-    "Le bien n'a pas été vérifié sur le terrain par VelQix (un abonnement Premium ne vaut pas vérification). En cas de fraude, VelQix ne s'en mêle pas.",
-    'The property has not been verified on site by VelQix (a Premium subscription is not a verification). In case of fraud, VelQix does not get involved.');
+    "Aucun agent VelQix n'a vérifié ce bien sur le terrain. Les informations sont données par l'annonceur.",
+    'No VelQix agent has checked this property on site. The information is provided by the advertiser.');
+
+/// Limites des garanties (cahier des charges §14.3) — affichées sans détour.
+String trustLimitsNote() => _t(
+    "Une annonce n'est pas une garantie de disponibilité. La mise en relation ne remplace pas les contrôles juridiques d'une transaction immobilière. Visitez le bien avant tout paiement et ne versez jamais d'argent à l'avance.",
+    'A listing is not a guarantee of availability. Matching does not replace the legal checks of a property transaction. Visit the property before any payment and never send money in advance.');
 
 String _approvalReason(PropertyModel p) {
-  {
+  if (p.fieldVerified) {
     final who = (p.fieldVerifiedByName ?? '').trim();
     final d = p.fieldVerifiedAt;
     final date = d == null
         ? ''
         : ' (${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year})';
     return who.isEmpty
-        ? _t("Vérifié sur le terrain par un démarcheur VelQix$date.",
+        ? _t("Vérifié sur le terrain par un agent VelQix$date.",
             'Verified on site by a VelQix agent$date.')
-        : _t("Vérifié sur le terrain par le démarcheur $who$date.",
+        : _t("Vérifié sur le terrain par l'agent $who$date.",
             'Verified on site by agent $who$date.');
   }
+  return '';
 }
 
 // ─── Badge compact (cartes, listes) ──────────────────────────────────────────
@@ -66,7 +76,7 @@ class TrustBadge extends StatelessWidget {
             size: compact ? 12 : 15, color: ok ? Colors.white : const Color(0xFFB45309)),
         const SizedBox(width: 4),
         Text(
-          ok ? _t('Approuvée VelQix', 'VelQix approved') : _t('Non approuvée', 'Not approved'),
+          ok ? _t('Vérifiée terrain', 'Verified on site') : _t('Non vérifiée', 'Not verified'),
           style: GoogleFonts.poppins(
             fontSize: compact ? 10 : 12,
             fontWeight: FontWeight.w600,
@@ -110,21 +120,19 @@ class TrustInfoCard extends StatelessWidget {
           Text(_approvalReason(property),
               style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text(_t("En cas de fraude, VelQix s'en charge.", 'In case of fraud, VelQix takes care of it.'),
+          Text(trustApprovedRule(),
               style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
         ] else ...[
           Text(trustUnapprovedRule(),
               style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
-          Text(
-              _t('Visitez le bien avant tout paiement et ne versez jamais d\'argent à l\'avance.',
-                  'Visit the property before any payment and never send money in advance.'),
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
         ],
+        const SizedBox(height: 4),
+        Text(trustLimitsNote(),
+            style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary, height: 1.4)),
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () => showTrustExplainer(context),
-          child: Text(_t('Comprendre les 2 types d\'annonces', 'Understand the 2 listing types'),
+          child: Text(_t('Comprendre les niveaux de vérification', 'Understand verification levels'),
               style: GoogleFonts.poppins(
                   fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary,
                   decoration: TextDecoration.underline)),
@@ -181,11 +189,24 @@ Future<void> showTrustExplainer(BuildContext context, {PropertyModel? property})
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_t("Les 2 types d'annonces sur VelQix", 'The 2 listing types on VelQix'),
+          Text(_t('Niveaux de vérification sur VelQix', 'Verification levels on VelQix'),
               style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           _definition(approved: true, current: property?.isVelqixApproved == true),
           _definition(approved: false, current: property != null && !property.isVelqixApproved),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              _t('Un paiement (abonnement Premium, mise en avant) ne donne jamais le statut « vérifiée sur le terrain ».',
+                  'A payment (Premium, promotion) never grants the “verified on site” status.'),
+              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(trustLimitsNote(),
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4)),
+          ),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(onPressed: () => Navigator.pop(ctx), child: Text(_t('Fermer', 'Close'))),
@@ -222,8 +243,8 @@ Future<bool> confirmTrustBeforeChat(BuildContext context, PropertyModel p) async
           const SizedBox(height: 4),
           Text(
             ok
-                ? _t('Cette annonce est approuvée par VelQix.', 'This listing is approved by VelQix.')
-                : _t("Cette annonce n'est pas approuvée par VelQix.", 'This listing is not approved by VelQix.'),
+                ? _t('Cette annonce a été vérifiée sur le terrain.', 'This listing was verified on site.')
+                : _t("Cette annonce n'a pas été vérifiée par VelQix.", 'This listing has not been verified by VelQix.'),
             style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600,
                 color: ok ? const Color(0xFF047857) : const Color(0xFFB45309)),
@@ -231,15 +252,11 @@ Future<bool> confirmTrustBeforeChat(BuildContext context, PropertyModel p) async
           const SizedBox(height: 12),
           _definition(approved: true, current: ok),
           _definition(approved: false, current: !ok),
-          if (!ok)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                _t("Visitez le bien avant tout paiement et ne versez jamais d'argent à l'avance.",
-                    'Visit the property before any payment and never send money in advance.'),
-                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(trustLimitsNote(),
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+          ),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

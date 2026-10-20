@@ -6,7 +6,6 @@ import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
 import '../services/premium_plan_service.dart';
 import 'payment_screen.dart';
-import 'plans_screen.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -168,16 +167,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   Text(tr('prem_free_vs'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   _ComparisonTable(),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.push(
-                          context, MaterialPageRoute(builder: (_) => const PlansScreen())),
-                      icon: const Icon(Icons.layers_rounded, size: 18),
-                      label: const Text('Toutes les formules : particuliers, pros, entreprises'),
-                    ),
-                  ),
                   const SizedBox(height: 24),
                   PrimaryButton(
                     label: (_plans[_selectedPlan]['isFree'] as bool? ?? false)

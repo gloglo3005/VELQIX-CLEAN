@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'auth_gate.dart';
 import 'net_image.dart';
 import 'trust_widgets.dart';
+import 'availability_widgets.dart';
 import '../services/app_translations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -264,7 +265,10 @@ class _HorizontalCard extends StatelessWidget {
                       Text(property.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
                     ]),
                     const SizedBox(height: 5),
-                    TrustBadge(property: property),
+                    Wrap(spacing: 6, runSpacing: 4, children: [
+                      AvailabilityBadge(property: property),
+                      TrustBadge(property: property),
+                    ]),
                   ],
                 ),
               ),

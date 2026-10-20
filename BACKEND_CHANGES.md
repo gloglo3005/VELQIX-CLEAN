@@ -111,20 +111,23 @@ Si le serveur ne renvoie pas `videoUrl` après la création, l'app affiche maint
 
 ---
 
-# Annonces « approuvées par VelQix » vs « non approuvées »
+# Annonces « vérifiées sur le terrain » vs « non vérifiées »
+
+> ⚠️ **Règle modifiée (cahier des charges v1.0, §10.3 et §14.3).** Le statut Premium ne rend plus une annonce
+> « approuvée ». Seule une vérification terrain validée donne `fieldVerified = true`. VelQix ne promet plus de
+> « prendre en charge » les fraudes. Les mentions ci-dessous à « Premium OU démarcheur » sont obsolètes.
 
 Règle métier :
-- **Approuvée par VelQix** = un **démarcheur VelQix** a vérifié le bien
+- **Approuvée par VelQix** = le propriétaire est **Premium** OU un **démarcheur VelQix** a vérifié le bien
   sur le terrain. En cas de fraude, VelQix s'en charge.
 - **Non approuvée** = tout le reste. En cas de fraude, VelQix ne s'en mêle pas.
 (À ne pas confondre avec `status` : `en_attente / approuve / rejete` = modération admin avant publication.)
 
-**Règle du cahier des charges : le Premium ne signifie PAS « bien vérifié ».** L'app calcule
-`isVelqixApproved = fieldVerified` (vérification terrain réellement effectuée et validée).
+L'app calcule désormais `isVelqixApproved = fieldVerified` (le Premium n'entre plus dans le calcul).
 
 ## Champs à renvoyer dans toutes les réponses d'annonces
 `fieldVerified` (bool), `fieldVerifiedAt` (ISO), `fieldVerifiedByName` (string, nom du démarcheur),
-`verificationRequested` (bool).
+`verificationRequested` (bool). `proprietaire.isPremium` doit être présent et à jour (Premium expiré = plus approuvé).
 
 ## Routes
 | Route | Qui | Rôle |
@@ -230,46 +233,66 @@ Nouveaux droits dans le catalogue : `missions.manage`, `pricing.manage`, `financ
 
 ---
 
-# Phase 2 du cahier des charges : formules, espaces Pro / Business
+# Cahier des charges v1.0 (19/10/2026) — disponibilité, visites, signalements
 
-> **Règle mise à jour** : le **Premium ne rend PAS un bien « vérifié »**. Seule une vérification terrain
-> réellement effectuée et validée donne `fieldVerified = true` (voir plus haut). Ne jamais déduire
-> « approuvée » du statut Premium du propriétaire.
+Principe (§7.1) : une annonce publiée n'est jamais assimilée à un bien disponible. Toutes les règles sont
+appliquées **côté serveur** (§8.5 : un client ne doit pas pouvoir forcer un statut protégé).
 
-## Formules (Freemium / Premium par profil)
-| Route | Rôle |
-|---|---|
-| `GET /plans` (public) | `[ { id, audience: particulier\|professionnel\|entreprise, name, tagline, premium, priceMonthly?, price6Months?, price1Year? } ]`. `premium: true` sans `priceMonthly` = « sur devis ». Valeurs de lancement : Particulier Plus 2 000 F/mois ; Professionnel Premium 2 000 F/mois, 6 mois 11 000 F, 1 an 20 000 F ; Entreprise Premium sur devis. **Pas de formule 5 ans.** Les plafonds (annonces, collaborateurs, crédits de mise en avant) viennent de `/admin/pricing`. |
-| `POST /subscriptions/checkout` | `{ planId, period: month\|6months\|year }` → `{ checkoutUrl }` (le prix est lu côté serveur, jamais dans la requête) |
-| `POST /subscriptions/quote-request` | `{ planId, message }` (Entreprise Premium) |
-| `GET /subscriptions/me` | `{ planName, status: actif\|expire\|aucun, expiresAt }` |
-| `GET /me/invoices` | `[ { id, label, date, amount, url? } ]` |
+## 1. Champs à renvoyer dans toutes les réponses d'annonces
+| Champ | Type | Rôle |
+|---|---|---|
+| `availabilityStatus` | string | `available` \| `pending` \| `unavailable` (loué / vendu) \| `suspended` \| `archived` |
+| `lastConfirmedAt` | ISO date | Date de la dernière confirmation de disponibilité par l'annonceur |
+| `updatedAt` | ISO date | Déjà lu par l'app ; sert de date de déclaration si `lastConfirmedAt` est absent |
 
-## Profil ≠ rôles : plusieurs espaces pour un même compte
-| Route | Rôle |
-|---|---|
-| `GET /me/spaces` | `{ pro: bool, business: bool, businessName?, businessRole? }` |
-| `POST /me/spaces/pro` | `{ activity: agent_immobilier\|demarcheur_independant\|commercial\|vendeur\|autre }` (gratuit, immédiat) |
-| `POST /me/spaces/business` | `{ name }` : crée l'entreprise, le demandeur en devient `administrateur` |
+Sans `lastConfirmedAt`, l'app affiche « Déclaré disponible » (jamais « confirmé »). Au-delà de `freshnessDays`
+(7 par défaut, `PropertyModel.freshnessDays`) l'app affiche « Disponibilité à reconfirmer ». **À rendre
+configurable côté admin** (§7.2, §15.2) et à exposer par `GET /config/availability` si besoin.
 
-## Velqix Pro (accès : `spaces.pro`)
-| Route | Rôle |
-|---|---|
-| `GET /pro/dashboard` | `{ activeListings, views, contacts, pendingRequests, visitsPlanned, verified }` |
-| `GET /pro/leads` | `[ { id, name, phone, propertyTitle, message, status, createdAt } ]` |
-| `PUT /pro/leads/:id` | `{ status: nouveau\|contacte\|visite\|conclu\|perdu }` |
+## 2. Catégories (§8.1)
+Ajouter à l'enum `categorie` : `chambre`, `studio`, `local_commercial` (valeur envoyée par l'app pour « Local
+commercial »). Les valeurs `hotel`, `entrepot`, `voiture`, `moto`, `camion`, `equipement`, `autre` restent
+lisibles mais l'app ne les propose plus à la **création**. Recommandé : refuser les véhicules sur `POST /properties`.
 
-## Velqix Business (rôles : administrateur, gestionnaire, commercial, comptable)
-| Route | Qui |
-|---|---|
-| `GET /business/overview` | tous : `{ listings, members, views, contacts, verifiedProperties, pendingVerifications }` |
-| `GET /business/properties` | administrateur, gestionnaire (tous) ; commercial (ses annonces attribuées) : `[ { id, titre, assignedTo, views, verified } ]` |
-| `PUT /business/properties/:id/assign` | administrateur, gestionnaire : `{ userId }` |
-| `GET /business/team` | administrateur, gestionnaire |
-| `POST /business/team` | administrateur : `{ email, role }` (compte VelQix existant) |
-| `PUT /business/team/:id` / `DELETE /business/team/:id` | administrateur |
-| `GET /business/reports?period=7d\|30d\|90d` | administrateur, gestionnaire, comptable : `{ listings, views, contacts, visits, verificationsDone, verifications:[{title,date,status}] }` |
-| `GET /business/reports/export?period=&format=csv` | idem : `{ url }` |
+## 3. Demandes de confirmation et de visite (VIS-01, VIS-02, NOT-01)
+| Route | Qui | Rôle |
+|---|---|---|
+| `POST /properties/:id/availability-requests` | utilisateur connecté | Body `{ type: 'confirmation' \| 'visit', desiredSlot?: ISO, note? }`. Crée la demande `pending`, notifie l'annonceur (push / e-mail / SMS). Limiter les doublons et le spam (ex. 1 demande ouverte par utilisateur et par annonce). |
+| `GET /availability-requests/mine` | demandeur | Ses demandes. |
+| `GET /availability-requests/received` | annonceur | Demandes sur ses annonces (liste vide si aucune). |
+| `PUT /availability-requests/:id/respond` | **propriétaire de l'annonce uniquement** | Body `{ response: 'available' \| 'unavailable' \| 'propose_slot', proposedSlot?: ISO, note? }`. `available` → met `lastConfirmedAt = now` et écrit un événement d'historique ; `unavailable` → `availabilityStatus = 'unavailable'` ; `propose_slot` → statut `slot_proposed`. Notifie le demandeur. |
 
-Rappel : l'app masque onglets et boutons selon le rôle, mais **le serveur doit refuser** toute route
-interdite au rôle de l'appelant. L'accès aux fonctions financières reste réservé aux personnes autorisées.
+Objet renvoyé : `{ id, propertyId, propertyTitle (ou property.titre), type, status, requesterName (ou requester.{prenom,nom}), note, desiredSlot, proposedSlot, responseNote, createdAt, respondedAt }`
+avec `status` ∈ `pending | available | unavailable | slot_proposed | expired | cancelled`.
+
+**Expiration (§6.3, §7.4)** : une tâche planifiée passe les demandes sans réponse à `expired` après un délai
+**configurable** (cible à tester : 30 à 60 min pour une visite). Le silence n'est jamais traité comme une
+confirmation. Ensuite, selon la politique : avertissement de fraîcheur → nouvelle demande de confirmation →
+réduction de visibilité → suspension / archivage (pas de suppression immédiate).
+
+## 4. Déclaration simple par l'annonceur (§5.3, §7.3)
+`POST /properties/:id/availability` — propriétaire uniquement. Body `{ status: 'available' | 'rented' | 'sold' | 'unavailable' }`.
+- `available` : `lastConfirmedAt = now`, `availabilityStatus = 'available'` ;
+- `rented` / `sold` / `unavailable` : `availabilityStatus = 'unavailable'` et retrait des résultats actifs ;
+- chaque appel écrit une ligne d'historique (ANN-06 : auteur, date, résultat, canal) — ne jamais écraser l'historique.
+Ne PAS imposer à l'annonceur une confirmation manuelle tous les 2-3 jours (§5.3) : rappels périodiques raisonnables seulement.
+
+## 5. Signalements (SIG-01, SIG-02)
+`POST /properties/:id/reports` — utilisateur connecté. Body `{ reason, details? }` avec `reason` ∈
+`already_rented | not_found | misleading | wrong_price | suspicious_advertiser | wrong_info_or_images`.
+- Un signalement **isolé** ne sanctionne pas automatiquement (§7.5). Plusieurs signalements **indépendants et
+  concordants** (comptes distincts) peuvent suspendre temporairement l'annonce (`availabilityStatus = 'suspended'`).
+- Limiter les abus de signalement (1 par utilisateur et par annonce, quota quotidien) — risque listé au §14.1.
+- File de traitement admin : évaluer le risque, demander des précisions, décision proportionnée, trace de la
+  résolution, canal de contestation (§14.2). Journaliser dans `audit_logs`.
+
+## 6. Mise en avant payante (§10.3)
+`isFeatured` ne doit **jamais** modifier `fieldVerified`, `availabilityStatus` ni `lastConfirmedAt`. L'app libelle
+désormais ces annonces « Mise en avant » (et non « Vedette ») et le Premium ne donne plus le statut vérifié.
+Le tri des résultats doit conserver une logique de pertinence et de confiance.
+
+## 7. Cohérence des promesses commerciales
+L'écran Premium ne promet plus « Assurance transactions / protection contre les litiges » ni « réponse garantie ».
+Le backend ne doit pas non plus présenter d'assurance ou de garantie de transaction tant que ce n'est pas défini
+juridiquement (§14.3, §22 : structure juridique et contrats à vérifier).
+

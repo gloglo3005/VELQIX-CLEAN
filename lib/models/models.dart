@@ -5,8 +5,30 @@
 enum PropertyType { immobilier, mobilier }
 enum ListingType { vente, location, les_deux }
 enum PropertyCategory {
-  maison, appartement, hotel, terrain, bureau, entrepot,
+  // Cahier des charges §8.1 : chambres, maisons, appartements, studios,
+  // terrains, locaux commerciaux, bureaux.
+  chambre, studio, maison, appartement, terrain, localCommercial, bureau,
+  // Catégories historiques : toujours lisibles, mais plus proposées à la
+  // publication (le lancement se concentre sur l'immobilier — §4.2).
+  hotel, entrepot,
   voiture, moto, camion, equipement, autre
+}
+
+extension PropertyCategoryApi on PropertyCategory {
+  /// Valeur échangée avec l'API (snake_case, comme l'enum Prisma).
+  String get apiValue => this == PropertyCategory.localCommercial ? 'local_commercial' : name;
+}
+
+/// États de disponibilité affichés à l'utilisateur (cahier des charges §7.2).
+/// Une annonce publiée n'est JAMAIS assimilée à un bien disponible (§7.1).
+enum AvailabilityState {
+  declared,           // Déclaré disponible (par l'annonceur, à une date)
+  confirmedRecently,  // Disponibilité confirmée récemment
+  pending,            // Confirmation en attente
+  toReconfirm,        // Disponibilité à reconfirmer (information ancienne)
+  unavailable,        // Indisponible (loué, vendu…)
+  suspended,          // Suspendu pour vérification
+  archived,           // Archivé
 }
 
 class UserModel {
@@ -153,10 +175,17 @@ class PropertyModel {
   final Map<String, List<String>>? caracteristiquesTranslations;
   final DateTime? updatedAt;
 
-  // ── Approbation VelQix ───────────────────────────────────────────────────
-  // Un bien est « approuvé par VelQix » UNIQUEMENT si la vérification terrain a
-  // réellement été effectuée et validée (cahier des charges : le Premium ne
-  // signifie pas « bien automatiquement vérifié »). Sinon : non approuvé.
+  // ── Disponibilité (cahier des charges §7) ────────────────────────────────
+  // Valeur brute renvoyée par l'API (voir BACKEND_CHANGES.md) : 'available',
+  // 'pending', 'unavailable' (loué / vendu), 'suspended', 'archived'.
+  final String? availabilityStatus;
+  // Date de la dernière confirmation de disponibilité par l'annonceur.
+  final DateTime? lastConfirmedAt;
+
+  // ── Vérification terrain ─────────────────────────────────────────────────
+  // Un bien est « vérifié sur le terrain » uniquement si un agent VelQix s'est
+  // rendu sur place (mission de vérification validée). Un paiement (Premium,
+  // mise en avant…) ne donne JAMAIS ce statut (cahier des charges §10.3).
   final bool fieldVerified;            // vérifié sur place par un démarcheur
   final DateTime? fieldVerifiedAt;
   final String? fieldVerifiedByName;   // nom du démarcheur
@@ -190,16 +219,48 @@ class PropertyModel {
     this.descriptionTranslations,
     this.caracteristiquesTranslations,
     this.updatedAt,
+    this.availabilityStatus,
+    this.lastConfirmedAt,
     this.fieldVerified = false,
     this.fieldVerifiedAt,
     this.fieldVerifiedByName,
     this.verificationRequested = false,
   });
 
-  /// Approuvé par VelQix = vérifié sur le terrain ET validé. VelQix prend alors en
-  /// charge les cas de fraude. Sinon VelQix n'intervient pas (même si le
-  /// propriétaire est Premium).
+  /// Vérifié sur le terrain par un agent VelQix. Le statut Premium du
+  /// propriétaire n'entre PAS dans ce calcul (cahier des charges §10.3 :
+  /// « le paiement ne doit jamais permettre d'afficher un bien comme vérifié »).
+  /// Le nom est conservé pour ne pas casser les écrans existants.
   bool get isVelqixApproved => fieldVerified;
+
+  /// Durée (en jours) pendant laquelle une information est dite « récente ».
+  /// Paramètre à rendre configurable côté admin (§7.2 : ~7 jours à tester).
+  static int freshnessDays = 7;
+
+  /// Date de référence de l'information de disponibilité affichée.
+  DateTime get availabilityDate => lastConfirmedAt ?? updatedAt ?? createdAt;
+
+  /// État de disponibilité calculé. Sans confirmation explicite de l'annonceur,
+  /// on affiche « Déclaré disponible » — jamais « confirmé ».
+  AvailabilityState get availabilityState {
+    switch ((availabilityStatus ?? '').toLowerCase()) {
+      case 'unavailable': case 'indisponible': case 'rented': case 'loue':
+      case 'sold': case 'vendu':
+        return AvailabilityState.unavailable;
+      case 'suspended': case 'suspendu':
+        return AvailabilityState.suspended;
+      case 'archived': case 'archive':
+        return AvailabilityState.archived;
+      case 'pending': case 'confirmation_pending':
+        return AvailabilityState.pending;
+    }
+    if (!isAvailable) return AvailabilityState.unavailable;
+    final fresh = DateTime.now().difference(availabilityDate).inDays <= freshnessDays;
+    if (lastConfirmedAt != null) {
+      return fresh ? AvailabilityState.confirmedRecently : AvailabilityState.toReconfirm;
+    }
+    return fresh ? AvailabilityState.declared : AvailabilityState.toReconfirm;
+  }
 
   /// Statut normalisé : accepte les variantes (pending / approved / rejected…).
   static String _normalizeStatus(dynamic raw) {
@@ -209,7 +270,7 @@ class PropertyModel {
     return 'approuve';
   }
 
-  /// Copie de l'annonce avec un autre statut.
+  /// Copie de l'annonce avec un autre statut (modération).
   PropertyModel withStatus(String newStatus) => PropertyModel(
         id: id, titre: titre, description: description, type: type,
         listingType: listingType, categorie: categorie, prix: prix,
@@ -222,6 +283,7 @@ class PropertyModel {
         descriptionTranslations: descriptionTranslations,
         caracteristiquesTranslations: caracteristiquesTranslations,
         updatedAt: DateTime.now(),
+        availabilityStatus: availabilityStatus, lastConfirmedAt: lastConfirmedAt,
         fieldVerified: fieldVerified, fieldVerifiedAt: fieldVerifiedAt,
         fieldVerifiedByName: fieldVerifiedByName,
         verificationRequested: verificationRequested,
@@ -257,6 +319,9 @@ class PropertyModel {
 
   String get categorieLabel {
     const labels = {
+      PropertyCategory.chambre: 'Chambre',
+      PropertyCategory.studio: 'Studio',
+      PropertyCategory.localCommercial: 'Local commercial',
       PropertyCategory.maison: 'Maison',
       PropertyCategory.appartement: 'Appartement',
       PropertyCategory.hotel: 'Hôtel',
@@ -291,6 +356,11 @@ class PropertyModel {
 
     PropertyCategory categorie;
     switch ((json['categorie'] ?? '').toString().toLowerCase()) {
+      case 'chambre':     categorie = PropertyCategory.chambre; break;
+      case 'studio':      categorie = PropertyCategory.studio; break;
+      case 'local_commercial':
+      case 'localcommercial':
+      case 'local':       categorie = PropertyCategory.localCommercial; break;
       case 'maison':      categorie = PropertyCategory.maison; break;
       case 'appartement': categorie = PropertyCategory.appartement; break;
       case 'hotel':       categorie = PropertyCategory.hotel; break;
@@ -381,6 +451,10 @@ class PropertyModel {
           ?.map((k, v) => MapEntry(k.toString(), (v as List).cast<String>())),
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'])
+          : null,
+      availabilityStatus: json['availabilityStatus']?.toString(),
+      lastConfirmedAt: json['lastConfirmedAt'] != null
+          ? DateTime.tryParse(json['lastConfirmedAt'].toString())
           : null,
       fieldVerified: json['fieldVerified'] == true,
       fieldVerifiedAt: json['fieldVerifiedAt'] != null

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../widgets/auth_gate.dart';
 import '../widgets/net_image.dart';
 import '../widgets/trust_widgets.dart';
+import '../widgets/availability_widgets.dart';
+import '../widgets/availability_actions.dart';
 import '../widgets/service_request_sheet.dart';
 import '../utils/image_url.dart';
 import '../services/app_translations.dart';
@@ -571,7 +573,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     Text('${_rating.toStringAsFixed(1)} ($_totalAvis ${tr("detail_reviews")})', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
                   ]),
 
-                  // Approuvée par VelQix / non approuvée (annoncé clairement)
+                  // Disponibilité (avec la date de l'information) — §7.2
+                  const SizedBox(height: 14),
+                  AvailabilityInfoCard(property: p),
+                  const SizedBox(height: 10),
+                  AvailabilityActionsRow(property: p),
+
+                  // Niveau de vérification : vérifiée sur le terrain / non vérifiée
                   const SizedBox(height: 14),
                   TrustInfoCard(property: p),
                   const SizedBox(height: 10),

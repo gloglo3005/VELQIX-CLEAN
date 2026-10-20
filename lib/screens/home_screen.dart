@@ -45,8 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // de bien, puis une catégorie propre à ce type.
   PropertyType _selectedType = PropertyType.immobilier;
   static const _immoCategoryKeys = [
-    'cat_all', 'cat_maisons', 'cat_appartements', 'cat_hotels',
-    'cat_terrains', 'cat_bureaux',
+    'cat_all', 'cat_chambres', 'cat_studios', 'cat_maisons', 'cat_appartements',
+    'cat_terrains', 'cat_locaux', 'cat_bureaux', 'cat_hotels',
   ];
   static const _mobilCategoryKeys = [
     'cat_all', 'cat_voitures', 'cat_motos', 'cat_camions',
@@ -55,6 +55,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedType == PropertyType.immobilier ? _immoCategoryKeys : _mobilCategoryKeys;
   // Correspondance clé → PropertyCategory pour le filtrage
   final _categoryFilters = {
+    'cat_chambres':     PropertyCategory.chambre,
+    'cat_studios':      PropertyCategory.studio,
+    'cat_locaux':       PropertyCategory.localCommercial,
     'cat_maisons':      PropertyCategory.maison,
     'cat_appartements': PropertyCategory.appartement,
     'cat_hotels':       PropertyCategory.hotel,

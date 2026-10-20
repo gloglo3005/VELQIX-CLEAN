@@ -217,9 +217,12 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       'moto':        ['moto', 'motocycle', 'scooter', 'bike', 'tricycle'],
       'camion':      ['camion', 'truck', 'poids lourd', 'semi'],
       'maison':      ['maison', 'villa', 'residence', 'bungalow', 'duplex', 'triplex'],
-      'appartement': ['appartement', 'appart', 'studio', 'flat', 'chambre'],
+      'chambre':     ['chambre', 'colocation', 'piece'],
+      'studio':      ['studio', 'garconniere'],
+      'appartement': ['appartement', 'appart', 'flat'],
       'terrain':     ['terrain', 'parcelle', 'lot', 'foncier', 'hectare'],
-      'bureau':      ['bureau', 'office', 'local', 'boutique', 'magasin', 'commerce'],
+      'bureau':      ['bureau', 'office'],
+      'local_commercial': ['local', 'localcommercial', 'boutique', 'magasin', 'commerce'],
       'entrepot':    ['entrepot', 'hangar', 'depot', 'stockage', 'usine'],
       'equipement':  ['equipement', 'materiel', 'machine', 'outil', 'engin'],
       'hotel':       ['hotel', 'motel', 'auberge', 'lodge', 'resort', 'hebergement'],
@@ -1062,6 +1065,9 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
   Widget _placeholderImage(PropertyModel p, double h) {
     final icons = {
+      PropertyCategory.chambre: Icons.bed_rounded,
+      PropertyCategory.studio: Icons.single_bed_rounded,
+      PropertyCategory.localCommercial: Icons.storefront_rounded,
       PropertyCategory.maison: Icons.home_rounded,
       PropertyCategory.appartement: Icons.apartment_rounded,
       PropertyCategory.terrain: Icons.landscape_rounded,

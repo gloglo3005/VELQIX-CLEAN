@@ -122,6 +122,9 @@ const _translations = <String, Map<String, String>>{
   'add_category':         {'fr': 'Catégorie',             'en': 'Category',           'es': 'Categoría',          'pt': 'Categoria',          'de': 'Kategorie',          'ar': 'الفئة'},
   'add_listing_type':     {'fr': 'Type d\'annonce',      'en': 'Listing type',       'es': 'Tipo de anuncio',    'pt': 'Tipo de anúncio',    'de': 'Anzeigentyp',        'ar': 'نوع الإعلان'},
   'add_cat_maison':       {'fr': 'Maison',                'en': 'House',              'es': 'Casa',               'pt': 'Casa',               'de': 'Haus',               'ar': 'منزل'},
+  'add_cat_chambre':      {'fr': 'Chambre', 'en': 'Room', 'es': 'Habitación', 'pt': 'Quarto', 'de': 'Zimmer', 'ar': 'غرفة'},
+  'add_cat_studio':       {'fr': 'Studio', 'en': 'Studio', 'es': 'Estudio', 'pt': 'Estúdio', 'de': 'Studio', 'ar': 'استوديو'},
+  'add_cat_local_commercial': {'fr': 'Local commercial', 'en': 'Commercial space', 'es': 'Local comercial', 'pt': 'Loja comercial', 'de': 'Gewerbefläche', 'ar': 'محل تجاري'},
   'add_cat_appartement':  {'fr': 'Appartement',           'en': 'Apartment',          'es': 'Apartamento',        'pt': 'Apartamento',        'de': 'Wohnung',            'ar': 'شقة'},
   'add_cat_terrain':      {'fr': 'Terrain',               'en': 'Land',               'es': 'Terreno',            'pt': 'Terreno',            'de': 'Grundstück',         'ar': 'أرض'},
   'add_cat_bureau':       {'fr': 'Bureau',                'en': 'Office',             'es': 'Oficina',            'pt': 'Escritório',         'de': 'Büro',               'ar': 'مكتب'},
@@ -150,7 +153,7 @@ const _translations = <String, Map<String, String>>{
   'add_field_rue':        {'fr': 'Rue / Quartier *',      'en': 'Street / District *','es': 'Calle / Barrio *',   'pt': 'Rua / Bairro *',    'de': 'Straße / Viertel *', 'ar': 'الشارع / الحي *'},
 
   // ── Widgets / Cards ──────────────────────────────────────────────────────
-  'card_featured':        {'fr': 'Vedette',               'en': 'Featured',           'es': 'Destacado',          'pt': 'Destaque',           'de': 'Highlight',          'ar': 'مميز'},
+  'card_featured':        {'fr': 'Mise en avant',         'en': 'Promoted',           'es': 'Promocionado',       'pt': 'Promovido',          'de': 'Beworben',           'ar': 'مُروَّج'},
   'card_per_day':         {'fr': '/jour',                 'en': '/day',               'es': '/día',               'pt': '/dia',               'de': '/Tag',               'ar': '/يوم'},
 
   // ── Property Detail ──────────────────────────────────────────────────────
@@ -308,6 +311,9 @@ const _translations = <String, Map<String, String>>{
   // ── Catégories home ──────────────────────────────────────────────────────
   'cat_all':          {'fr': 'Tous',          'en': 'All',           'es': 'Todos',         'pt': 'Todos',         'de': 'Alle',          'ar': 'الكل'},
   'cat_maisons':      {'fr': 'Maisons',       'en': 'Houses',        'es': 'Casas',         'pt': 'Casas',         'de': 'Häuser',        'ar': 'منازل'},
+  'cat_chambres':         {'fr': 'Chambres', 'en': 'Rooms', 'es': 'Habitaciones', 'pt': 'Quartos', 'de': 'Zimmer', 'ar': 'غرف'},
+  'cat_studios':          {'fr': 'Studios', 'en': 'Studios', 'es': 'Estudios', 'pt': 'Estúdios', 'de': 'Studios', 'ar': 'استوديوهات'},
+  'cat_locaux':           {'fr': 'Locaux commerciaux', 'en': 'Commercial spaces', 'es': 'Locales comerciales', 'pt': 'Lojas comerciais', 'de': 'Gewerbeflächen', 'ar': 'محلات تجارية'},
   'cat_voitures':     {'fr': 'Voitures',      'en': 'Cars',          'es': 'Coches',        'pt': 'Carros',        'de': 'Autos',         'ar': 'سيارات'},
   'cat_appartements': {'fr': 'Appartements',  'en': 'Apartments',    'es': 'Apartamentos',  'pt': 'Apartamentos',  'de': 'Wohnungen',     'ar': 'شقق'},
   'cat_equipements':  {'fr': 'Équipements',   'en': 'Equipment',     'es': 'Equipos',       'pt': 'Equipamentos',  'de': 'Ausstattung',   'ar': 'معدات'},
@@ -329,8 +335,8 @@ const _translations = <String, Map<String, String>>{
   // ── Premium features ─────────────────────────────────────────────────────
   'feat_badge':           {'fr': 'Badge Vendeur Premium',      'en': 'Premium Vendor Badge',      'es': 'Insignia Vendedor Premium',   'pt': 'Distintivo Vendedor Premium',  'de': 'Premium-Verkäufer-Abzeichen', 'ar': 'شارة البائع المميز'},
   'feat_badge_sub':       {'fr': 'Obtenez le badge doré sur votre profil', 'en': 'Get the golden badge on your profile', 'es': 'Obtén la insignia dorada en tu perfil', 'pt': 'Obtenha o distintivo dourado no seu perfil', 'de': 'Erhalten Sie das goldene Abzeichen in Ihrem Profil', 'ar': 'احصل على الشارة الذهبية في ملفك الشخصي'},
-  'feat_vedette':         {'fr': 'Annonces en vedette',        'en': 'Featured listings',         'es': 'Anuncios destacados',         'pt': 'Anúncios em destaque',         'de': 'Hervorgehobene Anzeigen',     'ar': 'إعلانات مميزة'},
-  'feat_vedette_sub':     {'fr': 'Vos biens apparaissent en premier', 'en': 'Your listings appear first', 'es': 'Tus bienes aparecen primero', 'pt': 'Seus imóveis aparecem primeiro', 'de': 'Ihre Objekte erscheinen zuerst', 'ar': 'تظهر عقاراتك أولاً'},
+  'feat_vedette':         {'fr': 'Annonces mises en avant',    'en': 'Promoted listings',         'es': 'Anuncios promocionados',      'pt': 'Anúncios promovidos',          'de': 'Beworbene Anzeigen',          'ar': 'إعلانات مُروَّجة'},
+  'feat_vedette_sub':     {'fr': 'Plus de visibilité, sans effet sur la vérification', 'en': 'More visibility, no effect on verification', 'es': 'Más visibilidad, sin efecto en la verificación', 'pt': 'Mais visibilidade, sem efeito na verificação', 'de': 'Mehr Sichtbarkeit, ohne Einfluss auf die Prüfung', 'ar': 'ظهور أكبر دون أي تأثير على التحقق'},
   'feat_photos':          {'fr': '30 photos par annonce',      'en': '30 photos per listing',     'es': '30 fotos por anuncio',        'pt': '30 fotos por anúncio',         'de': '30 Fotos pro Anzeige',        'ar': '30 صورة لكل إعلان'},
   'feat_photos_sub':      {'fr': 'vs 2 photos pour les comptes gratuits', 'en': 'vs 2 photos for free accounts', 'es': 'vs 2 fotos para cuentas gratuitas', 'pt': 'vs 2 fotos para contas gratuitas', 'de': 'vs. 2 Fotos für kostenlose Konten', 'ar': 'مقابل 2 صور للحسابات المجانية'},
   'feat_stats':           {'fr': 'Statistiques avancées',      'en': 'Advanced statistics',       'es': 'Estadísticas avanzadas',      'pt': 'Estatísticas avançadas',       'de': 'Erweiterte Statistiken',      'ar': 'إحصائيات متقدمة'},
@@ -339,8 +345,8 @@ const _translations = <String, Map<String, String>>{
   'feat_support_sub':     {'fr': 'Réponse garantie en moins de 2h', 'en': 'Response guaranteed within 2h', 'es': 'Respuesta garantizada en menos de 2h', 'pt': 'Resposta garantida em menos de 2h', 'de': 'Antwort garantiert innerhalb von 2h', 'ar': 'رد مضمون في أقل من ساعتين'},
   'feat_kyc':             {'fr': 'Vérification express KYC',  'en': 'Express KYC verification',  'es': 'Verificación KYC express',    'pt': 'Verificação KYC express',      'de': 'Express-KYC-Verifizierung',   'ar': 'التحقق السريع KYC'},
   'feat_kyc_sub':         {'fr': 'Validation en moins de 2h (vs 48h)', 'en': 'Validation in under 2h (vs 48h)', 'es': 'Validación en menos de 2h (vs 48h)', 'pt': 'Validação em menos de 2h (vs 48h)', 'de': 'Validierung unter 2h (vs. 48h)', 'ar': 'التحقق في أقل من ساعتين (مقابل 48 ساعة)'},
-  'feat_assurance':       {'fr': 'Assurance transactions',      'en': 'Transaction insurance',     'es': 'Seguro de transacciones',     'pt': 'Seguro de transações',         'de': 'Transaktionsversicherung',    'ar': 'تأمين المعاملات'},
-  'feat_assurance_sub':   {'fr': 'Protection contre les litiges', 'en': 'Protection against disputes', 'es': 'Protección contra disputas', 'pt': 'Proteção contra disputas',    'de': 'Schutz vor Streitigkeiten',   'ar': 'الحماية من النزاعات'},
+  'feat_assurance':       {'fr': 'Suivi des demandes',          'en': 'Request tracking',          'es': 'Seguimiento de solicitudes',  'pt': 'Acompanhamento de pedidos',    'de': 'Anfragen-Verfolgung',         'ar': 'متابعة الطلبات'},
+  'feat_assurance_sub':   {'fr': 'Suivez vos demandes de confirmation et de visite', 'en': 'Track your confirmation and visit requests', 'es': 'Sigue tus solicitudes de confirmación y visita', 'pt': 'Acompanhe seus pedidos de confirmação e visita', 'de': 'Verfolgen Sie Bestätigungs- und Besuchsanfragen', 'ar': 'تابع طلبات التأكيد والزيارة'},
   'feat_alertes':         {'fr': 'Alertes instantanées',        'en': 'Instant alerts',            'es': 'Alertas instantáneas',        'pt': 'Alertas instantâneos',         'de': 'Sofortige Benachrichtigungen','ar': 'تنبيهات فورية'},
   'feat_alertes_sub':     {'fr': "Notifié dès qu'un client s'intéresse", 'en': 'Notified as soon as a client shows interest', 'es': 'Notificado cuando un cliente se interesa', 'pt': 'Notificado quando um cliente se interessa', 'de': 'Benachrichtigt sobald ein Kunde Interesse zeigt', 'ar': 'إشعار فور اهتمام عميل'},
 

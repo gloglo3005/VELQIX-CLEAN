@@ -1,7 +1,7 @@
 // lib/screens/demarcheur_screen.dart
 // Interface démarcheur : voir les biens à vérifier, se rendre sur le terrain et
-// confirmer que le bien existe réellement. Une annonce vérifiée devient
-// « approuvée par VelQix ».
+// confirmer que le bien existe réellement. Une annonce vérifiée est marquée
+// « vérifiée sur le terrain » (avec la date et les limites du contrôle).
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -87,7 +87,7 @@ class _DemarcheurScreenState extends State<DemarcheurScreen> with SingleTickerPr
     );
     if (done == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Bien vérifié : l\'annonce est maintenant approuvée par VelQix.'),
+        content: Text('Bien vérifié : l\'annonce est maintenant marquée « vérifiée sur le terrain ».'),
         behavior: SnackBarBehavior.floating,
       ));
       _reloadAll();
@@ -306,8 +306,10 @@ class _VerifySheetState extends State<_VerifySheet> {
                 style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
             const SizedBox(height: 8),
             Text(
-              'En validant, vous certifiez vous être rendu sur place. L\'annonce deviendra '
-              '« approuvée par VelQix » : en cas de fraude, VelQix s\'en charge.',
+              'En validant, vous certifiez vous être rendu sur place. L\'annonce sera marquée '
+              '« vérifiée sur le terrain » avec la date de votre visite. Cette vérification '
+              'ne prouve pas la propriété et ne garantit pas la disponibilité future du bien : '
+              'indiquez clairement dans votre note ce que vous avez réellement contrôlé.',
               style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary),
             ),
             const SizedBox(height: 8),
