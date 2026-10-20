@@ -12,7 +12,7 @@ import 'legal_screen.dart';
 import 'auth_screens.dart';
 import 'my_listings_screen.dart';
 import 'favorites_screen.dart';
-import 'premium_screen.dart';
+import 'plans_screen.dart';
 import 'my_services_screen.dart';
 import 'availability_requests_screen.dart';
 import 'admin_dashboard_screen.dart';
@@ -515,7 +515,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(tr('profile_support'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
                       const SizedBox(height: 12),
                       _MenuGroup(items: [
-                        _MenuItem(icon: Icons.workspace_premium_rounded, label: tr('profile_premium'), onTap: () => _navigateTo(const PremiumScreen()), badge: 'Nouveau', badgeColor: AppTheme.accent),
+                        _MenuItem(icon: Icons.workspace_premium_rounded, label: tr('profile_premium'), onTap: () => _navigateTo(const PlansScreen()), badge: 'Nouveau', badgeColor: AppTheme.accent),
                         if (user.role == 'admin')
                           _MenuItem(icon: Icons.admin_panel_settings_outlined, label: tr('profile_admin'), onTap: () => _navigateTo(const AdminDashboardScreen())),
                         _MenuItem(icon: Icons.help_outline_rounded, label: tr('profile_help'), onTap: () => _navigateTo(const SupportScreen())),

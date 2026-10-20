@@ -9,7 +9,7 @@ import '../services/app_translations.dart';
 import '../widgets/widgets.dart';
 import 'property_detail_screen.dart';
 import 'notifications_screen.dart';
-import 'premium_screen.dart';
+import 'plans_screen.dart';
 import 'add_listing_screen.dart';
 import 'explore_screen.dart';
 import 'staff_directory_screen.dart';
@@ -622,11 +622,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _BannerSlide(icon: Icons.verified_user_rounded,
         title: tr('banner3_title'), subtitle: tr('banner3_sub'),
         gradient: const [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()))),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.star_rounded,
         title: tr('banner4_title'), subtitle: tr('banner4_sub'),
         gradient: const [Color(0xFFE65100), Color(0xFFFF6F00)],
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()))),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.add_circle_rounded,
         title: tr('banner5_title'), subtitle: tr('banner5_sub'),
         gradient: const [Color(0xFF6A1B9A), Color(0xFF8E24AA)],

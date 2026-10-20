@@ -121,12 +121,6 @@ class _PlansScreenState extends State<PlansScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(padding: const EdgeInsets.all(16), children: [
-            Text(
-              'Le Freemium est gratuit et durable. Le Premium fait gagner du temps et de la visibilité : '
-              'il n\'est jamais nécessaire pour publier une simple annonce.',
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 14),
             SegmentedButton<String>(
               segments: [
                 for (final a in PlanAudience.all)
@@ -153,22 +147,6 @@ class _PlansScreenState extends State<PlansScreen> {
                 style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             _matrixTable(),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.warning.withOpacity(0.35)),
-              ),
-              child: Text(
-                'Important : le Premium ne rend pas un bien « vérifié ». Une annonce n\'est « approuvée par '
-                'VelQix » que si une vérification terrain a réellement été effectuée et validée. '
-                'Les vérifications, visites et entretiens sont des services payants, facturés à la prestation, '
-                'y compris pour les abonnés.',
-                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, height: 1.45),
-              ),
-            ),
             const SizedBox(height: 30),
           ]),
         ),
