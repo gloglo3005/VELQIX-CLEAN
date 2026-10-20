@@ -154,8 +154,9 @@ class PropertyModel {
   final DateTime? updatedAt;
 
   // ── Approbation VelQix ───────────────────────────────────────────────────
-  // Un bien est « approuvé par VelQix » si son propriétaire est Premium OU si
-  // un démarcheur VelQix l'a vérifié sur le terrain. Sinon : non approuvé.
+  // Un bien est « approuvé par VelQix » UNIQUEMENT si la vérification terrain a
+  // réellement été effectuée et validée (cahier des charges : le Premium ne
+  // signifie pas « bien automatiquement vérifié »). Sinon : non approuvé.
   final bool fieldVerified;            // vérifié sur place par un démarcheur
   final DateTime? fieldVerifiedAt;
   final String? fieldVerifiedByName;   // nom du démarcheur
@@ -195,9 +196,10 @@ class PropertyModel {
     this.verificationRequested = false,
   });
 
-  /// Approuvé par VelQix (Premium ou vérifié terrain) — VelQix prend en charge
-  /// les cas de fraude. Sinon VelQix n'intervient pas.
-  bool get isVelqixApproved => fieldVerified || proprietaire.isPremium;
+  /// Approuvé par VelQix = vérifié sur le terrain ET validé. VelQix prend alors en
+  /// charge les cas de fraude. Sinon VelQix n'intervient pas (même si le
+  /// propriétaire est Premium).
+  bool get isVelqixApproved => fieldVerified;
 
   /// Statut normalisé : accepte les variantes (pending / approved / rejected…).
   static String _normalizeStatus(dynamic raw) {

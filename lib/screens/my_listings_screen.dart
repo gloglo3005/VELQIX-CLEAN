@@ -334,7 +334,7 @@ class _ListingManageCardState extends State<_ListingManageCard> {
             style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         const SizedBox(height: 2),
         Text(
-          'Pour rassurer les acheteurs : passez Premium, ou faites vérifier le bien sur place par un démarcheur VelQix (service payant).',
+          'Pour rassurer les acheteurs, faites vérifier le bien sur place par un démarcheur VelQix (service payant). Le Premium seul ne vérifie pas un bien.',
           style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 8),

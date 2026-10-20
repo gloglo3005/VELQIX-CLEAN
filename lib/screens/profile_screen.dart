@@ -14,6 +14,7 @@ import 'my_listings_screen.dart';
 import 'favorites_screen.dart';
 import 'premium_screen.dart';
 import 'my_services_screen.dart';
+import 'spaces_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'notifications_screen.dart';
 import 'support_screen.dart';
@@ -506,6 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _MenuItem(icon: Icons.home_outlined, label: tr('profile_listings'), onTap: () => _navigateTo(const MyListingsScreen())),
                         _MenuItem(icon: Icons.favorite_outline_rounded, label: tr('profile_favorites'), onTap: () => _navigateTo(const FavoritesScreen())),
                         _MenuItem(icon: Icons.fact_check_outlined, label: 'Mes demandes de services', onTap: () => _navigateTo(const MyServicesScreen())),
+                        _MenuItem(icon: Icons.layers_rounded, label: 'Mes espaces (Pro, Business)', onTap: () => _navigateTo(const SpacesScreen())),
                         _MenuItem(icon: Icons.notifications_outlined, label: tr('profile_notifs'), onTap: () => _navigateTo(const NotificationsScreen())),
                       ]),
                       const SizedBox(height: 16),

@@ -1,7 +1,8 @@
 // lib/widgets/trust_widgets.dart
 // Les 2 types d'annonces, annoncés clairement à l'utilisateur :
-//  • APPROUVÉE par VelQix : propriétaire Premium, ou bien vérifié sur le terrain
-//    par un démarcheur VelQix. En cas de fraude, VelQix s'en charge.
+//  • APPROUVÉE par VelQix : bien vérifié sur le terrain par un démarcheur VelQix
+//    (vérification réellement effectuée et validée). En cas de fraude, VelQix s'en charge.
+//    Le Premium ne suffit PAS : il ne rend pas un bien « vérifié ».
 //  • NON APPROUVÉE : bien non vérifié. En cas de fraude, VelQix ne s'en mêle pas.
 
 import 'package:flutter/material.dart';
@@ -21,15 +22,15 @@ String trustApprovedTitle() => _t('Annonce approuvée par VelQix', 'Listing appr
 String trustUnapprovedTitle() => _t('Annonce non approuvée', 'Listing not approved');
 
 String trustApprovedRule() => _t(
-    "Le propriétaire est Premium, ou un démarcheur VelQix s'est rendu sur le terrain et a confirmé que le bien existe réellement. En cas de fraude, VelQix s'en charge.",
-    'The owner is Premium, or a VelQix agent visited the site and confirmed the property really exists. In case of fraud, VelQix takes care of it.');
+    "Un démarcheur VelQix s'est rendu sur le terrain et a confirmé que le bien existe réellement. En cas de fraude, VelQix s'en charge.",
+    'A VelQix agent visited the site and confirmed the property really exists. In case of fraud, VelQix takes care of it.');
 
 String trustUnapprovedRule() => _t(
-    "Le bien n'a pas été vérifié par VelQix. En cas de fraude, VelQix ne s'en mêle pas.",
-    'The property has not been verified by VelQix. In case of fraud, VelQix does not get involved.');
+    "Le bien n'a pas été vérifié sur le terrain par VelQix (un abonnement Premium ne vaut pas vérification). En cas de fraude, VelQix ne s'en mêle pas.",
+    'The property has not been verified on site by VelQix (a Premium subscription is not a verification). In case of fraud, VelQix does not get involved.');
 
 String _approvalReason(PropertyModel p) {
-  if (p.fieldVerified) {
+  {
     final who = (p.fieldVerifiedByName ?? '').trim();
     final d = p.fieldVerifiedAt;
     final date = d == null
@@ -41,7 +42,6 @@ String _approvalReason(PropertyModel p) {
         : _t("Vérifié sur le terrain par le démarcheur $who$date.",
             'Verified on site by agent $who$date.');
   }
-  return _t('Le propriétaire est membre Premium VelQix.', 'The owner is a VelQix Premium member.');
 }
 
 // ─── Badge compact (cartes, listes) ──────────────────────────────────────────

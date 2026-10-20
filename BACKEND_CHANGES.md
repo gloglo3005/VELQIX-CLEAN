@@ -114,16 +114,17 @@ Si le serveur ne renvoie pas `videoUrl` après la création, l'app affiche maint
 # Annonces « approuvées par VelQix » vs « non approuvées »
 
 Règle métier :
-- **Approuvée par VelQix** = le propriétaire est **Premium** OU un **démarcheur VelQix** a vérifié le bien
+- **Approuvée par VelQix** = un **démarcheur VelQix** a vérifié le bien
   sur le terrain. En cas de fraude, VelQix s'en charge.
 - **Non approuvée** = tout le reste. En cas de fraude, VelQix ne s'en mêle pas.
 (À ne pas confondre avec `status` : `en_attente / approuve / rejete` = modération admin avant publication.)
 
-L'app calcule `isVelqixApproved = fieldVerified || proprietaire.isPremium`.
+**Règle du cahier des charges : le Premium ne signifie PAS « bien vérifié ».** L'app calcule
+`isVelqixApproved = fieldVerified` (vérification terrain réellement effectuée et validée).
 
 ## Champs à renvoyer dans toutes les réponses d'annonces
 `fieldVerified` (bool), `fieldVerifiedAt` (ISO), `fieldVerifiedByName` (string, nom du démarcheur),
-`verificationRequested` (bool). `proprietaire.isPremium` doit être présent et à jour (Premium expiré = plus approuvé).
+`verificationRequested` (bool).
 
 ## Routes
 | Route | Qui | Rôle |
@@ -226,3 +227,49 @@ Chaque action de ce tableau qui modifie des tarifs ou de l'argent doit écrire d
 ## Rôles
 Nouveaux droits dans le catalogue : `missions.manage`, `pricing.manage`, `finance.view`, `finance.payouts`,
 `audit.view`. Un démarcheur a déjà `properties.verify_field` ; un agent d'entretien n'a besoin que de `chat.use`.
+
+---
+
+# Phase 2 du cahier des charges : formules, espaces Pro / Business
+
+> **Règle mise à jour** : le **Premium ne rend PAS un bien « vérifié »**. Seule une vérification terrain
+> réellement effectuée et validée donne `fieldVerified = true` (voir plus haut). Ne jamais déduire
+> « approuvée » du statut Premium du propriétaire.
+
+## Formules (Freemium / Premium par profil)
+| Route | Rôle |
+|---|---|
+| `GET /plans` (public) | `[ { id, audience: particulier\|professionnel\|entreprise, name, tagline, premium, priceMonthly?, price6Months?, price1Year? } ]`. `premium: true` sans `priceMonthly` = « sur devis ». Valeurs de lancement : Particulier Plus 2 000 F/mois ; Professionnel Premium 2 000 F/mois, 6 mois 11 000 F, 1 an 20 000 F ; Entreprise Premium sur devis. **Pas de formule 5 ans.** Les plafonds (annonces, collaborateurs, crédits de mise en avant) viennent de `/admin/pricing`. |
+| `POST /subscriptions/checkout` | `{ planId, period: month\|6months\|year }` → `{ checkoutUrl }` (le prix est lu côté serveur, jamais dans la requête) |
+| `POST /subscriptions/quote-request` | `{ planId, message }` (Entreprise Premium) |
+| `GET /subscriptions/me` | `{ planName, status: actif\|expire\|aucun, expiresAt }` |
+| `GET /me/invoices` | `[ { id, label, date, amount, url? } ]` |
+
+## Profil ≠ rôles : plusieurs espaces pour un même compte
+| Route | Rôle |
+|---|---|
+| `GET /me/spaces` | `{ pro: bool, business: bool, businessName?, businessRole? }` |
+| `POST /me/spaces/pro` | `{ activity: agent_immobilier\|demarcheur_independant\|commercial\|vendeur\|autre }` (gratuit, immédiat) |
+| `POST /me/spaces/business` | `{ name }` : crée l'entreprise, le demandeur en devient `administrateur` |
+
+## Velqix Pro (accès : `spaces.pro`)
+| Route | Rôle |
+|---|---|
+| `GET /pro/dashboard` | `{ activeListings, views, contacts, pendingRequests, visitsPlanned, verified }` |
+| `GET /pro/leads` | `[ { id, name, phone, propertyTitle, message, status, createdAt } ]` |
+| `PUT /pro/leads/:id` | `{ status: nouveau\|contacte\|visite\|conclu\|perdu }` |
+
+## Velqix Business (rôles : administrateur, gestionnaire, commercial, comptable)
+| Route | Qui |
+|---|---|
+| `GET /business/overview` | tous : `{ listings, members, views, contacts, verifiedProperties, pendingVerifications }` |
+| `GET /business/properties` | administrateur, gestionnaire (tous) ; commercial (ses annonces attribuées) : `[ { id, titre, assignedTo, views, verified } ]` |
+| `PUT /business/properties/:id/assign` | administrateur, gestionnaire : `{ userId }` |
+| `GET /business/team` | administrateur, gestionnaire |
+| `POST /business/team` | administrateur : `{ email, role }` (compte VelQix existant) |
+| `PUT /business/team/:id` / `DELETE /business/team/:id` | administrateur |
+| `GET /business/reports?period=7d\|30d\|90d` | administrateur, gestionnaire, comptable : `{ listings, views, contacts, visits, verificationsDone, verifications:[{title,date,status}] }` |
+| `GET /business/reports/export?period=&format=csv` | idem : `{ url }` |
+
+Rappel : l'app masque onglets et boutons selon le rôle, mais **le serveur doit refuser** toute route
+interdite au rôle de l'appelant. L'accès aux fonctions financières reste réservé aux personnes autorisées.

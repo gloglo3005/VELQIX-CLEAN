@@ -12,15 +12,19 @@ Principe retenu : **améliorer l'existant sans changer les menus ni les fonction
 | 4 — Exemple de marge d'une vérification | Reproduit dans l'admin (3 500 F → contribution VelQix ≈ 1 395 F, ≈ 40 %) |
 | 7 — Contrat technique | `BACKEND_CHANGES.md` : tables, statuts, routes, règles de sécurité financière |
 
+## Fait (phase 2)
+| Section du cahier | Réalisation |
+|---|---|
+| Règle importante | Le Premium ne signifie plus « bien vérifié » : une annonce n'est « approuvée par VelQix » que si la vérification terrain a été effectuée et validée (badges, avertissement avant le chat, textes, documentation) |
+| 2 / 3 — Freemium / Premium, grille tarifaire | Écran « Formules et tarifs » (lien depuis Premium et « Mes espaces ») : particuliers, professionnels, entreprises ; 6 mois 11 000 F et 1 an 20 000 F avec économie affichée ; Entreprise Premium sur devis ; matrice des fonctionnalités ; pas de formule 5 ans |
+| 1 / 5 — Profil ≠ rôles | « Mes espaces » (menu Profil) : un compte, plusieurs espaces (personnel, Velqix Pro, Velqix Business) |
+| 5C — Velqix Pro | Tableau de bord, prospects (statuts : nouveau → contacté → visite → conclu / perdu), raccourcis publier / modifier / archiver / vérifications, abonnement et factures |
+| 5B — Velqix Business | Vue d'ensemble, portefeuille avec attribution aux collaborateurs, équipe et rôles (administrateur, gestionnaire, commercial, comptable), rapports avec export, historique des vérifications, factures ; onglets selon le rôle |
+
 ## À faire (phases suivantes)
-1. **Offres Freemium / Premium par profil** (grille : Particulier Plus, Professionnel Premium, Entreprise sur
-   devis ; prépayé 6 mois 11 000 F et 1 an 20 000 F) : nécessite `plans` / `subscriptions` côté API ; l'écran
-   Premium actuel ne gère qu'une formule (2 000 F / 30 jours).
-2. **Espace Entreprise** : portefeuille de biens, équipe et rôles (administrateur, gestionnaire, commercial,
-   comptable), suivi des prospects, rapports et factures exportables.
-3. **Espace Professionnel** : tableau de bord prospects / visites, statistiques de consultation détaillées,
-   archivage des annonces.
-4. **Séparer profil et rôles** (une même personne : propriétaire ET professionnel, plusieurs espaces sans
-   plusieurs comptes).
-5. Mise en avant payante à l'unité / crédits, alertes personnalisées, remise Premium appliquée aux prix
-   affichés, coordonnées GPS dans le rapport terrain, indicateurs mensuels dans le tableau de bord admin.
+1. Appliquer la remise Premium sur le prix des prestations affiché au client (la valeur est configurable côté admin).
+2. Mise en avant payante à l'unité / crédits de visibilité, alertes personnalisées Premium.
+3. Indicateurs mensuels dans le tableau de bord admin (conversion Premium, coût réel d'une vérification,
+   marge par mission, délais de prise en charge et de paiement, missions annulées ou contestées).
+4. Coordonnées GPS dans le rapport terrain.
+5. Choix du type de profil (Particulier / Professionnel / Entreprise) dès l'inscription.
