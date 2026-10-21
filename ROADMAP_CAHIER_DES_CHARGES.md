@@ -14,7 +14,7 @@ Légende : ✅ fait côté app · 🟡 app prête, **dépend du backend** (voir 
 | §5.3 / §7.3 | Mises à jour simples côté annonceur | 🟡 | « Toujours disponible », « Loué », « Vendu » sur la fiche (pas de relance manuelle imposée) |
 | SIG-01 / §7.5 | Signalement d'une annonce (6 motifs) | 🟡 | Feuille « Signaler l'annonce » ; pas de sanction automatique sur signalement isolé (règle serveur) |
 | §8.1 | Chambres, studios, locaux commerciaux | 🟡 | Ajoutés (publication, filtres accueil, assistant) ; enum Prisma à étendre |
-| §4.2 | Lancement centré sur l'immobilier | ✅ | Véhicules non proposés à la création (annonces existantes toujours lisibles/modifiables) |
+| §4.2 | Lancement centré sur l'immobilier | ✅ | Type « Mobilier » (véhicules) conservé à la publication, à la demande du fondateur |
 | SIG-02, ADM-01/02 | Traitement admin des signalements | ⬜ | Onglet admin « Signalements » à créer quand la route `/admin/reports` existera |
 | NOT-01 | Notifications de demandes / changements de statut | ⬜ | Envoi par le backend (FCM déjà branché côté app) |
 | §7.4 | Expiration / réduction de visibilité | ⬜ | Tâche planifiée serveur ; délais configurables dans l'admin (§15.2) |

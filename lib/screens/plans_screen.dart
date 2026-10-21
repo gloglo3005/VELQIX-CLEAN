@@ -117,19 +117,13 @@ class _PlansScreenState extends State<PlansScreen> {
         title: Text('Formules et tarifs',
             style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
       ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: ListView(padding: const EdgeInsets.all(16), children: [
-            // En-tête VelQix Premium (dégradé bleu + médaille)
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(children: [
+      body: ListView(children: [
+        // En-tête VelQix Premium : pleine largeur (dégradé bleu + médaille)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+          decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+          child: Column(children: [
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
@@ -140,9 +134,16 @@ class _PlansScreenState extends State<PlansScreen> {
                     style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
                 Text(tr('prem_subtitle'),
                     style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.8))),
-              ]),
-            ),
-            const SizedBox(height: 16),
+          ]),
+        ),
+        // Contenu centré et limité en largeur pour le web
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             SegmentedButton<String>(
               segments: [
                 for (final a in PlanAudience.all)
@@ -170,9 +171,11 @@ class _PlansScreenState extends State<PlansScreen> {
             const SizedBox(height: 8),
             _matrixTable(),
             const SizedBox(height: 30),
-          ]),
+              ]),
+            ),
+          ),
         ),
-      ),
+      ]),
     );
   }
 
