@@ -4,6 +4,7 @@
 // du temps et de la visibilité, mais ne rend PAS un bien « vérifié ».
 
 import 'package:flutter/material.dart';
+import '../services/app_translations.dart' show tr;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/plan_service.dart';
@@ -121,6 +122,27 @@ class _PlansScreenState extends State<PlansScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(padding: const EdgeInsets.all(16), children: [
+            // En-tête VelQix Premium (dégradé bleu + médaille)
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+                  child: const Icon(Icons.workspace_premium_rounded, size: 50, color: Colors.white),
+                ),
+                const SizedBox(height: 14),
+                Text(tr('prem_title'),
+                    style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
+                Text(tr('prem_subtitle'),
+                    style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.8))),
+              ]),
+            ),
+            const SizedBox(height: 16),
             SegmentedButton<String>(
               segments: [
                 for (final a in PlanAudience.all)
