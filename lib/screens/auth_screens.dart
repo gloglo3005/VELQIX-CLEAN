@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../main.dart' show localeNotifier, countryCodeToLocale;
 import '../widgets/widgets.dart';
-import '../widgets/video_brand_background.dart';
+import '../widgets/image_brand_background.dart';
 import 'role_home.dart';
 import 'legal_screen.dart';
 import '../services/auth_service.dart';
@@ -477,7 +477,7 @@ class AuthBrandPanel extends StatelessWidget {
           ]),
         );
 
-    return VideoBrandBackground(
+    return ImageBrandBackground(
       child: Padding(
         padding: const EdgeInsets.all(48),
         child: SafeArea(

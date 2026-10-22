@@ -639,18 +639,21 @@ class _HomeScreenState extends State<HomeScreen> {
     return ValueListenableBuilder(
       valueListenable: userStateNotifier,
       builder: (context, _, __) {
-    final featured = _serverProps
-        .where((p) => p.isFeatured).toList();
     final results = _searchResults;
 
     // « Les plus populaires » (web) / « Coups de cœur » (mobile) : biens
     // immobiliers disponibles les plus consultés, hors annonces mises en avant
     // (affichées dans leur propre section).
-    final popular = _serverProps
-        .where((p) => p.type == PropertyType.immobilier && p.isAvailable && !p.isFeatured)
-        .toList()
+    // Les annonces en vedette (mises en avant) s'affichent ici. S'il n'y en a
+    // pas encore, on retombe sur les biens les plus consultés.
+    final immoDispo = _serverProps
+        .where((p) => p.type == PropertyType.immobilier && p.isAvailable)
+        .toList();
+    final vedettes = immoDispo.where((p) => p.isFeatured).toList()
       ..sort((a, b) => b.vues.compareTo(a.vues));
-    final popularTop = popular.take(8).toList();
+    final populaires = immoDispo.toList()
+      ..sort((a, b) => b.vues.compareTo(a.vues));
+    final popularTop = (vedettes.isNotEmpty ? vedettes : populaires).take(8).toList();
 
     // ✅ Banières recalculées à chaque build → tr() utilise la locale courante
     final banners = [
@@ -676,21 +679,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen()))),
     ];
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-
-            // ── HEADER ──────────────────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    Row(
+    // En-tête (logo, connexion, pays, notifications) : posé par-dessus le hero
+    final headerRow = Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Logo Velqix
@@ -705,15 +695,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                     fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.primary)),
                           ),
                         ),
-                        if (MediaQuery.of(context).size.width >= 900)
-                          Expanded(child: Center(child: _buildWebNav(context)))
-                        else
-                          const Spacer(),
+                        const Spacer(),
                         if (MediaQuery.of(context).size.width >= 900 && !AuthService.instance.isLoggedIn) ...[
                           TextButton(
                             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
                             child: Text(tr('hero_nav_login'),
-                                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)),
                           ),
                           const SizedBox(width: 6),
                           ElevatedButton(
@@ -828,13 +815,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
 
                       ],
-                    ),
+                    );
 
-                    const SizedBox(height: 18),
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        top: false, // le hero couvre le haut de l'écran (jusqu'au logo)
+        child: CustomScrollView(
+          slivers: [
 
-                    // ── HERO : image de fond + accroche (web et mobile) ─────
-                    _buildHero(context),
-                    const SizedBox(height: 18),
+            // ── HERO plein cadre (en-tête par-dessus) + contenu ─────────────
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHero(context, header: headerRow),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
 
                     // ── BANNIÈRES DÉFILANTES CLIQUABLES ──────────────────────
                     SizedBox(
@@ -888,8 +888,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ]),
                     ],
                     const SizedBox(height: 20),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -1043,53 +1045,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // ── Annonces vedettes (uniquement si la liste n'est pas vide) ──
-              if (featured.isNotEmpty) SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SectionHeader(
-                        title: tr('home_featured'),
-                        actionLabel: tr('home_see_all'),
-                        onAction: () {},
-                      ),
-                    ),
-                    const SizedBox(height: 14),   // ← espacement correct
-                    if (MediaQuery.of(context).size.width >= 900)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Wrap(
-                          spacing: 18, runSpacing: 18,
-                          children: [
-                            for (final p in featured.take(8))
-                              SizedBox(
-                                width: 260, height: 345,
-                                child: PropertyCard(property: p, onTap: () => _openDetail(p)),
-                              ),
-                          ],
-                        ),
-                      )
-                    else
-                    SizedBox(
-                      height: 345,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: featured.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 14),
-                        itemBuilder: (_, i) => SizedBox(
-                          width: 220,
-                          child: PropertyCard(property: featured[i], onTap: () => _openDetail(featured[i])),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),   // ← espace avant la section suivante
-                  ],
-                ),
-              ),
-
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1229,26 +1184,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );   // ← ferme ValueListenableBuilder
   }
 
-  // ─── Menu web (maquette) : Accueil · Logements · À propos · Contact ───────
-  Widget _buildWebNav(BuildContext context) {
-    Widget link(String label, VoidCallback? onTap, {bool active = false}) => TextButton(
-          onPressed: onTap,
-          child: Text(label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active ? AppTheme.primary : AppTheme.textPrimary,
-              )),
-        );
-    void go(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      link(tr('hero_nav_home'), null, active: true),
-      link(tr('hero_nav_listings'), () => go(const ExploreScreen())),
-      link(tr('hero_nav_about'), () => go(const SupportScreen())),
-      link(tr('hero_nav_contact'), () => go(const SupportScreen())),
-    ]);
-  }
-
   // ─── Hero : image de fond, accroche et recherche en 3 champs ──────────────
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1600';
@@ -1277,8 +1212,12 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  Widget _buildHero(BuildContext context) {
+  Widget _buildHero(BuildContext context, {Widget? header}) {
     final wide = MediaQuery.of(context).size.width >= 900;
+    // Hauteur réservée à l'en-tête posé sur l'image (marge haute + logo + respiration)
+    final topInset = MediaQuery.of(context).padding.top;
+    final logoH = wide ? 64.0 : 52.0;
+    final headerSpace = header == null ? 0.0 : topInset + 16 + logoH + (wide ? 36 : 20);
     const ink = Color(0xFF1F2937);
     const hintColor = Color(0xFF9CA3AF);
     final fieldStyle = GoogleFonts.poppins(fontSize: 13, color: ink);
@@ -1400,7 +1339,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final titleSize = wide ? 46.0 : 26.0;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       child: Stack(children: [
         Positioned.fill(
           child: DecoratedBox(
@@ -1423,7 +1362,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(wide ? 40 : 18, wide ? 56 : 28, wide ? 40 : 18, wide ? 40 : 20),
+          padding: EdgeInsets.fromLTRB(wide ? 40 : 18, headerSpace + (header == null ? (wide ? 56 : 28) : 0), wide ? 40 : 18, wide ? 40 : 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: wide ? 640 : 340),
@@ -1453,6 +1392,11 @@ class _HomeScreenState extends State<HomeScreen> {
             searchCard,
           ]),
         ),
+        if (header != null)
+          Positioned(
+            top: topInset + 16, left: 20, right: 20,
+            child: header,
+          ),
       ]),
     );
   }
