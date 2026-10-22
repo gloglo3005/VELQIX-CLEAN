@@ -613,30 +613,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final banners = [
       _BannerSlide(icon: Icons.home_work_rounded,
         title: tr('banner1_title'), subtitle: tr('banner1_sub'),
-        gradient: const [Color(0xFF0D47A1), Color(0xFF1976D2)],
+        gradient: const [Color(0xFF0F5132), Color(0xFF1A6B45)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.directions_car_rounded,
         title: tr('banner2_title'), subtitle: tr('banner2_sub'),
-        gradient: const [Color(0xFF0A237A), Color(0xFF1565C0)],
+        gradient: const [Color(0xFF0A3B24), Color(0xFF14603D)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.verified_user_rounded,
         title: tr('banner3_title'), subtitle: tr('banner3_sub'),
-        gradient: const [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+        gradient: const [Color(0xFF1F2937), Color(0xFF374151)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.star_rounded,
         title: tr('banner4_title'), subtitle: tr('banner4_sub'),
-        gradient: const [Color(0xFFE65100), Color(0xFFFF6F00)],
+        gradient: const [Color(0xFFB8932A), Color(0xFFD4AF37)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.add_circle_rounded,
         title: tr('banner5_title'), subtitle: tr('banner5_sub'),
-        gradient: const [Color(0xFF6A1B9A), Color(0xFF8E24AA)],
+        gradient: const [Color(0xFF0F5132), Color(0xFFB8932A)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen()))),
     ];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: CustomScrollView(
           slivers: [
 
             // ── HEADER ──────────────────────────────────────────────────────
@@ -679,13 +682,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Nom bicolore
                         RichText(
                           text: TextSpan(children: [
-                            TextSpan(text: 'VEL', style: GoogleFonts.poppins(
-                              fontSize: 24, fontWeight: FontWeight.w800,
-                              color: AppTheme.primary, letterSpacing: -0.5,
+                            TextSpan(text: 'Vel', style: GoogleFonts.poppins(
+                              fontSize: 24, fontWeight: FontWeight.w700,
+                              color: AppTheme.isDark ? AppTheme.ivory : AppTheme.primary, letterSpacing: -0.5,
                             )),
-                            TextSpan(text: 'QIX', style: GoogleFonts.poppins(
-                              fontSize: 24, fontWeight: FontWeight.w800,
-                              color: AppTheme.accent, letterSpacing: -0.5,
+                            TextSpan(text: 'qix', style: GoogleFonts.poppins(
+                              fontSize: 24, fontWeight: FontWeight.w700,
+                              color: AppTheme.isDark ? AppTheme.accent : AppTheme.primary, letterSpacing: -0.5,
                             )),
                           ]),
                         ),
@@ -1193,8 +1196,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           childCount: _filteredProps.length,
                         ),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2, crossAxisSpacing: 14,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: MediaQuery.of(context).size.width >= 1100
+                              ? 4
+                              : MediaQuery.of(context).size.width >= 700 ? 3 : 2,
+                          crossAxisSpacing: 14,
                           mainAxisSpacing: 14, mainAxisExtent: 310,
                         ),
                       ),
@@ -1203,6 +1209,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           ],
+        ),
+          ),
         ),
       ),
     );

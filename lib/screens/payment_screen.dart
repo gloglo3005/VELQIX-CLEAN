@@ -320,7 +320,7 @@ class _PremiumSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF6F00), Color(0xFFFFB300)],
+          colors: [Color(0xFFD4AF37), Color(0xFFE6C65C)],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
@@ -379,10 +379,10 @@ class _AcceptedMethodsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final methods = [
-      {'label': 'Flooz',    'color': const Color(0xFF0D47A1), 'icon': Icons.phone_android_rounded},
+      {'label': 'Flooz',    'color': const Color(0xFF0F5132), 'icon': Icons.phone_android_rounded},
       {'label': 'T-Money',  'color': const Color(0xFFE53935), 'icon': Icons.phone_android_rounded},
-      {'label': 'MTN MoMo', 'color': const Color(0xFFFFB300), 'icon': Icons.phone_android_rounded},
-      {'label': 'Carte',    'color': const Color(0xFF1976D2), 'icon': Icons.credit_card_rounded},
+      {'label': 'MTN MoMo', 'color': const Color(0xFFE6C65C), 'icon': Icons.phone_android_rounded},
+      {'label': 'Carte',    'color': const Color(0xFF1A6B45), 'icon': Icons.credit_card_rounded},
     ];
 
     return Wrap(
