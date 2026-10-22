@@ -135,9 +135,9 @@ class _BackgroundPainter extends CustomPainter {
       );
     }
 
-    orb(0.15, 0.20, 0.65, 1, 0.0, const Color(0xFF7C4DFF)); // violet du logo
+    orb(0.15, 0.20, 0.65, 1, 0.0, const Color(0xFF0F5132)); // violet du logo
     orb(0.90, 0.35, 0.55, 2, 1.7, AppTheme.accent);
-    orb(0.35, 0.95, 0.70, 1, 3.1, const Color(0xFF29B6F6));
+    orb(0.35, 0.95, 0.70, 1, 3.1, const Color(0xFFD4AF37));
   }
 
   @override

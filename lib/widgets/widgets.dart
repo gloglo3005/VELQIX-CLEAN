@@ -320,7 +320,7 @@ class _TypeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isVente ? AppTheme.success : AppTheme.info;
+    final color = isVente ? const Color(0xFFB8922A) : AppTheme.primary;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: small ? 2 : 4),
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),

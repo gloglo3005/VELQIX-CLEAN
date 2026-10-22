@@ -664,7 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.verified_user_rounded,
         title: tr('banner3_title'), subtitle: tr('banner3_sub'),
-        gradient: const [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+        gradient: const [Color(0xFF0A3622), Color(0xFF1B7A4E)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.star_rounded,
         title: tr('banner4_title'), subtitle: tr('banner4_sub'),
@@ -1405,8 +1405,11 @@ class _HomeScreenState extends State<HomeScreen> {
         Positioned.fill(
           child: DecoratedBox(
             decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-            child: Image.network(_heroImageUrl, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            // Photo de la maquette : déposez `assets/images/hero.jpg` pour
+            // l'utiliser ; à défaut, image en ligne, puis dégradé vert.
+            child: Image.asset('assets/images/hero.jpg', fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Image.network(_heroImageUrl, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink())),
           ),
         ),
         const Positioned.fill(

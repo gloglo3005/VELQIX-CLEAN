@@ -382,7 +382,7 @@ class _AcceptedMethodsRow extends StatelessWidget {
       {'label': 'Flooz',    'color': const Color(0xFF0D47A1), 'icon': Icons.phone_android_rounded},
       {'label': 'T-Money',  'color': const Color(0xFFE53935), 'icon': Icons.phone_android_rounded},
       {'label': 'MTN MoMo', 'color': const Color(0xFFFFB300), 'icon': Icons.phone_android_rounded},
-      {'label': 'Carte',    'color': const Color(0xFF1976D2), 'icon': Icons.credit_card_rounded},
+      {'label': 'Carte',    'color': const Color(0xFF0F5132), 'icon': Icons.credit_card_rounded},
     ];
 
     return Wrap(

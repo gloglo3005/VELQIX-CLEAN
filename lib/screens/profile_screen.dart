@@ -432,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Text(displayName, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white)),
                               if (user.isVerified) ...[
                                 const SizedBox(width: 6),
-                                const Icon(Icons.verified_rounded, size: 18, color: Colors.lightBlueAccent),
+                                const Icon(Icons.verified_rounded, size: 18, color: AppTheme.accent),
                               ],
                             ],
                           ),

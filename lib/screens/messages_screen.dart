@@ -1094,7 +1094,7 @@ class _ChatScreenState extends State<ChatScreen> {
       case MessageStatus.failed:
         return const Icon(Icons.error_outline_rounded, size: 13, color: Colors.redAccent);
       case MessageStatus.read:
-        return Icon(Icons.done_all_rounded, size: 13, color: Colors.lightBlueAccent.shade100);
+        return Icon(Icons.done_all_rounded, size: 13, color: AppTheme.accentLight);
       case MessageStatus.delivered:
         return Icon(Icons.done_all_rounded, size: 13, color: Colors.white.withOpacity(0.7));
       case MessageStatus.sent:

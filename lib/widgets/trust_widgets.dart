@@ -73,14 +73,14 @@ class TrustBadge extends StatelessWidget {
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(ok ? Icons.verified_rounded : Icons.info_outline_rounded,
-            size: compact ? 12 : 15, color: ok ? Colors.white : const Color(0xFFB45309)),
+            size: compact ? 12 : 15, color: ok ? Colors.white : const Color(0xFFB8922A)),
         const SizedBox(width: 4),
         Text(
           ok ? _t('Vérifiée terrain', 'Verified on site') : _t('Non vérifiée', 'Not verified'),
           style: GoogleFonts.poppins(
             fontSize: compact ? 10 : 12,
             fontWeight: FontWeight.w600,
-            color: ok ? Colors.white : const Color(0xFFB45309),
+            color: ok ? Colors.white : const Color(0xFFB8922A),
           ),
         ),
       ]),
@@ -108,7 +108,7 @@ class TrustInfoCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(ok ? Icons.verified_rounded : Icons.warning_amber_rounded,
-              color: ok ? color : const Color(0xFFB45309), size: 22),
+              color: ok ? color : const Color(0xFFB8922A), size: 22),
           const SizedBox(width: 8),
           Expanded(
             child: Text(ok ? trustApprovedTitle() : trustUnapprovedTitle(),
@@ -157,7 +157,7 @@ Widget _definition({required bool approved, required bool current}) {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Icon(approved ? Icons.verified_rounded : Icons.info_outline_rounded,
-            size: 18, color: approved ? color : const Color(0xFFB45309)),
+            size: 18, color: approved ? color : const Color(0xFFB8922A)),
         const SizedBox(width: 6),
         Expanded(
           child: Text(approved ? trustApprovedTitle() : trustUnapprovedTitle(),
@@ -247,7 +247,7 @@ Future<bool> confirmTrustBeforeChat(BuildContext context, PropertyModel p) async
                 : _t("Cette annonce n'a pas été vérifiée par VelQix.", 'This listing has not been verified by VelQix.'),
             style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600,
-                color: ok ? const Color(0xFF047857) : const Color(0xFFB45309)),
+                color: ok ? const Color(0xFF0F5132) : const Color(0xFFB8922A)),
           ),
           const SizedBox(height: 12),
           _definition(approved: true, current: ok),

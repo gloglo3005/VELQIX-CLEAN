@@ -28,7 +28,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       color: AppTheme.primary,
       title: 'Louez ou vendez\nen toute simplicité',
       subtitle: 'VelQix vous connecte propriétaires et acheteurs/locataires pour des transactions sécurisées.',
-      bgColor: const Color(0xFFE8F0FE),
+      bgColor: const Color(0xFFE7F1EC),
     ),
     _OnboardPage(
       icon: Icons.directions_car_filled_rounded,
@@ -42,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       color: AppTheme.accent,
       title: 'Paiement Mobile\nMoney inclus',
       subtitle: 'Transactions rapides et sécurisées via Mobile Money, carte bancaire ou PayPal.',
-      bgColor: const Color(0xFFFFF3E0),
+      bgColor: const Color(0xFFFBF3DC),
     ),
   ];
 

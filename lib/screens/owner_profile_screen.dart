@@ -226,7 +226,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: BoxDecoration(
-                                      color: Colors.lightBlueAccent,
+                                      color: AppTheme.accent,
                                       shape: BoxShape.circle,
                                       border: Border.all(color: Colors.white, width: 2),
                                     ),
@@ -255,7 +255,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                               if (widget.owner.isVerified) ...[
                                 const SizedBox(width: 6),
                                 const Icon(Icons.verified_rounded,
-                                    size: 18, color: Colors.lightBlueAccent),
+                                    size: 18, color: AppTheme.accent),
                               ],
                             ],
                           ),
@@ -316,7 +316,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                                 return Icon(
                                   full ? Icons.star_rounded : Icons.star_border_rounded,
                                   size: 18,
-                                  color: const Color(0xFFFFC107),
+                                  color: const Color(0xFFD4AF37),
                                 );
                               }),
                               const SizedBox(width: 6),

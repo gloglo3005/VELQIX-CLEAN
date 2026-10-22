@@ -150,7 +150,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
     if (props.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.hourglass_empty_rounded, size: 52, color: Color(0xFFCBD5E1)),
+          const Icon(Icons.hourglass_empty_rounded, size: 52, color: Color(0xFF9CA3AF)),
           const SizedBox(height: 16),
           Text(tr('mylist_no_pending'),
               style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),

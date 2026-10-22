@@ -629,7 +629,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         width: panelW,
         height: 520,
         decoration: BoxDecoration(
-          color: const Color(0xFF0D1B2A),
+          color: const Color(0xFF0A2418),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
               color: AppTheme.primary.withOpacity(0.25), width: 1),
@@ -798,7 +798,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
             text: text.substring(last, m.start),
             style: GoogleFonts.poppins(
                 fontSize: 12.5,
-                color: const Color(0xFFCBD5E0),
+                color: const Color(0xFFE5E7EB),
                 height: 1.5)));
       }
       spans.add(TextSpan(
@@ -815,7 +815,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
           text: text.substring(last),
           style: GoogleFonts.poppins(
               fontSize: 12.5,
-              color: const Color(0xFFCBD5E0),
+              color: const Color(0xFFE5E7EB),
               height: 1.5)));
     }
     return RichText(text: TextSpan(children: spans));
@@ -884,7 +884,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F2D4A),
+          color: const Color(0xFF0A3622),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
               color: AppTheme.primary.withOpacity(0.3), width: 1),
@@ -945,7 +945,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                     child: Text(formattedPrice,
                         style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: const Color(0xFF63B3ED),
+                            color: const Color(0xFFE6C766),
                             fontWeight: FontWeight.w700)),
                   ),
                 ),
@@ -961,12 +961,12 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                   Row(
                     children: [
                       const Icon(Icons.star_rounded,
-                          color: Color(0xFFF6AD55), size: 13),
+                          color: Color(0xFFD4AF37), size: 13),
                       const SizedBox(width: 3),
                       Text('${p.rating}',
                           style: GoogleFonts.poppins(
                               fontSize: 11,
-                              color: const Color(0xFFF6AD55),
+                              color: const Color(0xFFD4AF37),
                               fontWeight: FontWeight.w600)),
                       const SizedBox(width: 6),
                       Text('(${p.totalAvis} avis)',
@@ -1021,7 +1021,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                               child: Text(c,
                                   style: GoogleFonts.poppins(
                                       fontSize: 10,
-                                      color: const Color(0xFFA0C4E0))),
+                                      color: const Color(0xFFF7F3EB))),
                             ))
                         .toList(),
                   ),
@@ -1084,7 +1084,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1A365D), Color(0xFF2A4A7F)],
+          colors: [Color(0xFF0A3622), Color(0xFF0F5132)],
         ),
       ),
       child: Icon(icons[p.categorie] ?? Icons.home_rounded,
@@ -1114,7 +1114,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                     child: Text(s['label']!,
                         style: GoogleFonts.poppins(
                             fontSize: 11,
-                            color: const Color(0xFFA0C4E0))),
+                            color: const Color(0xFFF7F3EB))),
                   ),
                 ))
             .toList(),
@@ -1248,7 +1248,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 child: TextField(
                   controller: _inputCtrl,
                   style: GoogleFonts.poppins(
-                      fontSize: 13, color: const Color(0xFFE2E8F0)),
+                      fontSize: 13, color: const Color(0xFFE5E7EB)),
                   decoration: InputDecoration(
                     hintText: _isListening
                         ? 'Parlez maintenant…'
@@ -1327,7 +1327,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                         _isListening ? Icons.stop_rounded : Icons.mic_rounded,
                         color: _isListening
                             ? Colors.redAccent
-                            : const Color(0xFF63B3ED),
+                            : const Color(0xFFE6C766),
                         size: 20,
                       ),
                     ),

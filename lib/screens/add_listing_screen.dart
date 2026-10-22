@@ -208,7 +208,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   child: _CameraMenuBtn(
                     icon: Icons.camera_alt_rounded,
                     label: 'Photo',
-                    color: const Color(0xFF0EA5E9),
+                    color: const Color(0xFF1B7A4E),
                     onTap: () { Navigator.pop(context); _takePhoto(); },
                   ),
                 ),
@@ -735,7 +735,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
               icon: Icons.camera_alt_rounded,
               label: tr('add_photos_camera'),
               loading: _pickingPhotos || _pickingVideo,
-              color: const Color(0xFF0EA5E9),
+              color: const Color(0xFF1B7A4E),
               onTap: (_pickingPhotos || _pickingVideo) ? null : _takePhoto,
             ),
           ],
@@ -801,7 +801,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
               icon: Icons.video_library_rounded,
               label: 'Galerie',
               loading: _pickingVideo,
-              color: const Color(0xFF8B5CF6),
+              color: const Color(0xFFD4AF37),
               onTap: _pickingVideo ? null : _pickVideo,
             ),
           ],
@@ -927,7 +927,7 @@ class _PhotoThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _isCam ? const Color(0xFF0EA5E9) : AppTheme.primary;
+    final color = _isCam ? const Color(0xFF1B7A4E) : AppTheme.primary;
     return SizedBox(width: 90, height: 90,
       child: Stack(children: [
         ClipRRect(

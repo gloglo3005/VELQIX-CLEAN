@@ -211,7 +211,7 @@ class _DemarcheurScreenState extends State<DemarcheurScreen> with SingleTickerPr
                     const Icon(Icons.verified_rounded, size: 14, color: Color(0xFF10B981)),
                     const SizedBox(width: 4),
                     Text('Vérifié sur le terrain',
-                        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF047857))),
+                        style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF0F5132))),
                   ]),
                 ),
             ]),

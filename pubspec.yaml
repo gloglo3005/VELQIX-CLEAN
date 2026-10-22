@@ -61,14 +61,14 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/logo_square.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#0D47A1"
-  adaptive_icon_foreground: "assets/images/logo.png"
+  adaptive_icon_background: "#061005"
+  adaptive_icon_foreground: "assets/images/logo_square.png"
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/logo.png
+    - assets/images/
     - assets/videos/login_bg.mp4
     - assets/google_fonts/

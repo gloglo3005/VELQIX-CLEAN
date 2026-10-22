@@ -302,7 +302,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       Navigator.pop(ctx);
       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
         content: Text(tr('detail_copied')),
-        backgroundColor: const Color(0xFF6366F1),
+        backgroundColor: const Color(0xFF0F5132),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
@@ -346,16 +346,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           // Aperçu du lien
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: const Color(0xFFF5F7FA), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(color: const Color(0xFFF7F3EB), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE5E7EB))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(p.getLocalizedTitre(lang), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 4),
-              Text(p.adresse.full, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              Text(p.adresse.full, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
               const SizedBox(height: 6),
               Row(children: [
-                const Icon(Icons.link_rounded, size: 14, color: Color(0xFF6366F1)),
+                const Icon(Icons.link_rounded, size: 14, color: Color(0xFF0F5132)),
                 const SizedBox(width: 4),
-                Expanded(child: Text(p.shareUrl, style: const TextStyle(color: Color(0xFF6366F1), fontSize: 12, decoration: TextDecoration.underline), overflow: TextOverflow.ellipsis)),
+                Expanded(child: Text(p.shareUrl, style: const TextStyle(color: Color(0xFF0F5132), fontSize: 12, decoration: TextDecoration.underline), overflow: TextOverflow.ellipsis)),
               ]),
             ]),
           ),
@@ -364,9 +364,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           const SizedBox(height: 16),
           // Row 1 : Copy, WhatsApp, Email, Telegram
           Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            _ShareOption(icon: Icons.copy_rounded,   label: tr('detail_copy'), color: const Color(0xFF6366F1), onTap: onCopy),
+            _ShareOption(icon: Icons.copy_rounded,   label: tr('detail_copy'), color: const Color(0xFF0F5132), onTap: onCopy),
             _ShareOption(icon: Icons.chat_rounded,   label: 'WhatsApp',  color: const Color(0xFF25D366), onTap: () { Navigator.pop(ctx); onWhatsApp(); }),
-            _ShareOption(icon: Icons.email_rounded,  label: 'Email',     color: const Color(0xFF0EA5E9), onTap: () { Navigator.pop(ctx); onEmail(); }),
+            _ShareOption(icon: Icons.email_rounded,  label: 'Email',     color: const Color(0xFF1B7A4E), onTap: () { Navigator.pop(ctx); onEmail(); }),
             _ShareOption(icon: Icons.send_rounded,   label: 'Telegram',  color: const Color(0xFF2AABEE),
               onTap: () {
                 Navigator.pop(ctx);
@@ -696,7 +696,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   bottom: 0, right: 0,
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
-                                    decoration: BoxDecoration(color: Colors.lightBlueAccent, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                                    decoration: BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
                                     child: const Icon(Icons.verified_rounded, size: 11, color: Colors.white),
                                   ),
                                 ),
@@ -731,7 +731,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                             ...List.generate(5, (i) => Icon(
                               i < p.proprietaire.rating.floor() ? Icons.star_rounded : Icons.star_border_rounded,
-                              size: 18, color: const Color(0xFFFFC107),
+                              size: 18, color: const Color(0xFFD4AF37),
                             )),
                             const SizedBox(width: 6),
                             Text(
