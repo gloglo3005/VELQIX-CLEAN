@@ -28,6 +28,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final _focusNode = FocusNode();
   bool _isSearchFocused = false;
 
+  // ─── Hero : budget max (null = toutes les gammes) ──────────────────────────
+  double? _maxBudget;
+  static const _budgetSteps = <double>[100000, 250000, 500000, 1000000, 5000000];
+
   int _currentBannerIndex = 0;
   late PageController _bannerController;
   bool _autoScrollActive = true;
@@ -144,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final tokens = q.toLowerCase().split(RegExp(r'\s+'));
     final allProps = _serverProps;
     return allProps.where((p) {
+      if (_maxBudget != null && p.prix > _maxBudget!) return false;
       final blob = [
         p.titre, p.description, p.adresse.ville, p.adresse.rue,
         p.adresse.pays, p.categorieLabel, p.typeLabel, p.listingLabel,
@@ -166,6 +171,11 @@ class _HomeScreenState extends State<HomeScreen> {
         return pays == _filterCountryCode!.toLowerCase() ||
             pays == (_filterCountryName ?? '').toLowerCase();
       }).toList();
+    }
+
+    // ── Filtre budget max (hero) ──
+    if (_maxBudget != null) {
+      allProps = allProps.where((p) => p.prix <= _maxBudget!).toList();
     }
 
     // ── Filtre par type de bien (immobilier OU mobilier, jamais les deux) ──
@@ -798,6 +808,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 18),
 
+                    // ── HERO (charte Velqix) ──────────────────────────────────
+                    _buildHero(context),
+                    const SizedBox(height: 16),
+
                     // ── BANNIÈRES DÉFILANTES CLIQUABLES ──────────────────────
                     SizedBox(
                       height: 112,
@@ -1216,6 +1230,211 @@ class _HomeScreenState extends State<HomeScreen> {
     );
       }, // ← ferme builder: de ValueListenableBuilder(userStateNotifier)
     );   // ← ferme ValueListenableBuilder
+  }
+
+  // ─── Hero d'accueil : titre + recherche à 3 champs ───────────────────────────
+  String _fmtBudget(double v) => v.toInt().toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ' ');
+
+  Widget _heroField({required IconData icon, required String label, required Widget child}) {
+    return Row(children: [
+      Container(
+        width: 38, height: 38,
+        decoration: BoxDecoration(
+            color: AppTheme.accent.withOpacity(0.18), shape: BoxShape.circle),
+        child: Icon(icon, size: 18, color: AppTheme.accent),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: GoogleFonts.poppins(
+                fontSize: 10, fontWeight: FontWeight.w700,
+                letterSpacing: 0.4, color: AppTheme.textPrimary)),
+            child,
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildHero(BuildContext context) {
+    final wide = MediaQuery.of(context).size.width >= 700;
+    final valueStyle = GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textSecondary);
+
+    final whereField = _heroField(
+      icon: Icons.location_on_rounded,
+      label: 'OÙ RECHERCHEZ-VOUS ?',
+      child: SizedBox(
+        height: 26,
+        child: TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() => _searchQuery = v),
+          style: GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textPrimary),
+          decoration: InputDecoration(
+            isDense: true, filled: false,
+            border: InputBorder.none, enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            hintText: 'Ex: Lomé, Togo',
+            hintStyle: GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textHint),
+          ),
+        ),
+      ),
+    );
+
+    final typeField = _heroField(
+      icon: Icons.home_rounded,
+      label: 'TYPE DE LOGEMENT',
+      child: PopupMenuButton<String>(
+        padding: EdgeInsets.zero,
+        onSelected: (k) => setState(() => _selectedCategoryKey = k),
+        itemBuilder: (_) => _categoryKeys
+            .map((k) => PopupMenuItem<String>(value: k, child: Text(tr(k))))
+            .toList(),
+        child: SizedBox(
+          height: 26,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _selectedCategoryKey == 'cat_all' ? 'Appartement, studio...' : tr(_selectedCategoryKey),
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final budgetField = _heroField(
+      icon: Icons.account_balance_wallet_rounded,
+      label: 'BUDGET MAX',
+      child: PopupMenuButton<double>(
+        padding: EdgeInsets.zero,
+        onSelected: (v) => setState(() => _maxBudget = v == 0 ? null : v),
+        itemBuilder: (_) => [
+          const PopupMenuItem<double>(value: 0, child: Text('Toutes les gammes')),
+          ..._budgetSteps.map((v) =>
+              PopupMenuItem<double>(value: v, child: Text('≤ ${_fmtBudget(v)} F CFA'))),
+        ],
+        child: SizedBox(
+          height: 26,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              _maxBudget == null ? 'Toutes les gammes' : '≤ ${_fmtBudget(_maxBudget!)} F CFA',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final searchBtn = ElevatedButton.icon(
+      onPressed: () {
+        FocusScope.of(context).unfocus();
+        setState(() => _searchQuery = _searchCtrl.text);
+      },
+      icon: const Icon(Icons.search_rounded, size: 18),
+      label: const Text('Rechercher'),
+      style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 22)),
+    );
+
+    Widget vDivider() => Container(
+        width: 1, height: 34, color: AppTheme.divider,
+        margin: const EdgeInsets.symmetric(horizontal: 14));
+
+    final panel = Container(
+      padding: EdgeInsets.all(wide ? 14 : 16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(
+            color: Colors.black.withOpacity(0.18), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: wide
+          ? Row(children: [
+              Expanded(child: whereField), vDivider(),
+              Expanded(child: typeField), vDivider(),
+              Expanded(child: budgetField),
+              const SizedBox(width: 14), searchBtn,
+            ])
+          : Column(children: [
+              whereField, const Divider(height: 22),
+              typeField, const Divider(height: 22),
+              budgetField, const SizedBox(height: 14),
+              SizedBox(width: double.infinity, child: searchBtn),
+            ]),
+    );
+
+    final titleSize = wide ? 38.0 : 26.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(children: [
+        Positioned.fill(
+          child: Stack(fit: StackFit.expand, children: [
+            const DecoratedBox(decoration: BoxDecoration(gradient: AppTheme.primaryGradient)),
+            // Dépose ta photo dans assets/images/hero_bg.jpg (sinon : dégradé vert)
+            Image.asset('assets/images/hero_bg.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft, end: Alignment.centerRight,
+                  colors: [
+                    AppTheme.primaryDark.withOpacity(0.92),
+                    AppTheme.primaryDark.withOpacity(0.55),
+                  ],
+                ),
+              ),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(wide ? 36 : 20, wide ? 44 : 28, wide ? 36 : 20, wide ? 32 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: RichText(
+                  text: TextSpan(children: [
+                    TextSpan(
+                      text: "Des logements d'exception pour une ",
+                      style: GoogleFonts.poppins(
+                          fontSize: titleSize, fontWeight: FontWeight.w700,
+                          height: 1.15, color: Colors.white),
+                    ),
+                    TextSpan(
+                      text: 'vie meilleure',
+                      style: GoogleFonts.poppins(
+                          fontSize: titleSize, fontWeight: FontWeight.w700,
+                          height: 1.15, color: AppTheme.accent),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Text(
+                  'Appartements meublés, résidences de standing, villas... '
+                  'Trouvez le logement qui correspond à vos envies.',
+                  style: GoogleFonts.poppins(
+                      fontSize: wide ? 15 : 13, height: 1.5, color: Colors.white.withOpacity(0.92)),
+                ),
+              ),
+              SizedBox(height: wide ? 28 : 20),
+              panel,
+            ],
+          ),
+        ),
+      ]),
+    );
   }
 
   void _applySuggestion(String s) {
