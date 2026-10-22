@@ -445,7 +445,7 @@ class _OwnerProfileScreenState extends State<OwnerProfileScreen> {
                             crossAxisCount: 2,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.78,
+                            childAspectRatio: 0.62,
                           ),
                           itemCount: ownerListings.length,
                           itemBuilder: (_, i) =>

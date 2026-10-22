@@ -121,16 +121,21 @@ class AvailabilityBadge extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10, vertical: compact ? 3 : 5),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(availabilityIcon(s), size: compact ? 12 : 15, color: color),
-        const SizedBox(width: 4),
-        Text(
-          availabilityShortLabel(s),
-          style: GoogleFonts.poppins(
-              fontSize: compact ? 10 : 12, fontWeight: FontWeight.w600, color: color),
+        Container(
+          width: compact ? 6 : 8, height: compact ? 6 : 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            availabilityShortLabel(s),
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+                fontSize: compact ? 10 : 12, fontWeight: FontWeight.w600, color: color),
+          ),
         ),
       ]),
     );

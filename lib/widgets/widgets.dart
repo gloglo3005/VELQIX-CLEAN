@@ -90,8 +90,52 @@ class _VerticalCard extends StatelessWidget {
   final VoidCallback? onTap;
   const _VerticalCard({required this.property, this.onTap});
 
+  // Équipements reconnus dans les caractéristiques (maquette : piscine, jardin…)
+  static const _amenities = <(String, IconData, String)>[
+    ('piscine', Icons.pool_rounded, 'Piscine'),
+    ('jardin', Icons.yard_outlined, 'Jardin'),
+    ('balcon', Icons.balcony_rounded, 'Balcon'),
+    ('wifi', Icons.wifi_rounded, 'Wi-Fi'),
+    ('parking', Icons.local_parking_rounded, 'Parking'),
+    ('clim', Icons.ac_unit_rounded, 'Clim.'),
+  ];
+
+  Widget _feature(BuildContext context, IconData icon, String text) {
+    final c = Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: AppTheme.textHint),
+      const SizedBox(width: 3),
+      Text(text, style: GoogleFonts.poppins(fontSize: 10.5, color: c)),
+    ]);
+  }
+
+  Widget _features(BuildContext context) {
+    final items = <Widget>[];
+    if (property.nombrePieces != null) {
+      items.add(_feature(context, Icons.bed_outlined, '${property.nombrePieces}'));
+    }
+    final s = (property.surface ?? '').trim();
+    if (s.isNotEmpty) {
+      items.add(_feature(context, Icons.straighten_rounded, s.contains('m') ? s : '$s m²'));
+    }
+    final blob = property.caracteristiques.join(' ').toLowerCase();
+    for (final a in _amenities) {
+      if (blob.contains(a.$1)) {
+        items.add(_feature(context, a.$2, a.$3));
+        break;
+      }
+    }
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(spacing: 10, runSpacing: 2, children: items),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bodyColor = Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary;
+    final smallColor = Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -110,42 +154,36 @@ class _VerticalCard extends StatelessWidget {
                   borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                   child: _smartImage(
                     url: property.firstImage,
-                    height: 155, width: double.infinity, fit: BoxFit.cover,
-                    fallback: () => Container(height: 155, color: AppTheme.divider, child: Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
+                    height: 150, width: double.infinity, fit: BoxFit.cover,
+                    fallback: () => Container(height: 150, color: AppTheme.divider, child: Icon(Icons.image_not_supported, size: 40, color: AppTheme.textHint)),
                   ),
                 ),
                 Positioned(
                   top: 10, left: 10,
-                  child: _TypeBadge(label: property.listingLabel, isVente: property.listingType == ListingType.vente),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    _TypeBadge(label: property.listingLabel, isVente: property.listingType == ListingType.vente),
+                    if (property.isFeatured) ...[
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(8)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.star_rounded, size: 12, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(tr('card_featured'), style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ]),
+                      ),
+                    ],
+                  ]),
                 ),
-                if (property.isFeatured)
-                  Positioned(
-                    top: 10, right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: AppTheme.accent, borderRadius: BorderRadius.circular(8)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.star_rounded, size: 12, color: Colors.white),
-                        const SizedBox(width: 3),
-                        Text(tr('card_featured'), style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
-                      ]),
-                    ),
-                  ),
+                // Cœur en haut à droite (maquette)
+                Positioned(
+                  top: 8, right: 8,
+                  child: FavoriteButton(propertyId: property.id, overlay: true),
+                ),
                 Positioned(
                   bottom: 10, left: 10,
                   child: TrustBadge(property: property),
-                ),
-                Positioned(
-                  bottom: 10, right: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.remove_red_eye_outlined, size: 12, color: Colors.white),
-                      const SizedBox(width: 4),
-                      Text('${property.vues}', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w500)),
-                    ]),
-                  ),
                 ),
               ],
             ),
@@ -155,31 +193,27 @@ class _VerticalCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  // Statut de disponibilité (avec la règle du cahier des charges §7)
                   Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.09), borderRadius: BorderRadius.circular(6)),
-                      child: Text(property.categorieLabel, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w500)),
-                    ),
-                    const Spacer(),
+                    Flexible(child: AvailabilityBadge(property: property)),
+                    const SizedBox(width: 6),
                     const Icon(Icons.star_rounded, size: 14, color: AppTheme.accentLight),
-                    const SizedBox(width: 3),
-                    Text('${property.rating}', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
-                    Text(' (${property.totalAvis})', style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary)),
+                    const SizedBox(width: 2),
+                    Text('${property.rating}', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: bodyColor)),
                   ]),
-                  const SizedBox(height: 6),
-                  Text(property.getLocalizedTitre(localeNotifier.value.languageCode), style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
+                  Text(property.getLocalizedTitre(localeNotifier.value.languageCode),
+                      style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: bodyColor),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 3),
                   Row(children: [
-                    Icon(Icons.location_on_outlined, size: 13, color: AppTheme.textHint),
+                    Icon(Icons.location_on_outlined, size: 13, color: AppTheme.accent),
                     const SizedBox(width: 3),
-                    Expanded(child: Text(property.adresse.short, style: GoogleFonts.poppins(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Expanded(child: Text(property.adresse.short,
+                        style: GoogleFonts.poppins(fontSize: 11, color: smallColor),
+                        maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ]),
-                    ],
-                  ),
+                  _features(context),
                   const SizedBox(height: 8),
                   ValueListenableBuilder<String>(
                     valueListenable: currencyNotifier,
@@ -193,24 +227,22 @@ class _VerticalCard extends StatelessWidget {
                             children: [
                               Text(
                                 formatFcfa(property.prix),
-                                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary),
+                                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               if (property.listingType == ListingType.location || property.listingType == ListingType.les_deux)
-                                Text(formatPrixParJour(property.prixParJour), style: GoogleFonts.poppins(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary), maxLines: 1),
+                                Text(formatPrixParJour(property.prixParJour), style: GoogleFonts.poppins(fontSize: 10, color: smallColor), maxLines: 1),
                             ],
                           ),
                         ),
                         ShareButton(property: property),
-                        const SizedBox(width: 4),
-                        FavoriteButton(propertyId: property.id),
                       ],
                     ),
                   ),
                 ],
               ),
-            ),   // fin Padding
+            ),
           ],
         ),
       ),
@@ -390,7 +422,8 @@ void notifyUserChanged() => userStateNotifier.value++;
 // ─── Favorite Button ──────────────────────────────────────────────────────────
 class FavoriteButton extends StatefulWidget {
   final String propertyId;
-  const FavoriteButton({super.key, required this.propertyId});
+  final bool overlay; // pastille blanche ronde posée sur une photo
+  const FavoriteButton({super.key, required this.propertyId, this.overlay = false});
   @override
   State<FavoriteButton> createState() => _FavoriteButtonState();
 }
@@ -444,12 +477,19 @@ class _FavoriteButtonState extends State<FavoriteButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: _isFav ? AppTheme.error.withOpacity(0.1) : AppTheme.background,
-          borderRadius: BorderRadius.circular(10),
-        ),
+        decoration: widget.overlay
+            ? BoxDecoration(
+                color: Colors.white.withOpacity(0.92),
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6)],
+              )
+            : BoxDecoration(
+                color: _isFav ? AppTheme.error.withOpacity(0.1) : AppTheme.background,
+                borderRadius: BorderRadius.circular(10),
+              ),
         child: Icon(_isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            size: 18, color: _isFav ? AppTheme.error : AppTheme.textHint),
+            size: 18,
+            color: _isFav ? AppTheme.error : (widget.overlay ? const Color(0xFF6B7280) : AppTheme.textHint)),
       ),
     );
   }

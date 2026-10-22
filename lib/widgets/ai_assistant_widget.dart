@@ -589,7 +589,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF0A3B24), Color(0xFF1A6B45)],
+                    colors: [Color(0xFF0A3622), Color(0xFF1B7A4E)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -652,7 +652,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0A3B24), Color(0xFF14603D)],
+          colors: [Color(0xFF0A3622), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -748,7 +748,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF1A6B45), Color(0xFF14603D)],
+            colors: [Color(0xFF1B7A4E), Color(0xFF0F5132)],
           ),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(16),
@@ -1345,7 +1345,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
               height: 40,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1A6B45), Color(0xFF14603D)],
+                  colors: [Color(0xFF1B7A4E), Color(0xFF0F5132)],
                 ),
                 shape: BoxShape.circle,
               ),

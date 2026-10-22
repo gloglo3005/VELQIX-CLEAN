@@ -13,6 +13,8 @@ import 'plans_screen.dart';
 import 'add_listing_screen.dart';
 import 'explore_screen.dart';
 import 'staff_directory_screen.dart';
+import 'auth_screens.dart' show LoginScreen, RegisterScreen;
+import 'support_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
@@ -24,13 +26,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategoryKey = 'cat_all';
   String _searchQuery = '';
+  // Recherche du hero (maquette) : type de logement + budget max.
+  String _heroCategoryKey = 'cat_all';
+  final _budgetCtrl = TextEditingController();
+  double? _maxBudget;
+  bool _heroFilterActive = false;
   final _searchCtrl = TextEditingController();
   final _focusNode = FocusNode();
   bool _isSearchFocused = false;
-
-  // ─── Hero : budget max (null = toutes les gammes) ──────────────────────────
-  double? _maxBudget;
-  static const _budgetSteps = <double>[100000, 250000, 500000, 1000000, 5000000];
 
   int _currentBannerIndex = 0;
   late PageController _bannerController;
@@ -139,16 +142,20 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchCtrl.dispose();
     _focusNode.dispose();
     _bannerController.dispose();
+    _budgetCtrl.dispose();
     super.dispose();
   }
 
   List<PropertyModel> get _searchResults {
     final q = _searchQuery.trim();
-    if (q.length < 2) return [];
-    final tokens = q.toLowerCase().split(RegExp(r'\s+'));
+    if (q.length < 2 && !_heroFilterActive) return [];
+    final tokens = q.length >= 2 ? q.toLowerCase().split(RegExp(r'\s+')) : <String>[];
+    final cat = _selectedCategoryKey == 'cat_all' ? null : _categoryFilters[_selectedCategoryKey];
     final allProps = _serverProps;
     return allProps.where((p) {
+      if (cat != null && p.categorie != cat) return false;
       if (_maxBudget != null && p.prix > _maxBudget!) return false;
+      if (tokens.isEmpty) return true;
       final blob = [
         p.titre, p.description, p.adresse.ville, p.adresse.rue,
         p.adresse.pays, p.categorieLabel, p.typeLabel, p.listingLabel,
@@ -173,11 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }).toList();
     }
 
-    // ── Filtre budget max (hero) ──
-    if (_maxBudget != null) {
-      allProps = allProps.where((p) => p.prix <= _maxBudget!).toList();
-    }
-
     // ── Filtre par type de bien (immobilier OU mobilier, jamais les deux) ──
     allProps = allProps.where((p) => p.type == _selectedType).toList();
 
@@ -187,7 +189,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return allProps.where((p) => p.categorie == cat).toList();
   }
 
-  bool get _isActiveSearch => _searchQuery.trim().length >= 2;
+  bool get _isActiveSearch => _searchQuery.trim().length >= 2 || _heroFilterActive;
+
+  String get _searchLabel =>
+      _searchQuery.trim().isEmpty ? 'vos critères' : '"$_searchQuery"';
+
+  void _runHeroSearch() {
+    FocusScope.of(context).unfocus();
+    final budget = double.tryParse(_budgetCtrl.text.replaceAll(RegExp(r'[^0-9.]'), ''));
+    setState(() {
+      _searchQuery = _searchCtrl.text;
+      _selectedType = PropertyType.immobilier;
+      _selectedCategoryKey = _heroCategoryKey;
+      _maxBudget = (budget != null && budget > 0) ? budget : null;
+      _heroFilterActive = _heroCategoryKey != 'cat_all' || _maxBudget != null;
+    });
+  }
 
   // ─── Bandeau « hors connexion » ──────────────────────────────────────────
   Widget _buildOfflineBanner() {
@@ -324,7 +341,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _clearSearch() {
     _searchCtrl.clear();
-    setState(() => _searchQuery = '');
+    _budgetCtrl.clear();
+    setState(() {
+      _searchQuery = '';
+      _heroFilterActive = false;
+      _maxBudget = null;
+      _heroCategoryKey = 'cat_all';
+      _selectedCategoryKey = 'cat_all';
+    });
     _focusNode.unfocus();
   }
 
@@ -619,37 +643,43 @@ class _HomeScreenState extends State<HomeScreen> {
         .where((p) => p.isFeatured).toList();
     final results = _searchResults;
 
+    // « Les plus populaires » (web) / « Coups de cœur » (mobile) : biens
+    // immobiliers disponibles les plus consultés, hors annonces mises en avant
+    // (affichées dans leur propre section).
+    final popular = _serverProps
+        .where((p) => p.type == PropertyType.immobilier && p.isAvailable && !p.isFeatured)
+        .toList()
+      ..sort((a, b) => b.vues.compareTo(a.vues));
+    final popularTop = popular.take(8).toList();
+
     // ✅ Banières recalculées à chaque build → tr() utilise la locale courante
     final banners = [
       _BannerSlide(icon: Icons.home_work_rounded,
         title: tr('banner1_title'), subtitle: tr('banner1_sub'),
-        gradient: const [Color(0xFF0F5132), Color(0xFF1A6B45)],
+        gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.directions_car_rounded,
         title: tr('banner2_title'), subtitle: tr('banner2_sub'),
-        gradient: const [Color(0xFF0A3B24), Color(0xFF14603D)],
+        gradient: const [Color(0xFF0A3622), Color(0xFF0F5132)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.verified_user_rounded,
         title: tr('banner3_title'), subtitle: tr('banner3_sub'),
-        gradient: const [Color(0xFF1F2937), Color(0xFF374151)],
+        gradient: const [Color(0xFF1B5E20), Color(0xFF2E7D32)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.star_rounded,
         title: tr('banner4_title'), subtitle: tr('banner4_sub'),
-        gradient: const [Color(0xFFB8932A), Color(0xFFD4AF37)],
+        gradient: const [Color(0xFFB8922A), Color(0xFFD4AF37)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlansScreen()))),
       _BannerSlide(icon: Icons.add_circle_rounded,
         title: tr('banner5_title'), subtitle: tr('banner5_sub'),
-        gradient: const [Color(0xFF0F5132), Color(0xFFB8932A)],
+        gradient: const [Color(0xFF1F2937), Color(0xFF374151)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen()))),
     ];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: CustomScrollView(
+        child: CustomScrollView(
           slivers: [
 
             // ── HEADER ──────────────────────────────────────────────────────
@@ -663,47 +693,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Logo rond avec vraie image
-                        Container(
-                          width: 42, height: 42,
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.primaryGradient,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [BoxShadow(
-                              color: AppTheme.primary.withOpacity(0.35),
-                              blurRadius: 10, offset: const Offset(0, 4),
-                            )],
+                        // Logo Velqix
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/images/logo.png',
+                            height: MediaQuery.of(context).size.width >= 900 ? 64 : 52,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Text('VELQIX',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.primary)),
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.asset(
-                              'assets/images/logo.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Text('VQ', style: GoogleFonts.poppins(
-                                  fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white,
-                                )),
-                              ),
+                        ),
+                        if (MediaQuery.of(context).size.width >= 900)
+                          Expanded(child: Center(child: _buildWebNav(context)))
+                        else
+                          const Spacer(),
+                        if (MediaQuery.of(context).size.width >= 900 && !AuthService.instance.isLoggedIn) ...[
+                          TextButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+                            child: Text(tr('hero_nav_login'),
+                                style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                          ),
+                          const SizedBox(width: 6),
+                          ElevatedButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.accent, foregroundColor: Colors.white,
+                              shape: const StadiumBorder(),
+                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                             ),
+                            child: Text(tr('hero_nav_register'),
+                                style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-
-                        // Nom bicolore
-                        RichText(
-                          text: TextSpan(children: [
-                            TextSpan(text: 'Vel', style: GoogleFonts.poppins(
-                              fontSize: 24, fontWeight: FontWeight.w700,
-                              color: AppTheme.isDark ? AppTheme.ivory : AppTheme.primary, letterSpacing: -0.5,
-                            )),
-                            TextSpan(text: 'qix', style: GoogleFonts.poppins(
-                              fontSize: 24, fontWeight: FontWeight.w700,
-                              color: AppTheme.isDark ? AppTheme.accent : AppTheme.primary, letterSpacing: -0.5,
-                            )),
-                          ]),
-                        ),
-
-                        const Spacer(),
+                          const SizedBox(width: 12),
+                        ],
 
                         // ── Sélecteur de pays (drapeau) ──────────────────────
                         GestureDetector(
@@ -808,9 +832,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 18),
 
-                    // ── HERO (charte Velqix) ──────────────────────────────────
+                    // ── HERO : image de fond + accroche (web et mobile) ─────
                     _buildHero(context),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
 
                     // ── BANNIÈRES DÉFILANTES CLIQUABLES ──────────────────────
                     SizedBox(
@@ -843,95 +867,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
 
                     const SizedBox(height: 18),
-
-                    // ── Recherche ─────────────────────────────────────────────
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _isSearchFocused ? AppTheme.primary : Colors.transparent,
-                          width: 1.5,
-                        ),
-                        boxShadow: [BoxShadow(
-                          color: _isSearchFocused
-                              ? AppTheme.primary.withOpacity(0.12)
-                              : Colors.black.withOpacity(0.06),
-                          blurRadius: 12, offset: const Offset(0, 3),
-                        )],
-                      ),
-                      child: TextField(
-                        controller: _searchCtrl,
-                        focusNode: _focusNode,
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        style: GoogleFonts.poppins(fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary),
-                        decoration: InputDecoration(
-                          hintText: tr('home_search_hint'),
-                          hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textHint),
-                          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint, size: 22),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? GestureDetector(
-                                  onTap: _clearSearch,
-                                  child: Container(
-                                    margin: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                        color: AppTheme.textHint.withOpacity(0.15),
-                                        shape: BoxShape.circle),
-                                    child: Icon(Icons.close_rounded, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary, size: 16),
-                                  ),
-                                )
-                              : _speechAvailable
-                                  ? GestureDetector(
-                                      onTap: _isListening ? _stopVoiceSearch : _startVoiceSearch,
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
-                                        margin: const EdgeInsets.all(8),
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: _isListening
-                                              ? AppTheme.error.withOpacity(0.15)
-                                              : AppTheme.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(
-                                          _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                                          size: 18,
-                                          color: _isListening ? AppTheme.error : AppTheme.primary,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      margin: const EdgeInsets.all(8),
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                          color: AppTheme.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8)),
-                                      child: const Icon(Icons.tune_rounded, size: 18, color: AppTheme.primary),
-                                    ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        ),
-                      ),
-                    ),
-
-                    if (_searchQuery.length == 1) ...[
-                      const SizedBox(height: 10),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(children: [
-                          _SuggestionChip(label: 'Lomé', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Agoè', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Maison', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Voiture', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Location', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Vente', onTap: _applySuggestion),
-                          _SuggestionChip(label: 'Appartement', onTap: _applySuggestion),
-                        ]),
-                      ),
-                    ],
 
                     if (!_isActiveSearch) ...[
                       const SizedBox(height: 20),
@@ -986,8 +921,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 6),
                         Text(
                           results.isEmpty
-                              ? 'Aucun résultat pour "$_searchQuery"'
-                              : '${results.length} résultat${results.length > 1 ? 's' : ''} pour "$_searchQuery"',
+                              ? 'Aucun résultat pour $_searchLabel'
+                              : '${results.length} résultat${results.length > 1 ? 's' : ''} pour $_searchLabel',
                           style: GoogleFonts.poppins(
                             fontSize: 12, fontWeight: FontWeight.w600,
                             color: results.isEmpty ? AppTheme.error : AppTheme.success,
@@ -995,6 +930,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ]),
                     ),
+                    const SizedBox(width: 10),
+                    TextButton(onPressed: _clearSearch, child: const Text('Effacer')),
                   ]),
                 ),
               ),
@@ -1056,6 +993,56 @@ class _HomeScreenState extends State<HomeScreen> {
             // ══════════════════════════════════════════════════════════════
             ] else ...[
 
+              // ── Nos logements les plus populaires / Nos coups de cœur ──────
+              if (popularTop.isNotEmpty) SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SectionHeader(
+                        title: MediaQuery.of(context).size.width >= 900
+                            ? tr('home_popular')
+                            : tr('home_hearts'),
+                        actionLabel: tr('home_see_all'),
+                        onAction: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const ExploreScreen())),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    if (MediaQuery.of(context).size.width >= 900)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Wrap(
+                          spacing: 18, runSpacing: 18,
+                          children: [
+                            for (final p in popularTop)
+                              SizedBox(
+                                width: 260, height: 345,
+                                child: PropertyCard(property: p, onTap: () => _openDetail(p)),
+                              ),
+                          ],
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 345,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: popularTop.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 14),
+                          itemBuilder: (_, i) => SizedBox(
+                            width: 230,
+                            child: PropertyCard(property: popularTop[i], onTap: () => _openDetail(popularTop[i])),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 28),
+                  ],
+                ),
+              ),
+
               // ── Annonces vedettes (uniquement si la liste n'est pas vide) ──
               if (featured.isNotEmpty) SliverToBoxAdapter(
                 child: Column(
@@ -1070,8 +1057,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),   // ← espacement correct
+                    if (MediaQuery.of(context).size.width >= 900)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Wrap(
+                          spacing: 18, runSpacing: 18,
+                          children: [
+                            for (final p in featured.take(8))
+                              SizedBox(
+                                width: 260, height: 345,
+                                child: PropertyCard(property: p, onTap: () => _openDetail(p)),
+                              ),
+                          ],
+                        ),
+                      )
+                    else
                     SizedBox(
-                      height: 290,
+                      height: 345,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1210,12 +1212,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           childCount: _filteredProps.length,
                         ),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: MediaQuery.of(context).size.width >= 1100
-                              ? 4
-                              : MediaQuery.of(context).size.width >= 700 ? 3 : 2,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14, mainAxisExtent: 310,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2, crossAxisSpacing: 14,
+                          mainAxisSpacing: 14, mainAxisExtent: 345,
                         ),
                       ),
                     ),
@@ -1224,214 +1223,232 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ],
         ),
-          ),
-        ),
       ),
     );
       }, // ← ferme builder: de ValueListenableBuilder(userStateNotifier)
     );   // ← ferme ValueListenableBuilder
   }
 
-  // ─── Hero d'accueil : titre + recherche à 3 champs ───────────────────────────
-  String _fmtBudget(double v) => v.toInt().toString().replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ' ');
+  // ─── Menu web (maquette) : Accueil · Logements · À propos · Contact ───────
+  Widget _buildWebNav(BuildContext context) {
+    Widget link(String label, VoidCallback? onTap, {bool active = false}) => TextButton(
+          onPressed: onTap,
+          child: Text(label,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? AppTheme.primary : AppTheme.textPrimary,
+              )),
+        );
+    void go(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      link(tr('hero_nav_home'), null, active: true),
+      link(tr('hero_nav_listings'), () => go(const ExploreScreen())),
+      link(tr('hero_nav_about'), () => go(const SupportScreen())),
+      link(tr('hero_nav_contact'), () => go(const SupportScreen())),
+    ]);
+  }
 
-  Widget _heroField({required IconData icon, required String label, required Widget child}) {
+  // ─── Hero : image de fond, accroche et recherche en 3 champs ──────────────
+  static const _heroImageUrl =
+      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1600';
+
+  Widget _heroField({
+    required IconData icon,
+    required String label,
+    required Widget child,
+  }) {
     return Row(children: [
       Container(
         width: 38, height: 38,
         decoration: BoxDecoration(
-            color: AppTheme.accent.withOpacity(0.18), shape: BoxShape.circle),
+            color: AppTheme.accent.withOpacity(0.15), shape: BoxShape.circle),
         child: Icon(icon, size: 18, color: AppTheme.accent),
       ),
       const SizedBox(width: 10),
       Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: GoogleFonts.poppins(
-                fontSize: 10, fontWeight: FontWeight.w700,
-                letterSpacing: 0.4, color: AppTheme.textPrimary)),
-            child,
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text(label.toUpperCase(),
+              style: GoogleFonts.poppins(
+                  fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF1F2937), letterSpacing: 0.3)),
+          child,
+        ]),
       ),
     ]);
   }
 
   Widget _buildHero(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 700;
-    final valueStyle = GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textSecondary);
+    final wide = MediaQuery.of(context).size.width >= 900;
+    const ink = Color(0xFF1F2937);
+    const hintColor = Color(0xFF9CA3AF);
+    final fieldStyle = GoogleFonts.poppins(fontSize: 13, color: ink);
+    final hintStyle = GoogleFonts.poppins(fontSize: 13, color: hintColor);
 
-    final whereField = _heroField(
+    final placeField = _heroField(
       icon: Icons.location_on_rounded,
-      label: 'OÙ RECHERCHEZ-VOUS ?',
-      child: SizedBox(
-        height: 26,
-        child: TextField(
-          controller: _searchCtrl,
-          onChanged: (v) => setState(() => _searchQuery = v),
-          style: GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textPrimary),
-          decoration: InputDecoration(
-            isDense: true, filled: false,
-            border: InputBorder.none, enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            contentPadding: EdgeInsets.zero,
-            hintText: 'Ex: Lomé, Togo',
-            hintStyle: GoogleFonts.poppins(fontSize: 12.5, color: AppTheme.textHint),
-          ),
+      label: tr('hero_where'),
+      child: TextField(
+        controller: _searchCtrl,
+        focusNode: _focusNode,
+        onChanged: (v) => setState(() => _searchQuery = v),
+        onSubmitted: (_) => _runHeroSearch(),
+        style: fieldStyle,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: tr('hero_where_hint'),
+          hintStyle: hintStyle,
+          border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
+          suffixIcon: _speechAvailable
+              ? GestureDetector(
+                  onTap: _isListening ? _stopVoiceSearch : _startVoiceSearch,
+                  child: Icon(_isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                      size: 18, color: _isListening ? AppTheme.error : AppTheme.primary),
+                )
+              : null,
+          suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 28),
         ),
       ),
     );
 
     final typeField = _heroField(
       icon: Icons.home_rounded,
-      label: 'TYPE DE LOGEMENT',
-      child: PopupMenuButton<String>(
-        padding: EdgeInsets.zero,
-        onSelected: (k) => setState(() => _selectedCategoryKey = k),
-        itemBuilder: (_) => _categoryKeys
-            .map((k) => PopupMenuItem<String>(value: k, child: Text(tr(k))))
-            .toList(),
-        child: SizedBox(
-          height: 26,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _selectedCategoryKey == 'cat_all' ? 'Appartement, studio...' : tr(_selectedCategoryKey),
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle,
-            ),
-          ),
+      label: tr('hero_type'),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isDense: true,
+          isExpanded: true,
+          value: _heroCategoryKey,
+          dropdownColor: Colors.white,
+          style: fieldStyle,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: hintColor),
+          items: [
+            for (final k in _immoCategoryKeys)
+              DropdownMenuItem(
+                value: k,
+                child: Text(k == 'cat_all' ? tr('hero_type_hint') : tr(k),
+                    style: k == 'cat_all' ? hintStyle : fieldStyle, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+          onChanged: (v) => setState(() => _heroCategoryKey = v ?? 'cat_all'),
         ),
       ),
     );
 
     final budgetField = _heroField(
       icon: Icons.account_balance_wallet_rounded,
-      label: 'BUDGET MAX',
-      child: PopupMenuButton<double>(
-        padding: EdgeInsets.zero,
-        onSelected: (v) => setState(() => _maxBudget = v == 0 ? null : v),
-        itemBuilder: (_) => [
-          const PopupMenuItem<double>(value: 0, child: Text('Toutes les gammes')),
-          ..._budgetSteps.map((v) =>
-              PopupMenuItem<double>(value: v, child: Text('≤ ${_fmtBudget(v)} F CFA'))),
-        ],
-        child: SizedBox(
-          height: 26,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              _maxBudget == null ? 'Toutes les gammes' : '≤ ${_fmtBudget(_maxBudget!)} F CFA',
-              maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle,
-            ),
-          ),
+      label: tr('hero_budget'),
+      child: TextField(
+        controller: _budgetCtrl,
+        keyboardType: TextInputType.number,
+        onSubmitted: (_) => _runHeroSearch(),
+        style: fieldStyle,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: tr('hero_budget_hint'),
+          hintStyle: hintStyle,
+          suffixText: 'FCFA',
+          suffixStyle: hintStyle,
+          border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(vertical: 4),
         ),
       ),
     );
 
     final searchBtn = ElevatedButton.icon(
-      onPressed: () {
-        FocusScope.of(context).unfocus();
-        setState(() => _searchQuery = _searchCtrl.text);
-      },
+      onPressed: _runHeroSearch,
       icon: const Icon(Icons.search_rounded, size: 18),
-      label: const Text('Rechercher'),
+      label: Text(tr('hero_search'), style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
       style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 22)),
+        backgroundColor: AppTheme.accent, foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     );
 
-    Widget vDivider() => Container(
-        width: 1, height: 34, color: AppTheme.divider,
-        margin: const EdgeInsets.symmetric(horizontal: 14));
+    Widget divider() => Container(
+        width: 1, height: 36, margin: const EdgeInsets.symmetric(horizontal: 16),
+        color: const Color(0xFFE5E7EB));
 
-    final panel = Container(
-      padding: EdgeInsets.all(wide ? 14 : 16),
+    final searchCard = Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(
-            color: Colors.black.withOpacity(0.18), blurRadius: 20, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 24, offset: const Offset(0, 8))],
       ),
       child: wide
           ? Row(children: [
-              Expanded(child: whereField), vDivider(),
-              Expanded(child: typeField), vDivider(),
+              Expanded(child: placeField), divider(),
+              Expanded(child: typeField), divider(),
               Expanded(child: budgetField),
-              const SizedBox(width: 14), searchBtn,
+              const SizedBox(width: 16),
+              searchBtn,
             ])
-          : Column(children: [
-              whereField, const Divider(height: 22),
-              typeField, const Divider(height: 22),
-              budgetField, const SizedBox(height: 14),
-              SizedBox(width: double.infinity, child: searchBtn),
+          : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              placeField,
+              const Divider(height: 18),
+              typeField,
+              const Divider(height: 18),
+              budgetField,
+              const SizedBox(height: 12),
+              searchBtn,
             ]),
     );
 
-    final titleSize = wide ? 38.0 : 26.0;
+    final titleSize = wide ? 46.0 : 26.0;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
       child: Stack(children: [
         Positioned.fill(
-          child: Stack(fit: StackFit.expand, children: [
-            const DecoratedBox(decoration: BoxDecoration(gradient: AppTheme.primaryGradient)),
-            // Dépose ta photo dans assets/images/hero_bg.jpg (sinon : dégradé vert)
-            Image.asset('assets/images/hero_bg.jpg',
-                fit: BoxFit.cover,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+            child: Image.network(_heroImageUrl, fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft, end: Alignment.centerRight,
-                  colors: [
-                    AppTheme.primaryDark.withOpacity(0.92),
-                    AppTheme.primaryDark.withOpacity(0.55),
-                  ],
-                ),
+          ),
+        ),
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft, end: Alignment.centerRight,
+                colors: [Color(0xE60A2418), Color(0xB30A2418), Color(0x4D0A2418)],
               ),
             ),
-          ]),
+          ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(wide ? 36 : 20, wide ? 44 : 28, wide ? 36 : 20, wide ? 32 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: RichText(
-                  text: TextSpan(children: [
-                    TextSpan(
-                      text: "Des logements d'exception pour une ",
-                      style: GoogleFonts.poppins(
-                          fontSize: titleSize, fontWeight: FontWeight.w700,
-                          height: 1.15, color: Colors.white),
-                    ),
-                    TextSpan(
-                      text: 'vie meilleure',
-                      style: GoogleFonts.poppins(
-                          fontSize: titleSize, fontWeight: FontWeight.w700,
-                          height: 1.15, color: AppTheme.accent),
-                    ),
-                  ]),
-                ),
+          padding: EdgeInsets.fromLTRB(wide ? 40 : 18, wide ? 56 : 28, wide ? 40 : 18, wide ? 40 : 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: wide ? 640 : 340),
+              child: RichText(
+                text: TextSpan(children: [
+                  TextSpan(
+                    text: '${tr('hero_title')} ',
+                    style: GoogleFonts.poppins(
+                        fontSize: titleSize, fontWeight: FontWeight.w800, color: Colors.white, height: 1.12),
+                  ),
+                  TextSpan(
+                    text: tr('hero_title_accent'),
+                    style: GoogleFonts.poppins(
+                        fontSize: titleSize, fontWeight: FontWeight.w800, color: AppTheme.accent, height: 1.12),
+                  ),
+                ]),
               ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Text(
-                  'Appartements meublés, résidences de standing, villas... '
-                  'Trouvez le logement qui correspond à vos envies.',
+            ),
+            SizedBox(height: wide ? 16 : 10),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: wide ? 560 : 340),
+              child: Text(tr('hero_sub'),
                   style: GoogleFonts.poppins(
-                      fontSize: wide ? 15 : 13, height: 1.5, color: Colors.white.withOpacity(0.92)),
-                ),
-              ),
-              SizedBox(height: wide ? 28 : 20),
-              panel,
-            ],
-          ),
+                      fontSize: wide ? 16 : 12.5, color: Colors.white.withOpacity(0.92), height: 1.5)),
+            ),
+            SizedBox(height: wide ? 40 : 22),
+            searchCard,
+          ]),
         ),
       ]),
     );
