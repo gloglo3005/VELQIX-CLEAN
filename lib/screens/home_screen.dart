@@ -1016,16 +1016,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (MediaQuery.of(context).size.width >= 900)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Wrap(
-                          spacing: 18, runSpacing: 18,
-                          children: [
-                            for (final p in popularTop)
-                              SizedBox(
-                                width: 260, height: 345,
-                                child: PropertyCard(property: p, onTap: () => _openDetail(p)),
-                              ),
-                          ],
-                        ),
+                        // Les cartes s'étirent pour remplir toute la largeur (plus de vide à droite)
+                        child: LayoutBuilder(builder: (context, c) {
+                          const gap = 18.0;
+                          final cols = ((c.maxWidth + gap) / (260 + gap)).floor().clamp(2, 6);
+                          final cardW = ((c.maxWidth - gap * (cols - 1)) / cols).floorToDouble();
+                          return Wrap(
+                            spacing: gap, runSpacing: gap,
+                            children: [
+                              for (final p in popularTop)
+                                SizedBox(
+                                  width: cardW, height: 345,
+                                  child: PropertyCard(property: p, onTap: () => _openDetail(p)),
+                                ),
+                            ],
+                          );
+                        }),
                       )
                     else
                       SizedBox(
@@ -1168,10 +1174,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                           childCount: _filteredProps.length,
                         ),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2, crossAxisSpacing: 14,
-                          mainAxisSpacing: 14, mainAxisExtent: 345,
-                        ),
+                        // Grand écran : autant de colonnes que la largeur le permet, cartes étirées
+                        gridDelegate: MediaQuery.of(context).size.width >= 900
+                            ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 320, crossAxisSpacing: 18,
+                                mainAxisSpacing: 18, mainAxisExtent: 345,
+                              )
+                            : const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2, crossAxisSpacing: 14,
+                                mainAxisSpacing: 14, mainAxisExtent: 345,
+                              ),
                       ),
                     ),
 
