@@ -817,6 +817,39 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     );
 
+    // Barre de défilement des bannières : posée sur l'image du hero (verre dépoli)
+    final bannerCarousel = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 112,
+          child: PageView.builder(
+            controller: _bannerController,
+            onPageChanged: (i) => setState(() => _currentBannerIndex = i),
+            itemCount: banners.length,
+            itemBuilder: (_, i) => _AdBannerCard(slide: banners[i], glass: true),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(banners.length, (i) {
+            final active = i == _currentBannerIndex;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 22 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active ? AppTheme.accent : Colors.white.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -829,44 +862,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHero(context, header: headerRow),
+                  _buildHero(context, header: headerRow, carousel: bannerCarousel),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                    // ── BANNIÈRES DÉFILANTES CLIQUABLES ──────────────────────
-                    SizedBox(
-                      height: 112,
-                      child: PageView.builder(
-                        controller: _bannerController,
-                        onPageChanged: (i) => setState(() => _currentBannerIndex = i),
-                        itemCount: banners.length,
-                        itemBuilder: (_, i) => _AdBannerCard(slide: banners[i]),
-                      ),
-                    ),
-
-                    // Dots
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(banners.length, (i) {
-                        final active = i == _currentBannerIndex;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: active ? 20 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: active ? banners[_currentBannerIndex].gradient.first : AppTheme.border,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        );
-                      }),
-                    ),
-
-                    const SizedBox(height: 18),
 
                     if (!_isActiveSearch) ...[
                       const SizedBox(height: 20),
@@ -1212,7 +1213,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  Widget _buildHero(BuildContext context, {Widget? header}) {
+  Widget _buildHero(BuildContext context, {Widget? header, Widget? carousel}) {
     final wide = MediaQuery.of(context).size.width >= 900;
     // Hauteur réservée à l'en-tête posé sur l'image (marge haute + logo + respiration)
     final topInset = MediaQuery.of(context).padding.top;
@@ -1390,6 +1391,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: wide ? 40 : 22),
             searchCard,
+            if (carousel != null) ...[
+              SizedBox(height: wide ? 28 : 18),
+              carousel,
+            ],
           ]),
         ),
         if (header != null)
@@ -1427,7 +1432,8 @@ class _BannerSlide {
 // ─── Carte bannière cliquable ─────────────────────────────────────────────────
 class _AdBannerCard extends StatelessWidget {
   final _BannerSlide slide;
-  const _AdBannerCard({required this.slide});
+  final bool glass; // true = translucide, posée sur l'image du hero
+  const _AdBannerCard({required this.slide, this.glass = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1436,11 +1442,15 @@ class _AdBannerCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 1),
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: slide.gradient,
+          gradient: LinearGradient(
+              colors: glass
+                  ? [for (final c in slide.gradient) c.withOpacity(0.82)]
+                  : slide.gradient,
               begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(18),
+          border: glass ? Border.all(color: Colors.white.withOpacity(0.25)) : null,
           boxShadow: [BoxShadow(
-            color: slide.gradient.first.withOpacity(0.35),
+            color: glass ? Colors.black.withOpacity(0.25) : slide.gradient.first.withOpacity(0.35),
             blurRadius: 14, offset: const Offset(0, 6),
           )],
         ),
