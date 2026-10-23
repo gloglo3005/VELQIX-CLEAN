@@ -63,7 +63,7 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/logo_square.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#061005"
+  adaptive_icon_background: "#061008"
   adaptive_icon_foreground: "assets/images/logo_square.png"
 
 flutter:
