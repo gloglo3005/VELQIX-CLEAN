@@ -116,6 +116,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _bannerController = PageController();
+    // Précharge les images du hero pour que le fondu soit fluide
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final a in _heroSlideImages) {
+        precacheImage(AssetImage(a), context).catchError((_) {});
+      }
+    });
 
     _focusNode.addListener(() => setState(() => _isSearchFocused = _focusNode.hasFocus));
     _loadProperties();
@@ -127,10 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await Future.delayed(const Duration(seconds: 4));
       if (!mounted || !_autoScrollActive) return false;
       final next = ((_currentBannerIndex + 1) % 5).toInt(); // 5 banières fixes
-      if (_bannerController.hasClients) {
-        _bannerController.animateToPage(next,
-            duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
-      }
+      if (mounted) setState(() => _currentBannerIndex = next);
       return true;
     });
   }
@@ -817,25 +821,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     );
 
-    // Barre de défilement des bannières : posée sur l'image du hero (verre dépoli)
-    final bannerCarousel = Column(
+    // Contrôles du diaporama du hero (flèches + points), posés sur l'image
+    void goTo(int i) => setState(() => _currentBannerIndex = (i + banners.length) % banners.length);
+    Widget arrow(IconData ic, VoidCallback f) => InkWell(
+          onTap: f,
+          customBorder: const CircleBorder(),
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18), shape: BoxShape.circle),
+            child: Icon(ic, color: Colors.white, size: 18),
+          ),
+        );
+    final bannerCarousel = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: 112,
-          child: PageView.builder(
-            controller: _bannerController,
-            onPageChanged: (i) => setState(() => _currentBannerIndex = i),
-            itemCount: banners.length,
-            itemBuilder: (_, i) => _AdBannerCard(slide: banners[i], glass: true),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(banners.length, (i) {
-            final active = i == _currentBannerIndex;
-            return AnimatedContainer(
+        arrow(Icons.chevron_left_rounded, () => goTo(_currentBannerIndex - 1)),
+        const SizedBox(width: 10),
+        ...List.generate(banners.length, (i) {
+          final active = i == _currentBannerIndex;
+          return GestureDetector(
+            onTap: () => goTo(i),
+            child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(horizontal: 3),
               width: active ? 22 : 6,
@@ -844,9 +851,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: active ? AppTheme.accent : Colors.white.withOpacity(0.45),
                 borderRadius: BorderRadius.circular(3),
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
+        const SizedBox(width: 10),
+        arrow(Icons.chevron_right_rounded, () => goTo(_currentBannerIndex + 1)),
       ],
     );
 
@@ -862,7 +871,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHero(context, header: headerRow, carousel: bannerCarousel),
+                  _buildHero(context, header: headerRow, carousel: bannerCarousel,
+                      slide: banners[_currentBannerIndex % banners.length]),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                     child: Column(
@@ -1198,6 +1208,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ─── Hero : image de fond, accroche et recherche en 3 champs ──────────────
+  // Une image par bannière (même ordre que `banners` dans build()) :
+  // 1 Louez & Vendez · 2 Voitures & motos · 3 Transactions sécurisées · 4 Premium · 5 Publiez
+  static const _heroSlideImages = <String>[
+    'assets/images/hero_slide_1.jpg',
+    'assets/images/hero_slide_3.jpg',
+    'assets/images/hero_slide_4.jpg',
+    'assets/images/hero_slide_5.jpg',
+    'assets/images/hero_slide_2.jpg',
+  ];
+
   static const _heroImageUrl =
       'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1600';
 
@@ -1225,7 +1245,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  Widget _buildHero(BuildContext context, {Widget? header, Widget? carousel}) {
+  Widget _buildHero(BuildContext context, {Widget? header, Widget? carousel, required _BannerSlide slide}) {
     final wide = MediaQuery.of(context).size.width >= 900;
     // Hauteur réservée à l'en-tête posé sur l'image (marge haute + logo + respiration)
     final topInset = MediaQuery.of(context).padding.top;
@@ -1351,6 +1371,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     final titleSize = wide ? 46.0 : 26.0;
+    String titleHead(String t) {
+      final i = t.trim().lastIndexOf(' ');
+      return i <= 0 ? '' : t.trim().substring(0, i);
+    }
+    String titleAccent(String t) {
+      final i = t.trim().lastIndexOf(' ');
+      return i <= 0 ? t.trim() : t.trim().substring(i + 1);
+    }
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       child: Stack(children: [
@@ -1359,9 +1387,22 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: const BoxDecoration(color: Color(0xFF1A1A1A)),
             // Photo de la maquette : déposez `assets/images/hero.jpg` pour
             // l'utiliser ; à défaut, image en ligne, puis dégradé vert.
-            child: Image.asset('assets/images/hero.jpg', fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Image.network(_heroImageUrl, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 900),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              child: SizedBox.expand(
+                key: ValueKey(_currentBannerIndex),
+                child: Image.asset(
+                  _heroSlideImages[_currentBannerIndex % _heroSlideImages.length],
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, __, ___) => Image.network(_heroImageUrl, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                ),
+              ),
+            ),
           ),
         ),
         const Positioned.fill(
@@ -1377,36 +1418,73 @@ class _HomeScreenState extends State<HomeScreen> {
         Padding(
           padding: EdgeInsets.fromLTRB(wide ? 40 : 18, headerSpace + (header == null ? (wide ? 56 : 28) : 0), wide ? 40 : 18, wide ? 40 : 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: wide ? 640 : 340),
-              child: RichText(
-                text: TextSpan(children: [
-                  TextSpan(
-                    text: '${tr('hero_title')} ',
-                    style: GoogleFonts.poppins(
-                        fontSize: titleSize, fontWeight: FontWeight.w800, color: Colors.white, height: 1.12),
+            // Texte de la bannière (Annonce, Premium…) : change avec l'image
+            SizedBox(
+              height: wide ? 250 : 205,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 700),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                layoutBuilder: (cur, prev) => Stack(
+                  alignment: Alignment.topLeft,
+                  children: [...prev, if (cur != null) cur],
+                ),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(anim),
+                    child: child,
                   ),
-                  TextSpan(
-                    text: tr('hero_title_accent'),
-                    style: GoogleFonts.poppins(
-                        fontSize: titleSize, fontWeight: FontWeight.w800, color: AppTheme.accent, height: 1.12),
-                  ),
-                ]),
+                ),
+                child: Column(
+                  key: ValueKey('hero_txt_$_currentBannerIndex'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: wide ? 640 : 340),
+                      child: RichText(
+                        text: TextSpan(children: [
+                          TextSpan(
+                            text: '${titleHead(slide.title)} ',
+                            style: GoogleFonts.poppins(
+                                fontSize: titleSize, fontWeight: FontWeight.w800, color: Colors.white, height: 1.12),
+                          ),
+                          TextSpan(
+                            text: titleAccent(slide.title),
+                            style: GoogleFonts.poppins(
+                                fontSize: titleSize, fontWeight: FontWeight.w800, color: AppTheme.accent, height: 1.12),
+                          ),
+                        ]),
+                      ),
+                    ),
+                    SizedBox(height: wide ? 14 : 10),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: wide ? 560 : 340),
+                      child: Text(slide.subtitle,
+                          style: GoogleFonts.poppins(
+                              fontSize: wide ? 16 : 12.5, color: Colors.white.withOpacity(0.92), height: 1.5)),
+                    ),
+                    SizedBox(height: wide ? 18 : 14),
+                    ElevatedButton.icon(
+                      onPressed: slide.onTap,
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: Text(tr('home_see_all'), style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accent, foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: wide ? 22 : 16, vertical: wide ? 14 : 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            SizedBox(height: wide ? 16 : 10),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: wide ? 560 : 340),
-              child: Text(tr('hero_sub'),
-                  style: GoogleFonts.poppins(
-                      fontSize: wide ? 16 : 12.5, color: Colors.white.withOpacity(0.92), height: 1.5)),
-            ),
-            SizedBox(height: wide ? 40 : 22),
-            searchCard,
             if (carousel != null) ...[
-              SizedBox(height: wide ? 28 : 18),
+              SizedBox(height: wide ? 12 : 8),
               carousel,
+              SizedBox(height: wide ? 24 : 16),
             ],
+            searchCard,
           ]),
         ),
         if (header != null)
