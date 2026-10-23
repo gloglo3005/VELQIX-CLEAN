@@ -1356,7 +1356,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Stack(children: [
         Positioned.fill(
           child: DecoratedBox(
-            decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+            decoration: const BoxDecoration(color: Color(0xFF1A1A1A)),
             // Photo de la maquette : déposez `assets/images/hero.jpg` pour
             // l'utiliser ; à défaut, image en ligne, puis dégradé vert.
             child: Image.asset('assets/images/hero.jpg', fit: BoxFit.cover,
@@ -1369,7 +1369,7 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft, end: Alignment.centerRight,
-                colors: [Color(0xE60A2418), Color(0xB30A2418), Color(0x4D0A2418)],
+                colors: [Color(0xB3000000), Color(0x80000000), Color(0x40000000)], // voile noir neutre (sans teinte verte)
               ),
             ),
           ),

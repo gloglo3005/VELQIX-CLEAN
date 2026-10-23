@@ -1,10 +1,9 @@
 // lib/widgets/image_brand_background.dart
-// Image plein cadre (recadrée en « cover ») avec un voile vert sombre VelQix pour
+// Image plein cadre (recadrée en « cover ») avec un voile noir neutre pour
 // que le texte blanc reste lisible. Même photo que le hero de l'accueil :
-// `assets/images/hero.jpg` si elle existe, sinon la photo en ligne, sinon le dégradé.
+// `assets/images/hero.jpg` si elle existe, sinon la photo en ligne, sinon un fond sombre.
 
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class ImageBrandBackground extends StatelessWidget {
   final Widget child;
@@ -24,10 +23,7 @@ class ImageBrandBackground extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         // Repli si aucune image ne peut se charger
-        const DecoratedBox(
-          decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-          child: SizedBox.expand(),
-        ),
+        const ColoredBox(color: Color(0xFF1A1A1A), child: SizedBox.expand()),
         Image.asset(
           asset,
           fit: BoxFit.cover,
@@ -39,13 +35,13 @@ class ImageBrandBackground extends StatelessWidget {
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
         ),
-        // Voile sombre (comme la maquette) : plus foncé à gauche pour le texte
+        // Voile noir neutre (sans teinte verte) : plus foncé à gauche pour le texte
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Color(0xE60A2418), Color(0xB30A2418), Color(0x800A2418)],
+              colors: [Color(0xB3000000), Color(0x8C000000), Color(0x66000000)],
             ),
           ),
         ),
