@@ -133,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 4));
       if (!mounted || !_autoScrollActive) return false;
-      final next = ((_currentBannerIndex + 1) % 5).toInt(); // 5 banières fixes
+      final next = (_currentBannerIndex + 1) % _heroSlideImages.length; // 1 slide d'origine + 5 bannières
       if (mounted) setState(() => _currentBannerIndex = next);
       return true;
     });
@@ -661,6 +661,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // ✅ Banières recalculées à chaque build → tr() utilise la locale courante
     final banners = [
+      // Slide d'origine du hero : photo + accroche « logements d'exception »
+      _BannerSlide(icon: Icons.home_rounded,
+        title: tr('hero_title'), accent: tr('hero_title_accent'), subtitle: tr('hero_sub'),
+        gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.home_work_rounded,
         title: tr('banner1_title'), subtitle: tr('banner1_sub'),
         gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
@@ -1209,8 +1214,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ─── Hero : image de fond, accroche et recherche en 3 champs ──────────────
   // Une image par bannière (même ordre que `banners` dans build()) :
-  // 1 Louez & Vendez · 2 Voitures & motos · 3 Transactions sécurisées · 4 Premium · 5 Publiez
+  // 0 Accroche d'origine · 1 Louez & Vendez · 2 Voitures & motos · 3 Transactions sécurisées · 4 Premium · 5 Publiez
   static const _heroSlideImages = <String>[
+    'assets/images/hero.jpg', // photo d'origine (repli en ligne si le fichier est absent)
     'assets/images/hero_slide_1.jpg',
     'assets/images/hero_slide_3.jpg',
     'assets/images/hero_slide_4.jpg',
@@ -1445,12 +1451,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: RichText(
                         text: TextSpan(children: [
                           TextSpan(
-                            text: '${titleHead(slide.title)} ',
+                            text: '${slide.accent == null ? titleHead(slide.title) : slide.title} ',
                             style: GoogleFonts.poppins(
                                 fontSize: titleSize, fontWeight: FontWeight.w800, color: Colors.white, height: 1.12),
                           ),
                           TextSpan(
-                            text: titleAccent(slide.title),
+                            text: slide.accent ?? titleAccent(slide.title),
                             style: GoogleFonts.poppins(
                                 fontSize: titleSize, fontWeight: FontWeight.w800, color: AppTheme.accent, height: 1.12),
                           ),
@@ -1511,10 +1517,11 @@ class _BannerSlide {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String? accent; // partie du titre en or (sinon : dernier mot)
   final List<Color> gradient;
   final VoidCallback onTap;
   const _BannerSlide({
-    required this.icon, required this.title, required this.subtitle,
+    required this.icon, required this.title, required this.subtitle, this.accent,
     required this.gradient, required this.onTap,
   });
 }
