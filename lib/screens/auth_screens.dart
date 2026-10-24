@@ -26,6 +26,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardPage(
       icon: Icons.home_work_rounded,
       color: AppTheme.primary,
+      image: 'assets/images/hero_slide_1.jpg', // terrain
       title: 'Louez ou vendez\nen toute simplicité',
       subtitle: 'VelQix vous connecte propriétaires et acheteurs/locataires pour des transactions sécurisées.',
       bgColor: const Color(0xFFE7F1EC),
@@ -33,6 +34,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardPage(
       icon: Icons.directions_car_filled_rounded,
       color: const Color(0xFF1B5E20),
+      image: 'assets/images/hero_slide_2.jpg', // moto
       title: 'Biens mobiliers\net immobiliers',
       subtitle: 'Voitures, équipements, maisons, appartements… Publiez et trouvez tout sur une seule plateforme.',
       bgColor: const Color(0xFFE8F5E9),
@@ -112,11 +114,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 12),
-            Container(
-              width: 180, height: 180,
-              decoration: BoxDecoration(color: page.bgColor, shape: BoxShape.circle),
-              child: Icon(page.icon, size: 80, color: page.color),
-            ),
+            if (page.image != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset(
+                  page.image!,
+                  width: double.infinity, height: 260, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: double.infinity, height: 260, color: page.bgColor,
+                    child: Icon(page.icon, size: 80, color: page.color),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: 180, height: 180,
+                decoration: BoxDecoration(color: page.bgColor, shape: BoxShape.circle),
+                child: Icon(page.icon, size: 80, color: page.color),
+              ),
             const SizedBox(height: 40),
             Text(page.title, style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, height: 1.25), textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -137,7 +152,8 @@ class _OnboardPage {
   final String title;
   final String subtitle;
   final Color bgColor;
-  const _OnboardPage({required this.icon, required this.color, required this.title, required this.subtitle, required this.bgColor});
+  final String? image; // photo affichée à la place de l'icône
+  const _OnboardPage({required this.icon, required this.color, required this.title, required this.subtitle, required this.bgColor, this.image});
 }
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
