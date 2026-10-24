@@ -136,12 +136,10 @@ class _PlansScreenState extends State<PlansScreen> {
                     style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.8))),
           ]),
         ),
-        // Contenu centré et limité en largeur pour le web
-        Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Padding(
+        // Contenu pleine largeur
+        SizedBox(
+          width: double.infinity,
+          child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             SegmentedButton<String>(
@@ -173,7 +171,6 @@ class _PlansScreenState extends State<PlansScreen> {
             const SizedBox(height: 30),
               ]),
             ),
-          ),
         ),
       ]),
     );
