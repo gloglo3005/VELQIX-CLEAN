@@ -1,13 +1,13 @@
 // lib/widgets/trust_widgets.dart
-// Niveau de vérification d'une annonce (cahier des charges §3.3, §6.4, §10.3, §14.3) :
-//  • VÉRIFIÉE SUR LE TERRAIN : un agent VelQix s'est rendu sur place. Le statut
-//    précise la date, ce qui a été contrôlé et les LIMITES du contrôle.
-//  • NON VÉRIFIÉE : aucune vérification terrain par VelQix.
+// Signes de confiance d'une annonce :
+//  • SIGNE « VÉRIFIÉ » : un agent VelQix s'est rendu sur place. Seul ce signe est affiché.
+//  • AUCUN SIGNE : l'annonce n'a pas (encore) été vérifiée — on n'affiche RIEN
+//    (aucun message « non vérifiée »).
+//  • BADGE PREMIUM : affiché pour les annonceurs abonnés Premium.
 // Règles :
-//  - un paiement (Premium, mise en avant) ne donne JAMAIS le statut « vérifié » ;
+//  - un paiement (Premium, mise en avant) ne donne JAMAIS le signe « vérifié » ;
 //  - une vérification n'est ni une garantie de disponibilité, ni une preuve de
-//    propriété, ni un contrôle juridique ; VelQix ne promet pas de prendre en
-//    charge les fraudes.
+//    propriété, ni un contrôle juridique.
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,19 +19,19 @@ import '../theme/app_theme.dart';
 String _t(String fr, String en) => localeNotifier.value.languageCode == 'en' ? en : fr;
 
 const Color _approvedColor = Color(0xFF10B981);
-const Color _unapprovedColor = Color(0xFFF59E0B);
+const Color _premiumColor = Color(0xFFD4A017);
 
 // ─── Textes ──────────────────────────────────────────────────────────────────
-String trustApprovedTitle() => _t('Vérifiée sur le terrain', 'Verified on site');
-String trustUnapprovedTitle() => _t('Non vérifiée par VelQix', 'Not verified by VelQix');
+String trustApprovedTitle() => _t('Vérifiée par VelQix', 'Verified by VelQix');
 
 String trustApprovedRule() => _t(
     "Un agent VelQix s'est rendu sur place à la date indiquée et a contrôlé que le bien existe et correspond aux photos et à la description. Cela ne prouve pas la propriété et ne garantit pas que le bien reste disponible.",
     'A VelQix agent visited the site on the date shown and checked that the property exists and matches the photos and description. This is not proof of ownership and does not guarantee the property stays available.');
 
-String trustUnapprovedRule() => _t(
-    "Aucun agent VelQix n'a vérifié ce bien sur le terrain. Les informations sont données par l'annonceur.",
-    'No VelQix agent has checked this property on site. The information is provided by the advertiser.');
+/// Explication du signe (message de l'app : signe = vérifié, pas de signe = non vérifié).
+String trustSignMeaning() => _t(
+    'Si une annonce porte ce signe, elle a été vérifiée par VelQix. Sans ce signe, elle ne l\'a pas été.',
+    'If a listing shows this sign, it has been verified by VelQix. Without the sign, it has not.');
 
 /// Limites des garanties (cahier des charges §14.3) — affichées sans détour.
 String trustLimitsNote() => _t(
@@ -54,7 +54,25 @@ String _approvalReason(PropertyModel p) {
   return '';
 }
 
-// ─── Badge compact (cartes, listes) ──────────────────────────────────────────
+// ─── Signes ronds (cartes, listes, détail) ───────────────────────────────────
+Widget _sign({required IconData icon, required Color color, required double size, required String tip}) {
+  return Tooltip(
+    message: tip,
+    child: Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 1))],
+      ),
+      child: Icon(icon, size: size * 0.62, color: Colors.white),
+    ),
+  );
+}
+
+/// Signes affichés sur une annonce : Premium (annonceur abonné) et/ou Vérifié (agent VelQix).
+/// Annonce sans signe → ne rend RIEN.
 class TrustBadge extends StatelessWidget {
   final PropertyModel property;
   final bool compact;
@@ -62,124 +80,45 @@ class TrustBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ok = property.isVelqixApproved;
-    final color = ok ? _approvedColor : _unapprovedColor;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 10, vertical: compact ? 3 : 5),
-      decoration: BoxDecoration(
-        color: ok ? color : Colors.white.withOpacity(0.92),
-        borderRadius: BorderRadius.circular(8),
-        border: ok ? null : Border.all(color: color.withOpacity(0.6)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(ok ? Icons.verified_rounded : Icons.info_outline_rounded,
-            size: compact ? 12 : 15, color: ok ? Colors.white : const Color(0xFFB8922A)),
-        const SizedBox(width: 4),
-        Text(
-          ok ? _t('Vérifiée terrain', 'Verified on site') : _t('Non vérifiée', 'Not verified'),
-          style: GoogleFonts.poppins(
-            fontSize: compact ? 10 : 12,
-            fontWeight: FontWeight.w600,
-            color: ok ? Colors.white : const Color(0xFFB8922A),
-          ),
-        ),
-      ]),
-    );
+    final verified = property.isVelqixApproved;
+    final premium = property.proprietaire.isPremium;
+    if (!verified && !premium) return const SizedBox.shrink();
+    final size = compact ? 22.0 : 28.0;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      if (premium)
+        _sign(icon: Icons.workspace_premium_rounded, color: _premiumColor, size: size, tip: 'Premium'),
+      if (premium && verified) const SizedBox(width: 5),
+      if (verified)
+        _sign(icon: Icons.verified_rounded, color: _approvedColor, size: size, tip: trustApprovedTitle()),
+    ]);
   }
 }
 
-// ─── Encadré de la page détail ───────────────────────────────────────────────
+// ─── Page détail : uniquement les signes (rien si aucun) ─────────────────────
 class TrustInfoCard extends StatelessWidget {
   final PropertyModel property;
   const TrustInfoCard({super.key, required this.property});
 
+  /// true si au moins un signe est à afficher
+  static bool hasSign(PropertyModel p) => p.isVelqixApproved || p.proprietaire.isPremium;
+
   @override
   Widget build(BuildContext context) {
-    final ok = property.isVelqixApproved;
-    final color = ok ? _approvedColor : _unapprovedColor;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.35)),
+    if (!hasSign(property)) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: GestureDetector(
+        onTap: () => showTrustExplainer(context, property: property),
+        child: TrustBadge(property: property, compact: false),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(ok ? Icons.verified_rounded : Icons.warning_amber_rounded,
-              color: ok ? color : const Color(0xFFB8922A), size: 22),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(ok ? trustApprovedTitle() : trustUnapprovedTitle(),
-                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        if (ok) ...[
-          Text(_approvalReason(property),
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 4),
-          Text(trustApprovedRule(),
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-        ] else ...[
-          Text(trustUnapprovedRule(),
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.w500)),
-        ],
-        const SizedBox(height: 4),
-        Text(trustLimitsNote(),
-            style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary, height: 1.4)),
-        const SizedBox(height: 6),
-        GestureDetector(
-          onTap: () => showTrustExplainer(context),
-          child: Text(_t('Comprendre les niveaux de vérification', 'Understand verification levels'),
-              style: GoogleFonts.poppins(
-                  fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primary,
-                  decoration: TextDecoration.underline)),
-        ),
-      ]),
     );
   }
 }
 
-// ─── Les 2 définitions côte à côte ───────────────────────────────────────────
-Widget _definition({required bool approved, required bool current}) {
-  final color = approved ? _approvedColor : _unapprovedColor;
-  return Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: color.withOpacity(current ? 0.12 : 0.05),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: color.withOpacity(current ? 0.8 : 0.25), width: current ? 1.6 : 1),
-    ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Icon(approved ? Icons.verified_rounded : Icons.info_outline_rounded,
-            size: 18, color: approved ? color : const Color(0xFFB8922A)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(approved ? trustApprovedTitle() : trustUnapprovedTitle(),
-              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-        ),
-        if (current)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-            child: Text(_t('Cette annonce', 'This listing'),
-                style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
-          ),
-      ]),
-      const SizedBox(height: 6),
-      Text(approved ? trustApprovedRule() : trustUnapprovedRule(),
-          style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, height: 1.45)),
-    ]),
-  );
-}
-
-/// Feuille d'explication (accessible depuis la page détail).
+/// Feuille d'explication (touche sur un signe).
 Future<void> showTrustExplainer(BuildContext context, {PropertyModel? property}) {
+  final verified = property?.isVelqixApproved == true;
+  final premium = property?.proprietaire.isPremium == true;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -189,24 +128,42 @@ Future<void> showTrustExplainer(BuildContext context, {PropertyModel? property})
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_t('Niveaux de vérification sur VelQix', 'Verification levels on VelQix'),
-              style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          _definition(approved: true, current: property?.isVelqixApproved == true),
-          _definition(approved: false, current: property != null && !property.isVelqixApproved),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              _t('Un paiement (abonnement Premium, mise en avant) ne donne jamais le statut « vérifiée sur le terrain ».',
-                  'A payment (Premium, promotion) never grants the “verified on site” status.'),
-              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+          Row(children: [
+            _sign(icon: Icons.verified_rounded, color: _approvedColor, size: 30, tip: trustApprovedTitle()),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(trustApprovedTitle(),
+                  style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(trustLimitsNote(),
-                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4)),
-          ),
+          ]),
+          const SizedBox(height: 10),
+          Text(trustSignMeaning(),
+              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary, height: 1.45)),
+          if (verified && property != null) ...[
+            const SizedBox(height: 8),
+            Text(_approvalReason(property),
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary, fontWeight: FontWeight.w500)),
+          ],
+          const SizedBox(height: 6),
+          Text(trustApprovedRule(),
+              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.45)),
+          if (premium) ...[
+            const SizedBox(height: 14),
+            Row(children: [
+              _sign(icon: Icons.workspace_premium_rounded, color: _premiumColor, size: 26, tip: 'Premium'),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                    _t('Annonceur Premium. Le statut Premium ne remplace pas la vérification VelQix.',
+                        'Premium advertiser. Premium status does not replace VelQix verification.'),
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4)),
+              ),
+            ]),
+          ],
+          const SizedBox(height: 12),
+          Text(trustLimitsNote(),
+              style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4)),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(onPressed: () => Navigator.pop(ctx), child: Text(_t('Fermer', 'Close'))),
@@ -227,7 +184,6 @@ Future<bool> confirmTrustBeforeChat(BuildContext context, PropertyModel p) async
   if (AuthService.instance.currentUser?.id == p.proprietaire.id) return true;
   if (_acknowledgedListings.contains(p.id)) return true;
 
-  final ok = p.isVelqixApproved;
   final accepted = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -240,22 +196,11 @@ Future<bool> confirmTrustBeforeChat(BuildContext context, PropertyModel p) async
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_t('Avant de contacter le propriétaire', 'Before contacting the owner'),
               style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(
-            ok
-                ? _t('Cette annonce a été vérifiée sur le terrain.', 'This listing was verified on site.')
-                : _t("Cette annonce n'a pas été vérifiée par VelQix.", 'This listing has not been verified by VelQix.'),
-            style: GoogleFonts.poppins(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: ok ? const Color(0xFF0F5132) : const Color(0xFFB8922A)),
-          ),
           const SizedBox(height: 12),
-          _definition(approved: true, current: ok),
-          _definition(approved: false, current: !ok),
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 14),
             child: Text(trustLimitsNote(),
-                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.45)),
           ),
           SizedBox(
             width: double.infinity,

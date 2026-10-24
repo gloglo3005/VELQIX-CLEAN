@@ -330,7 +330,7 @@ class _ListingManageCardState extends State<_ListingManageCard> {
         border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(trustUnapprovedTitle(),
+        Text('Obtenir le signe « Vérifié par VelQix »',
             style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         const SizedBox(height: 2),
         Text(

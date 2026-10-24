@@ -661,11 +661,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // ✅ Banières recalculées à chaque build → tr() utilise la locale courante
     final banners = [
-      // Slide d'origine du hero : photo + accroche « logements d'exception »
-      _BannerSlide(icon: Icons.home_rounded,
-        title: tr('hero_title'), accent: tr('hero_title_accent'), subtitle: tr('hero_sub'),
-        gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.home_work_rounded,
         title: tr('banner1_title'), subtitle: tr('banner1_sub'),
         gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
@@ -686,6 +681,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: tr('banner5_title'), subtitle: tr('banner5_sub'),
         gradient: const [Color(0xFF1F2937), Color(0xFF374151)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen()))),
+      // Slide d'origine du hero : photo + accroche « logements d'exception »
+      _BannerSlide(icon: Icons.home_rounded,
+        title: tr('hero_title'), accent: tr('hero_title_accent'), subtitle: tr('hero_sub'),
+        gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
     ];
 
     // En-tête (logo, connexion, pays, notifications) : posé par-dessus le hero
@@ -1214,14 +1214,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ─── Hero : image de fond, accroche et recherche en 3 champs ──────────────
   // Une image par bannière (même ordre que `banners` dans build()) :
-  // 0 Accroche d'origine · 1 Louez & Vendez · 2 Voitures & motos · 3 Transactions sécurisées · 4 Premium · 5 Publiez
+  // Même ordre que `banners` dans build()
   static const _heroSlideImages = <String>[
-    'assets/images/hero.jpg', // photo d'origine (repli en ligne si le fichier est absent)
-    'assets/images/hero_slide_1.jpg',
-    'assets/images/hero_slide_3.jpg',
-    'assets/images/hero_slide_4.jpg',
-    'assets/images/hero_slide_5.jpg',
-    'assets/images/hero_slide_2.jpg',
+    'assets/images/hero_slide_1.jpg', // terrain  → Louez & Vendez
+    'assets/images/hero_slide_2.jpg', // moto     → Voitures, motos & équipements
+    'assets/images/hero_slide_4.jpg', // terrasse → Transactions sécurisées
+    'assets/images/hero_slide_5.jpg', // hôtel    → Premium
+    'assets/images/hero_slide_3.jpg', // voiture  → Publiez votre annonce
+    'assets/images/hero.jpg',         // photo d'origine + accroche d'origine (repli en ligne)
   ];
 
   static const _heroImageUrl =

@@ -579,9 +579,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   const SizedBox(height: 10),
                   AvailabilityActionsRow(property: p),
 
-                  // Niveau de vérification : vérifiée sur le terrain / non vérifiée
-                  const SizedBox(height: 14),
-                  TrustInfoCard(property: p),
+                  // Signes : Vérifié VelQix / Premium (rien si aucun)
+                  if (TrustInfoCard.hasSign(p)) ...[
+                    const SizedBox(height: 14),
+                    TrustInfoCard(property: p),
+                  ],
                   const SizedBox(height: 10),
                   ServiceActionsRow(property: p),
 
