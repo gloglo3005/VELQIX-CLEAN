@@ -1060,13 +1060,22 @@ class AppTextField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final int? maxLength;
+  final bool strongBorder;
 
   const AppTextField({
-    super.key, required this.label, this.hint, this.controller,
+    super.key, this.strongBorder = false, required this.label, this.hint, this.controller,
     this.prefixIcon, this.suffix, this.obscureText = false,
     this.keyboardType, this.validator, this.maxLines = 1,
     this.readOnly = false, this.onTap, this.maxLength,
   });
+
+  OutlineInputBorder _strongBorder(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: dark ? const Color(0xFF6B9A82) : const Color(0xFF8A94A3), width: 1.3),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1089,6 +1098,9 @@ class AppTextField extends StatelessWidget {
             hintText: hint,
             prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20, color: AppTheme.textHint) : null,
             suffixIcon: suffix,
+            // Bordure plus lisible (connexion / inscription)
+            enabledBorder: strongBorder ? _strongBorder(context) : null,
+            border: strongBorder ? _strongBorder(context) : null,
           ),
         ),
       ],

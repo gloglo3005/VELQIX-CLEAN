@@ -404,7 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Text('Bienvenue ! Connectez-vous à votre compte.',
             style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
         const SizedBox(height: 24),
-        AppTextField(
+        AppTextField(strongBorder: true, 
           label: "Nom d'utilisateur",
           hint: 'ama_kofi',
           controller: _usernameCtrl,
@@ -412,7 +412,7 @@ class _LoginScreenState extends State<LoginScreen> {
           keyboardType: TextInputType.text,
         ),
         const SizedBox(height: 16),
-        AppTextField(
+        AppTextField(strongBorder: true, 
           label: tr('auth_password'),
           hint: '••••••••',
           controller: _passCtrl,
@@ -1138,7 +1138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               // ── Champs entreprise (conditionnels) ──
               if (_accountType == 'business') ...[
-                AppTextField(
+                AppTextField(strongBorder: true, 
                   label: "Nom de l\'entreprise *",
                   hint: "Ex: VelQix Sarl",
                   controller: _nomEntrepriseCtrl,
@@ -1154,8 +1154,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: _selectedTypeActivite != null ? AppTheme.primary : AppTheme.border,
-                      width: _selectedTypeActivite != null ? 1.5 : 1,
+                      color: _selectedTypeActivite != null ? AppTheme.primary : (AppTheme.isDark ? const Color(0xFF6B9A82) : const Color(0xFF8A94A3)),
+                      width: _selectedTypeActivite != null ? 1.5 : 1.3,
                     ),
                   ),
                   child: DropdownButtonHideUnderline(
@@ -1183,7 +1183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               if (_accountType != 'business') ...[
                 Row(children: [
                   Expanded(
-                    child: AppTextField(
+                    child: AppTextField(strongBorder: true, 
                       label: tr('auth_field_nom'),
                       hint: 'Kofi',
                       controller: _nomCtrl,
@@ -1193,7 +1193,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: AppTextField(
+                    child: AppTextField(strongBorder: true, 
                       label: tr('auth_field_prenom'),
                       hint: 'Ama',
                       controller: _prenomCtrl,
@@ -1205,7 +1205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 14),
 
                 // ── Nom d'utilisateur ──
-                AppTextField(
+                AppTextField(strongBorder: true, 
                   label: tr('auth_field_username'),
                   hint: 'ama_kofi',
                   controller: _usernameCtrl,
@@ -1221,7 +1221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
 
               // ── Email ──
-              AppTextField(
+              AppTextField(strongBorder: true, 
                 label: tr('auth_field_email'),
                 hint: 'ama@email.com',
                 controller: _emailCtrl,
@@ -1244,8 +1244,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: AppTheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: _selectedCountryCode != null ? AppTheme.primary : AppTheme.border,
-                      width: _selectedCountryCode != null ? 1.5 : 1,
+                      color: _selectedCountryCode != null ? AppTheme.primary : (AppTheme.isDark ? const Color(0xFF6B9A82) : const Color(0xFF8A94A3)),
+                      width: _selectedCountryCode != null ? 1.5 : 1.3,
                     ),
                   ),
                   child: Row(
@@ -1274,7 +1274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 14),
 
               // ── Téléphone ──
-              AppTextField(
+              AppTextField(strongBorder: true, 
                 label: tr('auth_field_phone'),
                 hint: '+228 90 00 00 00',
                 controller: _telCtrl,
@@ -1285,7 +1285,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 14),
 
               // ── Adresse ──
-              AppTextField(
+              AppTextField(strongBorder: true, 
                 label: tr('auth_field_address'),
                 hint: 'Ex: Rue de la Paix, Lomé',
                 controller: _adresseCtrl,
@@ -1295,7 +1295,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 14),
 
               // ── Mot de passe ──
-              AppTextField(
+              AppTextField(strongBorder: true, 
                 label: tr('auth_pwd_label'),
                 hint: 'Min. 8 caractères',
                 controller: _passCtrl,
@@ -1317,7 +1317,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 14),
 
               // ── Confirmer le mot de passe ──
-              AppTextField(
+              AppTextField(strongBorder: true, 
                 label: 'Confirmer le mot de passe *',
                 hint: 'Répétez votre mot de passe',
                 controller: _confirmPassCtrl,
@@ -1542,7 +1542,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.6),
           ),
           const SizedBox(height: 32),
-          AppTextField(
+          AppTextField(strongBorder: true, 
             label: 'Adresse email *',
             hint: 'ama@email.com',
             controller: _emailCtrl,
