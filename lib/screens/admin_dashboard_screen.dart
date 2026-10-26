@@ -202,10 +202,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       appBar: AppBar(
         backgroundColor: AppTheme.primaryDark,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 18),
-        ),
+        automaticallyImplyLeading: false,
+        titleSpacing: 16,
         title: Row(children: [
           Container(
             padding: const EdgeInsets.all(6),

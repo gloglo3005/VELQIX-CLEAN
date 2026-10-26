@@ -256,7 +256,7 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
                   _miniAction('Approuver', AppTheme.success,
                       () => _act(p, () => AdminService.instance.approveProperty(p.id),
                           'Annonce approuvée et publiée.', newStatus: 'approuve')),
-                if (p.status != 'rejete')
+                if (p.status != 'rejete' && p.status != 'approuve')
                   _miniAction('Rejeter', AppTheme.warning,
                       () => _act(p, () => AdminService.instance.rejectProperty(p.id),
                           'Annonce rejetée.', newStatus: 'rejete')),
