@@ -9,6 +9,7 @@ import '../services/admin_socket_service.dart'; // NEW
 import '../services/api_service.dart'; // NEW : vraies routes /api/admin/*
 import '../services/staff_service.dart';
 import '../services/admin_service.dart';
+import '../services/report_service.dart';
 import 'admin_tabs/admin_users_tab.dart';
 import 'admin_tabs/admin_properties_tab.dart';
 import 'admin_tabs/admin_roles_tab.dart';
@@ -29,10 +30,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // NOTE : listes de démo retirées. "Litiges" n'a pas encore de backend réel
-  // (aucune route/contrôleur fourni pour ça) — l'onglet affiche donc un état
-  // vide honnête plutôt que des données inventées, en attendant l'implémentation.
-  final List<Map<String, String>> _disputes = [];
+  // Litiges : l'onglet est branché sur les signalements (voir ReportService).
 
   // ── NEW : vraies données chargées depuis l'API (remplacent MockDataService) ─
   List<UserModel> _users = [];
@@ -107,6 +105,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     // Le token JWT est stocké côté ApiService (SharedPreferences), pas sur
     // AuthService lui-même (qui n'expose aucun getter `token`).
     _connectAdminSocket();
+
+    // Compteur de litiges à traiter (carte du tableau de bord)
+    ReportService.instance.refreshOpenCount();
 
     // ── NEW : Écouter les notifs live pour afficher le bandeau ──────────────
     adminLiveNotifNotifier.addListener(_onLiveNotif);
@@ -473,7 +474,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             children: [
               Expanded(child: StatCard(label: 'En attente', value: '${pendingPropertiesNotifier.value.length}', icon: Icons.pending_actions_rounded, color: AppTheme.warning)),
               const SizedBox(width: 12),
-              Expanded(child: StatCard(label: 'Litiges', value: '${_disputes.length}', icon: Icons.gavel_rounded, color: AppTheme.error)),
+              Expanded(child: ValueListenableBuilder<int>(valueListenable: openReportsCountNotifier, builder: (_, n, __) => StatCard(label: 'Litiges', value: '$n', icon: Icons.gavel_rounded, color: AppTheme.error))),
             ],
           ),
           const SizedBox(height: 16),
@@ -561,58 +562,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Widget _buildLitiges() {
-    if (_disputes.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.gavel_rounded, size: 56, color: AppTheme.textHint),
-            const SizedBox(height: 16),
-            Text('Aucun litige pour le moment',
-                style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 6),
-            Text('La gestion des litiges n\'est pas encore connectée au backend.',
-                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textHint),
-                textAlign: TextAlign.center),
-          ]),
-        ),
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: _disputes.map((l) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.gavel_rounded, color: AppTheme.error, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(l['titre']!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600))),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: l['statut'] == 'Ouvert' ? AppTheme.error.withOpacity(0.1) : AppTheme.warning.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(l['statut']!, style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: l['statut'] == 'Ouvert' ? AppTheme.error : AppTheme.warning)),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          Text('Parties : ${l['parties']}', style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
-          Text('Ouvert ${l['date']}', style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: OutlinedButton(onPressed: () {}, style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)), child: Text('Voir les détails', style: GoogleFonts.poppins(fontSize: 12)))),
-            const SizedBox(width: 8),
-            Expanded(child: ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8), backgroundColor: AppTheme.success), child: Text('Résoudre', style: GoogleFonts.poppins(fontSize: 12)))),
-          ]),
-        ]),
-      )).toList(),
-    );
-  }
+  Widget _buildLitiges() => const _AdminReportsPanel();
 }
 
 // ── NEW : Widget onglet avec badge compteur ───────────────────────────────────
@@ -1001,6 +951,397 @@ class _CreateStaffSheetState extends State<_CreateStaffSheet> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Litiges : signalements d'annonces (GET/PUT /api/admin/reports) ───────────
+class _ReportFilter {
+  final String? status; // null = à traiter (open, reviewing, needs_info)
+  final String label;
+  const _ReportFilter(this.status, this.label);
+}
+
+class _AdminReportsPanel extends StatefulWidget {
+  const _AdminReportsPanel();
+  @override
+  State<_AdminReportsPanel> createState() => _AdminReportsPanelState();
+}
+
+class _AdminReportsPanelState extends State<_AdminReportsPanel> {
+  static const List<_ReportFilter> _filters = [
+    _ReportFilter(null, 'À traiter'),
+    _ReportFilter('resolved', 'Résolus'),
+    _ReportFilter('dismissed', 'Classés'),
+    _ReportFilter('all', 'Tous'),
+  ];
+
+  String? _filter;
+  List<PropertyReportItem> _items = [];
+  int _total = 0;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    final requested = _filter;
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    final res = await ReportService.instance.list(status: requested);
+    if (!mounted || requested != _filter) return; // filtre changé entre-temps
+    setState(() {
+      _loading = false;
+      _error = res.error;
+      if (res.error == null) {
+        _items = res.items;
+        _total = res.total;
+      }
+    });
+    if (res.error == null && requested == null) {
+      openReportsCountNotifier.value = res.total;
+    }
+  }
+
+  Color _statusColor(String s) {
+    switch (s) {
+      case 'open':       return AppTheme.error;
+      case 'reviewing':  return AppTheme.info;
+      case 'needs_info': return AppTheme.warning;
+      case 'resolved':   return AppTheme.success;
+      default:           return AppTheme.textHint;
+    }
+  }
+
+  String _fmtDate(DateTime? d) {
+    if (d == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.day)}/${two(d.month)}/${d.year}';
+  }
+
+  Widget _pill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label,
+          style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  Future<void> _openActionSheet(PropertyReportItem r) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ReportActionSheet(report: r),
+    );
+    if (changed == true) {
+      ReportService.instance.refreshOpenCount();
+      if (mounted) _load(silent: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      SizedBox(
+        height: 52,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          children: [
+            for (final f in _filters)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(f.label, style: GoogleFonts.poppins(fontSize: 12)),
+                  selected: _filter == f.status,
+                  onSelected: (_) {
+                    if (_filter == f.status) return;
+                    setState(() => _filter = f.status);
+                    _load();
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+      Expanded(child: _buildBody()),
+    ]);
+  }
+
+  Widget _buildBody() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.textHint),
+            const SizedBox(height: 12),
+            Text(_error!,
+                style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: Text('Réessayer', style: GoogleFonts.poppins(fontSize: 12))),
+          ]),
+        ),
+      );
+    }
+
+    if (_items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.gavel_rounded, size: 56, color: AppTheme.textHint),
+            const SizedBox(height: 16),
+            Text(_filter == null ? 'Aucun signalement à traiter' : 'Aucun signalement dans cette liste',
+                style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+          ]),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _load(silent: true),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _items.length + (_total > _items.length ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (i >= _items.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Affichage des ${_items.length} plus récents sur $_total.',
+                  style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint),
+                  textAlign: TextAlign.center),
+            );
+          }
+          return _reportCard(_items[i]);
+        },
+      ),
+    );
+  }
+
+  Widget _reportCard(PropertyReportItem r) {
+    final color = _statusColor(r.status);
+    final place = r.propertyCity.isEmpty ? r.propertyTitle : '${r.propertyTitle} · ${r.propertyCity}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.gavel_rounded, color: AppTheme.error, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(place,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+          _pill(ReportService.statusLabel(r.status), color),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          _pill(ReportService.reasonLabel(r.reason), AppTheme.warning),
+          if (r.isSuspended) _pill('Annonce suspendue', AppTheme.error),
+          if (r.isActive && r.activeOnProperty > 1)
+            _pill('${r.activeOnProperty} signalements actifs sur ce bien', AppTheme.info),
+          if (r.isActive && r.activeSameReason > 1)
+            _pill('${r.activeSameReason} pour ce même motif', AppTheme.info),
+        ]),
+        if (r.details != null) ...[
+          const SizedBox(height: 8),
+          Text(r.details!, style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+        ],
+        const SizedBox(height: 8),
+        Text(
+          'Signalé par ${r.reporterName.isEmpty ? 'un utilisateur' : r.reporterName}'
+          '${r.createdAt == null ? '' : ' le ${_fmtDate(r.createdAt)}'}',
+          style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint),
+        ),
+        if (r.ownerName.isNotEmpty)
+          Text(
+            'Annonceur : ${r.ownerName}${r.ownerPhone.isEmpty ? '' : ' · ${r.ownerPhone}'}',
+            style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint),
+          ),
+        if (r.resolution != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('Décision : ${r.resolution}',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+          ),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: r.isActive
+              ? ElevatedButton(
+                  onPressed: () => _openActionSheet(r),
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)),
+                  child: Text('Traiter', style: GoogleFonts.poppins(fontSize: 12)),
+                )
+              : OutlinedButton(
+                  onPressed: () => _openActionSheet(r),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)),
+                  child: Text('Revoir la décision', style: GoogleFonts.poppins(fontSize: 12)),
+                ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _ReportActionSheet extends StatefulWidget {
+  final PropertyReportItem report;
+  const _ReportActionSheet({required this.report});
+  @override
+  State<_ReportActionSheet> createState() => _ReportActionSheetState();
+}
+
+class _ReportActionSheetState extends State<_ReportActionSheet> {
+  late String _status;
+  String _action = 'none'; // none | suspend | restore
+  late final TextEditingController _resolutionCtrl;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.report.status;
+    _resolutionCtrl = TextEditingController(text: widget.report.resolution ?? '');
+  }
+
+  @override
+  void dispose() {
+    _resolutionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final r = widget.report;
+    final status = _status != r.status ? _status : null;
+    final resolution = _resolutionCtrl.text.trim();
+    final resolutionChanged = resolution != (r.resolution ?? '');
+    final action = _action == 'none' ? null : _action;
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (status == null && !resolutionChanged && action == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('Aucune modification à enregistrer')));
+      return;
+    }
+
+    setState(() => _saving = true);
+    final res = await ReportService.instance.update(
+      r.id,
+      status: status,
+      resolution: resolutionChanged ? resolution : null,
+      propertyAction: action,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    messenger.showSnackBar(SnackBar(
+      content: Text(res.message),
+      backgroundColor: res.ok ? AppTheme.success : AppTheme.error,
+    ));
+    if (res.ok) Navigator.of(context).pop(true);
+  }
+
+  Widget _choice(String label, bool selected, VoidCallback onTap) {
+    return ChoiceChip(
+      label: Text(label, style: GoogleFonts.poppins(fontSize: 12)),
+      selected: selected,
+      onSelected: _saving ? null : (_) => onTap(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.report;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('Traiter le signalement',
+                style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('${ReportService.reasonLabel(r.reason)} · ${r.propertyTitle}',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+            const SizedBox(height: 16),
+            Text('Statut', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final s in ReportService.statuses)
+                _choice(ReportService.statusLabel(s), _status == s, () => setState(() => _status = s)),
+            ]),
+            const SizedBox(height: 16),
+            Text('Décision / commentaire', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _resolutionCtrl,
+              enabled: !_saving,
+              maxLines: 3,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                hintText: 'Ex. : annonce vérifiée, informations corrigées par le propriétaire',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('Action sur l\'annonce', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              _choice('Aucune', _action == 'none', () => setState(() => _action = 'none')),
+              if (!r.isSuspended)
+                _choice('Suspendre l\'annonce', _action == 'suspend', () => setState(() => _action = 'suspend')),
+              if (r.isSuspended)
+                _choice('Rétablir l\'annonce', _action == 'restore', () => setState(() => _action = 'restore')),
+            ]),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _submit,
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                child: _saving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text('Enregistrer', style: GoogleFonts.poppins(fontSize: 13)),
+              ),
+            ),
+          ]),
         ),
       ),
     );
