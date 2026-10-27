@@ -13,6 +13,7 @@ import '../services/report_service.dart';
 import 'admin_tabs/admin_users_tab.dart';
 import 'admin_tabs/admin_properties_tab.dart';
 import 'admin_tabs/admin_roles_tab.dart';
+import 'admin_tabs/admin_kpi_section.dart';
 import 'admin_tabs/admin_ops_tab.dart';
 import 'admin_tabs/admin_common.dart' show adminRoleColor;
 import '../theme/app_theme.dart';
@@ -477,6 +478,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Expanded(child: ValueListenableBuilder<int>(valueListenable: openReportsCountNotifier, builder: (_, n, __) => StatCard(label: 'Litiges', value: '$n', icon: Icons.gavel_rounded, color: AppTheme.error))),
             ],
           ),
+          const SizedBox(height: 16),
+          const AdminKpiSection(),
           const SizedBox(height: 16),
           _buildRoleBreakdown(),
           const SizedBox(height: 20),
