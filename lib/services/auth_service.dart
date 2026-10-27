@@ -43,6 +43,7 @@ final _googleSignIn = GoogleSignIn(
 const _kAccountType = 'auth_account_type';
 const _kNomEntreprise = 'auth_nom_entreprise';
 const _kTypeActivite = 'auth_type_activite';
+const _kMustChangePassword = 'auth_must_change_password';
 
 // Erreurs backend qui signifient que la session n'est plus valide.
 const _kSessionErrors = {
@@ -68,6 +69,17 @@ class AuthService {
   final _api = ApiService.instance;
 
   UserModel? _currentUser;
+
+  // Mot de passe temporaire (réinitialisé par un admin) pas encore remplacé.
+  // Mémorisé sur l'appareil : fermer l'app ne fait pas oublier l'obligation.
+  bool _mustChangePassword = false;
+  bool get mustChangePassword => _mustChangePassword;
+
+  Future<void> _setMustChangePassword(bool value) async {
+    _mustChangePassword = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kMustChangePassword, value);
+  }
 
   bool get isLoggedIn => _currentUser != null;
 
@@ -100,6 +112,13 @@ class AuthService {
   Future<bool> restoreSessionFast() async {
     final prefs = await SharedPreferences.getInstance();
     if (!(prefs.getBool(_kLoggedIn) ?? false)) return false;
+    // Mot de passe temporaire jamais remplacé : on ne restaure pas la session.
+    // Le prochain passage par l'écran de connexion redemandera le changement.
+    if (prefs.getBool(_kMustChangePassword) ?? false) {
+      await _api.clearToken();
+      await prefs.setBool(_kLoggedIn, false);
+      return false;
+    }
     _currentUser = _userFromPrefs(prefs);
     return _currentUser != null;
   }
@@ -113,6 +132,13 @@ class AuthService {
     final res = await _api.get('/auth/me', auth: true);
 
     if (res['success'] == true) {
+      // Un admin a réinitialisé le mot de passe pendant que la session était
+      // ouverte : retour à l'écran de connexion (qui redemandera le changement).
+      if (res['data']['mustChangePassword'] == true && !_mustChangePassword) {
+        await logout();
+        _api.sessionExpiredNotifier.value++;
+        return;
+      }
       _currentUser = _userFromJson(res['data']);
       await _cacheUser(
         _currentUser!,
@@ -224,6 +250,9 @@ class AuthService {
     if (res['success'] != true) {
       return res['message'] ?? 'Email ou mot de passe invalide.';
     }
+
+    // Le serveur indique si ce mot de passe est temporaire (réinitialisé par un admin).
+    await _setMustChangePassword(res['data']['user']?['mustChangePassword'] == true);
 
     await _api.saveToken(res['data']['accessToken']);
 
@@ -464,6 +493,18 @@ class AuthService {
       return res['message'] ?? 'Erreur';
     }
 
+    // Le serveur révoque TOUS les refresh tokens à chaque changement de mot de
+    // passe : sans nouvelle connexion, la session tomberait dès l'expiration du
+    // jeton d'accès (15 min). On se reconnecte donc silencieusement avec le
+    // nouveau mot de passe pour obtenir de nouveaux jetons.
+    final email = _currentUser?.email;
+    if (email == null || email.isEmpty) return null;
+    final relogin = await login(email: email, password: newPassword);
+    if (relogin != null) {
+      return 'Mot de passe modifié, mais la reconnexion a échoué. '
+          'Déconnectez-vous puis reconnectez-vous avec votre nouveau mot de passe.';
+    }
+    await _setMustChangePassword(false);
     return null;
   }
 
@@ -670,6 +711,7 @@ class AuthService {
     await _api.clearToken();
 
     _currentUser = null;
+    await _setMustChangePassword(false);
 
     globalFavorites.clear();
 

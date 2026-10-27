@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // 🔐 Mot de passe réinitialisé par un admin : changement obligatoire
-    if (AuthService.instance.currentUserOrEmpty.mustChangePassword) {
+    if (AuthService.instance.mustChangePassword) {
       final done = await _forcePasswordChange(password);
       if (!done || !mounted) {
         await AuthService.instance.logout();
