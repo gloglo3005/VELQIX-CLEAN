@@ -44,6 +44,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
   bool _pickingVideo   = false;
   bool _showPhotoError = false;
 
+  // Limite de photos : 2 sans Premium, 12 avec Premium actif (ANN-03)
+  bool get _isPremium => AuthService.instance.currentUserOrEmpty.isPremium;
+  int get _photoLimit => PropertyService.photoLimitFor(_isPremium);
+
   // Cahier des charges §8.1 / §4.2 : le lancement se concentre sur l'immobilier
   // (chambres, studios, maisons, appartements, terrains, locaux commerciaux,
   // bureaux). Le type « Mobilier » (véhicules) reste proposé à la publication.
@@ -109,7 +113,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
       _category    = p.categorie;
       // Anciennes annonces (équipement / autre) : on se rabat sur une catégorie valide
       if (!_currentCats.contains(_category)) _category = _currentCats.first;
-      _selectedPhotos.addAll(p.images.take(2));
+      _selectedPhotos.addAll(p.images.take(_photoLimit));
       if (p.videoUrl != null && p.videoUrl!.isNotEmpty) _selectedVideos.add(p.videoUrl!);
     }
   }
@@ -126,10 +130,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   // ─── Galerie ────────────────────────────────────────────────────────────────
   Future<void> _pickPhotos() async {
-    if (_selectedPhotos.length >= 2) { _showMaxSnack(); return; }
+    if (_selectedPhotos.length >= _photoLimit) { _showMaxSnack(); return; }
     setState(() => _pickingPhotos = true);
     try {
-      final files = await WebFilePicker.pickMultipleImages(maxCount: 2 - _selectedPhotos.length);
+      final files = await WebFilePicker.pickMultipleImages(maxCount: _photoLimit - _selectedPhotos.length);
       if (files.isNotEmpty && mounted) {
         setState(() { _selectedPhotos.addAll(files); _showPhotoError = false; });
       }
@@ -141,7 +145,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   // ─── Caméra ─────────────────────────────────────────────────────────────────
   Future<void> _takePhoto() async {
-    if (_selectedPhotos.length >= 2) { _showMaxSnack(); return; }
+    if (_selectedPhotos.length >= _photoLimit) { _showMaxSnack(); return; }
     setState(() => _pickingPhotos = true);
     try {
       // capture=true => ouvre UNIQUEMENT l'appareil photo (jamais la galerie)
@@ -231,7 +235,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   void _showMaxSnack() {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(tr('add_photos_max'), style: GoogleFonts.poppins(color: Colors.white)),
+      content: Text(
+        _isPremium
+            ? "Maximum $_photoLimit photos par annonce."
+            : "Maximum $_photoLimit photos sans Premium. Passez à Premium pour en ajouter jusqu'à ${PropertyService.photoLimitPremium}.",
+        style: GoogleFonts.poppins(color: Colors.white),
+      ),
       backgroundColor: AppTheme.warning,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -329,8 +338,21 @@ class _AddListingScreenState extends State<AddListingScreen> {
   }
 
   // ─── Soumission réelle au backend ───────────────────────────────────────────
-  void _submit() async {
-    if (!_validateStep()) return;
+  void _submit({bool draft = false}) async {
+    if (draft) {
+      // Brouillon : seul le titre est exigé, le reste peut être complété plus tard.
+      if (_titreCtrl.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Ajoute au moins un titre pour enregistrer un brouillon.'),
+          backgroundColor: AppTheme.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+        return;
+      }
+    } else if (!_validateStep()) {
+      return;
+    }
     setState(() => _loading = true);
 
     final prix = double.tryParse(
@@ -426,7 +448,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
     final images = uploadedImages.isNotEmpty
         ? uploadedImages
-        : [_categoryImageUrl(_category)];
+        : (draft ? <String>[] : [_categoryImageUrl(_category)]);
 
     // ── Étape 2 : créer l'annonce avec les URLs (légères) au lieu du base64 ──
     final payload = <String, dynamic>{
@@ -442,6 +464,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
         'pays': AuthService.instance.currentUserOrEmpty.countryName ?? 'Togo',
         // En modification, null = retirer la vidéo ; en création, rien si pas de vidéo.
         if (_isEdit || videoUrl != null) 'videoUrl': videoUrl,
+        if (draft && !_isEdit) 'draft': true,
     };
 
     final res = _isEdit
@@ -458,6 +481,27 @@ class _AddListingScreenState extends State<AddListingScreen> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));
+      return;
+    }
+
+    // Brouillon : enregistré sans notification ; modifié puis publié : on le soumet maintenant.
+    final wasDraft = _isEdit && widget.editing!.status == 'brouillon';
+    if (draft || wasDraft) {
+      String? submitErr;
+      if (wasDraft && !draft) {
+        submitErr = await PropertyService.instance.submitProperty(widget.editing!.id);
+      }
+      if (!mounted) return;
+      final msg = draft
+          ? 'Brouillon enregistré. Retrouve-le dans « Mes annonces ».'
+          : (submitErr ?? 'Annonce soumise ! En attente de validation par l\'administration.');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
+        backgroundColor: submitErr != null ? AppTheme.error : AppTheme.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+      Navigator.pop(context, true);
       return;
     }
 
@@ -584,6 +628,19 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
             ]),
           ),
+        // Brouillon (nouvelle annonce ou brouillon existant)
+        if (!_isEdit || widget.editing!.status == 'brouillon')
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _loading ? null : () => _submit(draft: true),
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Enregistrer en brouillon'),
+              ),
+            ),
+          ),
         // Navigation
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
@@ -708,7 +765,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
           ),
         ]),
         const Spacer(),
-        Text('${_selectedPhotos.length}/2',
+        Text('${_selectedPhotos.length}/$_photoLimit',
             style: GoogleFonts.poppins(fontSize: 12,
                 color: _selectedPhotos.isEmpty && _showPhotoError ? AppTheme.error : AppTheme.textSecondary,
                 fontWeight: FontWeight.w600)),
@@ -721,7 +778,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
             filename: e.value,
             onRemove: () => setState(() => _selectedPhotos.removeAt(e.key)),
           )),
-          if (_selectedPhotos.length < 2) ...[
+          if (_selectedPhotos.length < _photoLimit) ...[
             // Bouton Galerie
             _MediaButton(
               icon: Icons.add_photo_alternate_rounded,

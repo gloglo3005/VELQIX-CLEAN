@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart'; // NEW : vraie source de données
+import '../services/availability_service.dart';
 import '../services/property_service.dart'; // NEW : suppression / mise à jour réelles
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
@@ -27,6 +28,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
   bool _loading = true;
   String? _loadError;
   List<PropertyModel> _serverProps = [];
+  // availabilityStatus de chaque annonce (available | pending | unavailable | suspended | archived),
+  // lu dans la réponse brute de /properties/my.
+  Map<String, String> _availability = {};
 
   // NOTE : /properties/my renvoie TOUTES les annonces de l'utilisateur, quel
   // que soit leur statut (en_attente, approuve, rejete) — donc plus besoin de
@@ -39,7 +43,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
       _serverProps.where((p) => p.status != 'approuve').toList();
 
   List<PropertyModel> get _activeProps =>
-      _serverProps.where((p) => p.isAvailable && p.status == 'approuve').toList();
+      _serverProps.where((p) =>
+          p.isAvailable && p.status == 'approuve' &&
+          _availability[p.id] != 'archived' && _availability[p.id] != 'unavailable').toList();
   List<PropertyModel> get _allProps => _myProps;
 
   Future<void> _loadMyProperties() async {
@@ -53,6 +59,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
       _serverProps = (res['data'] as List)
           .map((j) => PropertyModel.fromJson(j as Map<String, dynamic>))
           .toList();
+      _availability = {
+        for (final j in (res['data'] as List))
+          (j as Map<String, dynamic>)['id'].toString():
+              (j['availabilityStatus'] ?? 'available').toString(),
+      };
     } else {
       _loadError = res['message'] ?? 'Impossible de charger tes annonces';
     }
@@ -101,7 +112,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
         centerTitle: true,
         actions: [
           GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen())),
+            onTap: _openAddListing,
             child: Container(
               margin: const EdgeInsets.all(10),
               padding: const EdgeInsets.all(8),
@@ -181,7 +192,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
         title: tr('mylist_no_listing'),
         subtitle: tr('mylist_no_listing_sub'),
         buttonLabel: tr('mylist_add_btn'),
-        onButton: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen())),
+        onButton: _openAddListing,
       );
     }
     return ListView.separated(
@@ -194,6 +205,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
         onEdit: () => _editProperty(props[i]),
         onDelete: () => _confirmDelete(context, props[i]),
         onToggle: (newValue) => _toggleAvailability(props[i], newValue),
+        availability: _availability[props[i].id],
+        onClose: () => _closeProperty(props[i]),
+        onArchive: () => _archiveProperty(props[i]),
+        onRestore: () => _restoreProperty(props[i]),
       ),
     );
   }
@@ -207,12 +222,82 @@ class _MyListingsScreenState extends State<MyListingsScreen> with SingleTickerPr
     if (mounted) _loadMyProperties();
   }
 
+  // ─── Nouvelle annonce (recharge la liste au retour : un brouillon n'émet aucun événement) ──
+  Future<void> _openAddListing() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddListingScreen()));
+    if (mounted) _loadMyProperties();
+  }
+
+  // ─── Clôture / archivage / réactivation par le propriétaire (ANN-05) ───────
+  Future<bool> _confirm(String title, String body, String cta) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+        content: Text(body, style: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text('Annuler', style: GoogleFonts.poppins())),
+          ElevatedButton(onPressed: () => Navigator.pop(dialogCtx, true), child: Text(cta, style: GoogleFonts.poppins())),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _declare(PropertyModel p, String status, String okMessage) async {
+    final res = await ApiService.instance.post(
+      '/properties/${p.id}/availability',
+      {'status': status},
+      auth: true,
+    );
+    if (!mounted) return;
+    final ok = res['success'] == true;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? okMessage : (res['message'] ?? 'Action impossible'),
+          style: GoogleFonts.poppins(color: Colors.white)),
+      backgroundColor: ok ? AppTheme.success : AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+    _loadMyProperties();
+  }
+
+  Future<void> _closeProperty(PropertyModel p) async {
+    final sold = p.listingType == ListingType.vente;
+    final ok = await _confirm(
+      sold ? 'Marquer comme vendu ?' : 'Marquer comme loué ?',
+      '« ${p.titre} » ne sera plus proposée dans les résultats. Tu pourras la remettre en ligne ou l\'archiver ensuite.',
+      'Clôturer',
+    );
+    if (!ok) return;
+    await _declare(p, sold ? 'sold' : 'rented',
+        sold ? 'Annonce clôturée : bien vendu.' : 'Annonce clôturée : bien loué.');
+  }
+
+  Future<void> _archiveProperty(PropertyModel p) async {
+    final ok = await _confirm(
+      'Archiver cette annonce ?',
+      '« ${p.titre} » sera retirée des annonces actives. Tu pourras la réactiver à tout moment.',
+      'Archiver',
+    );
+    if (!ok) return;
+    await _declare(p, 'archived', 'Annonce archivée.');
+  }
+
+  Future<void> _restoreProperty(PropertyModel p) async {
+    await _declare(p, 'available', 'Annonce remise en ligne.');
+  }
+
   // ─── Soumettre à nouveau une annonce refusée ───────────────────────────────
   Future<void> _resubmit(PropertyModel p) async {
     final err = await PropertyService.instance.submitProperty(p.id);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(err ?? 'Annonce soumise à nouveau. En attente de validation.',
+      content: Text(
+          err ?? (p.status == 'brouillon'
+              ? 'Annonce soumise. En attente de validation.'
+              : 'Annonce soumise à nouveau. En attente de validation.'),
           style: GoogleFonts.poppins(color: Colors.white)),
       backgroundColor: err != null ? AppTheme.error : AppTheme.warning,
       behavior: SnackBarBehavior.floating,
@@ -300,7 +385,12 @@ class _ListingManageCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final ValueChanged<bool> onToggle; // NEW : transmet le nouvel état au parent
-  const _ListingManageCard({required this.property, required this.onTap, required this.onEdit, required this.onDelete, required this.onToggle});
+  final String? availability; // availabilityStatus serveur (archived, unavailable, ...)
+  final VoidCallback onClose;
+  final VoidCallback onArchive;
+  final VoidCallback onRestore;
+  const _ListingManageCard({required this.property, required this.onTap, required this.onEdit, required this.onDelete, required this.onToggle,
+      this.availability, required this.onClose, required this.onArchive, required this.onRestore});
 
   @override
   State<_ListingManageCard> createState() => _ListingManageCardState();
@@ -398,10 +488,22 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                         if (p.status != 'approuve') ...[
                           const SizedBox(height: 2),
                           Text(
-                            p.status == 'rejete' ? 'Refusée' : 'En attente de validation',
+                            p.status == 'rejete'
+                                ? 'Refusée'
+                                : p.status == 'brouillon' ? 'Brouillon' : 'En attente de validation',
                             style: GoogleFonts.poppins(
                               fontSize: 10, fontWeight: FontWeight.w600,
-                              color: p.status == 'rejete' ? AppTheme.error : AppTheme.warning,
+                              color: p.status == 'rejete'
+                                  ? AppTheme.error
+                                  : p.status == 'brouillon' ? AppTheme.textSecondary : AppTheme.warning,
+                            ),
+                          ),
+                        ] else if (widget.availability == 'archived' || widget.availability == 'unavailable') ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.availability == 'archived' ? 'Archivée' : 'Clôturée (indisponible)',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary,
                             ),
                           ),
                         ],
@@ -430,6 +532,18 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                 child: _buildApprovalRow(p),
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _showAvailabilityHistory(context, p),
+                  icon: const Icon(Icons.history_rounded, size: 16),
+                  label: Text('Historique des confirmations',
+                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ),
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -475,6 +589,27 @@ class _ListingManageCardState extends State<_ListingManageCard> {
                       ]),
                     ),
                   ),
+                  if (p.status == 'approuve')
+                    PopupMenuButton<String>(
+                      tooltip: 'Plus d\'actions',
+                      icon: const Icon(Icons.more_vert_rounded, size: 18),
+                      onSelected: (v) {
+                        if (v == 'close') widget.onClose();
+                        if (v == 'archive') widget.onArchive();
+                        if (v == 'restore') widget.onRestore();
+                      },
+                      itemBuilder: (_) => [
+                        if (widget.availability == 'archived')
+                          const PopupMenuItem(value: 'restore', child: Text('Réactiver l\'annonce'))
+                        else ...[
+                          if (widget.availability == 'unavailable')
+                            const PopupMenuItem(value: 'restore', child: Text('Remettre en ligne'))
+                          else
+                            const PopupMenuItem(value: 'close', child: Text('Clôturer (louée / vendue)')),
+                          const PopupMenuItem(value: 'archive', child: Text('Archiver')),
+                        ],
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -517,6 +652,12 @@ class _PendingPropertyCard extends StatelessWidget {
       badgeText = AppTheme.warning;
       statusIcon = Icons.hourglass_top_rounded;
       statusLabel = tr('mylist_status_pending');
+    } else if (p.status == 'brouillon') {
+      borderColor = AppTheme.border;
+      badgeBg = AppTheme.textSecondary.withOpacity(0.1);
+      badgeText = AppTheme.textSecondary;
+      statusIcon = Icons.edit_note_rounded;
+      statusLabel = 'Brouillon';
     } else {
       borderColor = AppTheme.error.withOpacity(0.3);
       badgeBg = AppTheme.error.withOpacity(0.08);
@@ -584,18 +725,183 @@ class _PendingPropertyCard extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: Text('Modifier le bien', style: GoogleFonts.poppins(fontSize: 12)),
                 ),
-              if (p.status == 'rejete' && onResubmit != null) ...[
+              if ((p.status == 'rejete' || p.status == 'brouillon') && onResubmit != null) ...[
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: onResubmit,
                   icon: const Icon(Icons.publish_rounded, size: 16),
-                  label: Text('Soumettre à nouveau', style: GoogleFonts.poppins(fontSize: 12)),
+                  label: Text(p.status == 'brouillon' ? 'Soumettre' : 'Soumettre à nouveau', style: GoogleFonts.poppins(fontSize: 12)),
                 ),
               ],
             ]),
           ),
         ],
       ]),
+    );
+  }
+}
+
+// ─── Historique des confirmations d'une annonce (ANN-06) ─────────────────────
+Future<void> _showAvailabilityHistory(BuildContext context, PropertyModel p) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppTheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => _AvailabilityHistorySheet(property: p),
+  );
+}
+
+class _AvailabilityHistorySheet extends StatefulWidget {
+  final PropertyModel property;
+  const _AvailabilityHistorySheet({required this.property});
+  @override
+  State<_AvailabilityHistorySheet> createState() => _AvailabilityHistorySheetState();
+}
+
+class _AvailabilityHistorySheetState extends State<_AvailabilityHistorySheet> {
+  late Future<List<AvailabilityEventItem>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = AvailabilityService.instance.getHistory(widget.property.id);
+  }
+
+  void _retry() {
+    setState(() {
+      _future = AvailabilityService.instance.getHistory(widget.property.id);
+    });
+  }
+
+  String _fmt(DateTime? d) {
+    if (d == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.day)}/${two(d.month)}/${d.year} à ${two(d.hour)}:${two(d.minute)}';
+  }
+
+  IconData _icon(String action) {
+    if (action.startsWith('suspended')) return Icons.block_rounded;
+    if (action.startsWith('restored')) return Icons.restore_rounded;
+    if (action == 'declared_available' || action == 'confirmed_via_request') {
+      return Icons.check_circle_rounded;
+    }
+    return Icons.info_rounded;
+  }
+
+  Color _color(String action) {
+    if (action.startsWith('suspended')) return AppTheme.error;
+    if (action.startsWith('restored')) return AppTheme.info;
+    if (action == 'declared_available' || action == 'confirmed_via_request') {
+      return AppTheme.success;
+    }
+    return AppTheme.warning;
+  }
+
+  Widget _row(AvailabilityEventItem e) {
+    final color = _color(e.action);
+    // L'identité d'un membre de l'équipe n'est pas montrée : on affiche l'équipe.
+    final who = e.channel == 'app'
+        ? (e.actorName ?? 'Vous')
+        : AvailabilityEventItem.channelLabel(e.channel);
+    // Les notes internes (ex. « Signalement <id> ») ne concernent pas le propriétaire.
+    final note = (e.note != null && !e.note!.startsWith('Signalement')) ? e.note : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+          child: Icon(_icon(e.action), size: 16, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AvailabilityEventItem.actionLabel(e.action),
+                style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+            const SizedBox(height: 2),
+            Text('Statut : ${AvailabilityEventItem.statusLabel(e.resultStatus)}',
+                style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+            if (note != null)
+              Text(note, style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
+            const SizedBox(height: 2),
+            Text('${_fmt(e.createdAt)} · $who',
+                style: GoogleFonts.poppins(fontSize: 10, color: AppTheme.textHint)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _message(IconData icon, String text, {bool retry = false}) {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 44, color: AppTheme.textHint),
+        const SizedBox(height: 12),
+        Text(text,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+        if (retry) ...[
+          const SizedBox(height: 12),
+          OutlinedButton(onPressed: _retry, child: Text('Réessayer', style: GoogleFonts.poppins(fontSize: 12))),
+        ],
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Historique des confirmations',
+                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(widget.property.titre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+            ]),
+          ),
+          Flexible(
+            child: FutureBuilder<List<AvailabilityEventItem>>(
+              future: _future,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snap.hasError) {
+                  return _message(Icons.error_outline_rounded,
+                      snap.error.toString().replaceFirst('Exception: ', ''),
+                      retry: true);
+                }
+                final events = snap.data ?? const <AvailabilityEventItem>[];
+                if (events.isEmpty) {
+                  return _message(Icons.history_rounded,
+                      'Aucune confirmation ni aucun changement de statut enregistré pour cette annonce.');
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => Divider(height: 1, color: AppTheme.border),
+                  itemBuilder: (_, i) => _row(events[i]),
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }

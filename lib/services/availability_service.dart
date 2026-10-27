@@ -120,10 +120,100 @@ class AvailabilityRequest {
   }
 }
 
+/// Une ligne de l'historique de disponibilité d'une annonce (ANN-06).
+/// Le serveur ne la modifie ni ne l'efface jamais.
+class AvailabilityEventItem {
+  final String id;
+  final String action;
+  final String resultStatus;
+  final String channel; // app | system | admin
+  final String? actorName;
+  final String? note;
+  final DateTime? createdAt;
+
+  const AvailabilityEventItem({
+    required this.id,
+    required this.action,
+    required this.resultStatus,
+    required this.channel,
+    required this.actorName,
+    required this.note,
+    required this.createdAt,
+  });
+
+  factory AvailabilityEventItem.fromJson(Map<String, dynamic> j) {
+    String? sn(dynamic v) {
+      final t = v?.toString().trim() ?? '';
+      return t.isEmpty ? null : t;
+    }
+
+    return AvailabilityEventItem(
+      id: (j['id'] ?? '').toString(),
+      action: (j['action'] ?? '').toString(),
+      resultStatus: (j['resultStatus'] ?? '').toString(),
+      channel: (j['channel'] ?? '').toString(),
+      actorName: sn(j['actorName']),
+      note: sn(j['note']),
+      createdAt: DateTime.tryParse((j['createdAt'] ?? '').toString())?.toLocal(),
+    );
+  }
+
+  static String actionLabel(String a) {
+    switch (a) {
+      case 'declared_available':   return 'Bien confirmé disponible';
+      case 'declared_rented':      return 'Bien déclaré loué';
+      case 'declared_sold':        return 'Bien déclaré vendu';
+      case 'declared_unavailable': return 'Bien déclaré indisponible';
+      case 'confirmed_via_request':   return 'Disponibilité confirmée suite à une demande';
+      case 'unavailable_via_request': return 'Indisponibilité déclarée suite à une demande';
+      case 'suspended_by_admin':   return 'Annonce suspendue par l\'équipe';
+      case 'restored_by_admin':    return 'Annonce rétablie par l\'équipe';
+      case 'suspended_by_reports': return 'Annonce suspendue après signalements';
+      default:                     return a;
+    }
+  }
+
+  static String statusLabel(String s) {
+    switch (s) {
+      case 'available':   return 'Disponible';
+      case 'pending':     return 'À reconfirmer';
+      case 'unavailable': return 'Indisponible';
+      case 'rented':      return 'Loué';
+      case 'sold':        return 'Vendu';
+      case 'suspended':   return 'Suspendue';
+      case 'archived':    return 'Archivée';
+      default:            return s;
+    }
+  }
+
+  static String channelLabel(String c) {
+    switch (c) {
+      case 'app':    return 'Application';
+      case 'admin':  return 'Équipe VelQix';
+      case 'system': return 'Automatique';
+      default:       return c;
+    }
+  }
+}
+
 class AvailabilityService {
   AvailabilityService._();
   static final AvailabilityService instance = AvailabilityService._();
   final _api = ApiService.instance;
+
+  /// Propriétaire (ou admin) : historique daté des confirmations et changements
+  /// de statut d'une annonce, du plus récent au plus ancien (ANN-06).
+  /// Lance une Exception avec un message lisible en cas d'échec.
+  Future<List<AvailabilityEventItem>> getHistory(String propertyId) async {
+    final res = await _api.get('/properties/$propertyId/availability-history', auth: true);
+    if (res['success'] != true) throw Exception(_msg(res, "Impossible de charger l'historique."));
+    final data = res['data'];
+    if (data is! List) return <AvailabilityEventItem>[];
+    return data
+        .whereType<Map>()
+        .map((m) => AvailabilityEventItem.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+  }
 
   List<AvailabilityRequest> _parse(dynamic data) => data is List
       ? data.whereType<Map<String, dynamic>>().map(AvailabilityRequest.fromJson).toList()

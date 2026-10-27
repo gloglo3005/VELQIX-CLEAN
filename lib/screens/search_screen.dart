@@ -26,6 +26,17 @@ class _SearchScreenState extends State<SearchScreen>
   bool   _hasSearched = false;
   String _lastQuery   = '';
 
+  // Filtres d'annonces (ANN-02) : appliqués côté serveur par GET /properties
+  double? _surfaceMin;
+  double? _surfaceMax;
+  int?    _piecesMin;
+  int?    _freshDays;      // confirmées par l'annonceur depuis N jours
+  bool    _verifiedOnly = false;
+
+  bool get _hasFilters =>
+      _surfaceMin != null || _surfaceMax != null || _piecesMin != null ||
+      _freshDays != null || _verifiedOnly;
+
   late TabController _tabCtrl;
 
   @override
@@ -49,7 +60,7 @@ class _SearchScreenState extends State<SearchScreen>
     _debounce?.cancel();
     final q = value.trim();
     if (q == _lastQuery) return;
-    if (q.length < 2) {
+    if (q.length < 2 && !_hasFilters) {
       setState(() { _users = []; _properties = []; _hasSearched = false; _lastQuery = ''; });
       return;
     }
@@ -60,15 +71,23 @@ class _SearchScreenState extends State<SearchScreen>
     if (!mounted) return;
     setState(() { _loading = true; _lastQuery = q; });
     try {
-      final res = await ApiService.instance.get(
-        '/search?q=${Uri.encodeComponent(q)}',
-        auth: true,
-      );
+      var users = <dynamic>[];
+      var props = <dynamic>[];
+      if (q.length >= 2) {
+        final res = await ApiService.instance.get(
+          '/search?q=${Uri.encodeComponent(q)}',
+          auth: true,
+        );
+        final data = res['data'] ?? {};
+        users = (data['users']      as List?) ?? [];
+        props = (data['properties'] as List?) ?? [];
+      }
+      // Filtres actifs : les annonces viennent de /properties (filtrées côté serveur)
+      if (_hasFilters) props = await _filteredProperties(q);
       if (!mounted) return;
-      final data = res['data'] ?? {};
       setState(() {
-        _users      = (data['users']      as List?) ?? [];
-        _properties = (data['properties'] as List?) ?? [];
+        _users      = users;
+        _properties = props;
         _hasSearched = true;
       });
       if (_users.isEmpty && _properties.isNotEmpty) _tabCtrl.animateTo(1);
@@ -88,6 +107,164 @@ class _SearchScreenState extends State<SearchScreen>
 
   // ─── Reconstruction PropertyModel depuis JSON API ─────────────────────────────
   PropertyModel _propertyFromJson(Map<String, dynamic> p) => PropertyModel.fromJson(p);
+
+  // ─── Annonces filtrées (surface, pièces, fraîcheur, vérification) ────────────
+  Future<List<dynamic>> _filteredProperties(String q) async {
+    final params = <String, String>{
+      if (_surfaceMin != null) 'surfaceMin': _surfaceMin!.toString(),
+      if (_surfaceMax != null) 'surfaceMax': _surfaceMax!.toString(),
+      if (_piecesMin != null)  'piecesMin': _piecesMin!.toString(),
+      if (_freshDays != null)  'confirmedWithinDays': _freshDays!.toString(),
+      if (_verifiedOnly)       'verified': 'true',
+    };
+    final res = await ApiService.instance.get(
+      '/properties?${Uri(queryParameters: params).query}',
+    );
+    if (res['success'] != true) return <dynamic>[];
+    var list = (res['data'] as List?) ?? <dynamic>[];
+    // Le texte saisi (si >= 2 caractères) affine ensuite titre, ville, adresse, catégorie.
+    if (q.length >= 2) {
+      final needle = q.toLowerCase();
+      list = list.where((p) {
+        final m = p as Map<String, dynamic>;
+        return [m['titre'], m['ville'], m['adresse'], m['categorie']]
+            .any((v) => (v ?? '').toString().toLowerCase().contains(needle));
+      }).toList();
+    }
+    return list;
+  }
+
+  // ─── Feuille de filtres ──────────────────────────────────────────────────────
+  Future<void> _openFilters() async {
+    final surfMinCtrl = TextEditingController(text: _surfaceMin?.toStringAsFixed(0) ?? '');
+    final surfMaxCtrl = TextEditingController(text: _surfaceMax?.toStringAsFixed(0) ?? '');
+    int?  pieces   = _piecesMin;
+    int?  fresh    = _freshDays;
+    bool  verified = _verifiedOnly;
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.adaptiveSurface(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setSheet) {
+        final txt = AppTheme.adaptiveText(ctx);
+
+        Widget title(String s) => Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 8),
+          child: Text(s, style: GoogleFonts.poppins(
+              fontSize: 13, fontWeight: FontWeight.w600, color: txt)),
+        );
+
+        Widget choice<T>(String label, T? value, T? current, void Function(T?) onPick) =>
+            ChoiceChip(
+              label: Text(label, style: GoogleFonts.poppins(fontSize: 12)),
+              selected: current == value,
+              onSelected: (_) => setSheet(() => onPick(value)),
+            );
+
+        Widget numberField(TextEditingController c, String label) => Expanded(
+          child: TextField(
+            controller: c,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+        );
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Filtres', style: GoogleFonts.poppins(
+                    fontSize: 17, fontWeight: FontWeight.w700, color: txt)),
+                title('Surface (m²)'),
+                Row(children: [
+                  numberField(surfMinCtrl, 'Min'),
+                  const SizedBox(width: 12),
+                  numberField(surfMaxCtrl, 'Max'),
+                ]),
+                title('Nombre de pièces'),
+                Wrap(spacing: 8, children: [
+                  choice<int>('Toutes', null, pieces, (v) => pieces = v),
+                  for (final n in [1, 2, 3, 4, 5])
+                    choice<int>('$n+', n, pieces, (v) => pieces = v),
+                ]),
+                title('Confirmées par l\'annonceur'),
+                Wrap(spacing: 8, children: [
+                  choice<int>('Toutes', null, fresh, (v) => fresh = v),
+                  choice<int>('7 jours', 7, fresh, (v) => fresh = v),
+                  choice<int>('30 jours', 30, fresh, (v) => fresh = v),
+                  choice<int>('90 jours', 90, fresh, (v) => fresh = v),
+                ]),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('Vérifiées sur le terrain uniquement',
+                      style: GoogleFonts.poppins(fontSize: 13, color: txt)),
+                  value: verified,
+                  onChanged: (v) => setSheet(() => verified = v),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setSheet(() {
+                        surfMinCtrl.clear();
+                        surfMaxCtrl.clear();
+                        pieces = null;
+                        fresh = null;
+                        verified = false;
+                      }),
+                      child: const Text('Réinitialiser'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Appliquer'),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        );
+      }),
+    );
+
+    if (applied != true || !mounted) return;
+
+    var minS = double.tryParse(surfMinCtrl.text.trim().replaceAll(',', '.'));
+    var maxS = double.tryParse(surfMaxCtrl.text.trim().replaceAll(',', '.'));
+    if (minS != null && maxS != null && minS > maxS) {
+      final t = minS; minS = maxS; maxS = t;
+    }
+    setState(() {
+      _surfaceMin   = minS;
+      _surfaceMax   = maxS;
+      _piecesMin    = pieces;
+      _freshDays    = fresh;
+      _verifiedOnly = verified;
+    });
+
+    final q = _searchCtrl.text.trim();
+    if (_hasFilters || q.length >= 2) {
+      _debounce?.cancel();
+      await _search(q);
+    } else {
+      setState(() { _users = []; _properties = []; _hasSearched = false; _lastQuery = ''; });
+    }
+  }
 
   // ─── Build ────────────────────────────────────────────────────────────────────
   @override
@@ -126,6 +303,13 @@ class _SearchScreenState extends State<SearchScreen>
                 : null,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Filtres',
+            icon: Icon(Icons.tune_rounded, color: _hasFilters ? AppTheme.primary : txt),
+            onPressed: _openFilters,
+          ),
+        ],
         bottom: _hasSearched
             ? TabBar(
                 controller: _tabCtrl,

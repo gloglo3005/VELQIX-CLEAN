@@ -9,6 +9,12 @@ class PropertyService {
 
   final _api = ApiService.instance;
 
+  // Limite de photos par annonce (ANN-03) — identique à l'API
+  // (PHOTO_LIMIT_FREE / PHOTO_LIMIT_PREMIUM dans propertyController.ts).
+  static const int photoLimitFree = 2;
+  static const int photoLimitPremium = 12;
+  static int photoLimitFor(bool isPremium) => isPremium ? photoLimitPremium : photoLimitFree;
+
   // Un seul parseur pour toute l'app : PropertyModel.fromJson
   PropertyModel _fromJson(Map<String, dynamic> json) => PropertyModel.fromJson(json);
 
@@ -21,6 +27,11 @@ class PropertyService {
     String? pays,
     double? prixMin,
     double? prixMax,
+    double? surfaceMin,
+    double? surfaceMax,
+    int? piecesMin,
+    int? confirmedWithinDays,
+    bool verifiedOnly = false,
   }) async {
     // Construire les query params de filtrage
     final params = <String, String>{};
@@ -31,6 +42,11 @@ class PropertyService {
     if (pays != null) params['pays'] = pays;
     if (prixMin != null) params['prixMin'] = prixMin.toString();
     if (prixMax != null) params['prixMax'] = prixMax.toString();
+    if (surfaceMin != null) params['surfaceMin'] = surfaceMin.toString();
+    if (surfaceMax != null) params['surfaceMax'] = surfaceMax.toString();
+    if (piecesMin != null) params['piecesMin'] = piecesMin.toString();
+    if (confirmedWithinDays != null) params['confirmedWithinDays'] = confirmedWithinDays.toString();
+    if (verifiedOnly) params['verified'] = 'true';
 
     final query = params.isNotEmpty
         ? '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}'
