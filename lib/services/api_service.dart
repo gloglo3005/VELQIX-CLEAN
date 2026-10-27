@@ -165,7 +165,8 @@ class ApiService {
         }
         return {'success': false, 'message': 'Session expirée', 'error': 'SESSION_EXPIRED'};
       }
-      if (res.statusCode == 403 && data['error'] == 'ACCOUNT_BANNED') {
+      if (res.statusCode == 403 &&
+          (data['error'] == 'ACCOUNT_BANNED' || data['error'] == 'ACCOUNT_DISABLED')) {
         await _expireSession();
       }
       return _parse(res);

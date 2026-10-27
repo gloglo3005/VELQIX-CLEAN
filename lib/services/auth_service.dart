@@ -48,6 +48,7 @@ const _kTypeActivite = 'auth_type_activite';
 const _kSessionErrors = {
   'SESSION_EXPIRED',
   'ACCOUNT_BANNED',
+  'ACCOUNT_DISABLED',
   'USER_NOT_FOUND',
   'INVALID_TOKEN',
   'MISSING_TOKEN',
