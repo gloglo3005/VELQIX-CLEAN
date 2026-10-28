@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/mission_model.dart';
 import '../../services/mission_service.dart';
+import '../../services/zone_service.dart';
+import 'admin_zones_panel.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/net_image.dart';
 import '../../widgets/widgets.dart' show formatFcfa;
@@ -19,7 +21,7 @@ class AdminOpsTab extends StatefulWidget {
 }
 
 class _AdminOpsTabState extends State<AdminOpsTab> with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 5, vsync: this);
+  late final TabController _tab = TabController(length: 6, vsync: this);
 
   @override
   void dispose() {
@@ -39,6 +41,7 @@ class _AdminOpsTabState extends State<AdminOpsTab> with SingleTickerProviderStat
           tabs: const [
             Tab(text: 'Missions'),
             Tab(text: 'Tarifs'),
+            Tab(text: 'Zones'),
             Tab(text: 'Revenus'),
             Tab(text: 'Reversements'),
             Tab(text: 'Journal'),
@@ -49,6 +52,7 @@ class _AdminOpsTabState extends State<AdminOpsTab> with SingleTickerProviderStat
         child: TabBarView(controller: _tab, children: const [
           _MissionsPanel(),
           _PricingPanel(),
+          AdminZonesPanel(),
           _FinancePanel(),
           _PayoutsPanel(),
           _AuditPanel(),
@@ -152,6 +156,21 @@ class _MissionsPanelState extends State<_MissionsPanel> {
     final price = TextEditingController(text: m.price > 0 ? m.price.round().toString() : '');
     final pay = TextEditingController(text: m.agentPay > 0 ? m.agentPay.round().toString() : '');
     final transport = TextEditingController(text: m.transport > 0 ? m.transport.round().toString() : '');
+    // Tarif de référence de la zone (GEO-02) : simple pré-remplissage, l'admin garde la main.
+    if (m.price <= 0 && m.zone.isNotEmpty) {
+      final ref = await ZoneService.instance.referenceRate(zone: m.zone, type: m.type);
+      if (ref != null) {
+        price.text = ref.price.toString();
+        pay.text = ref.agentPay.toString();
+        transport.text = ref.transport.toString();
+      }
+    }
+    if (!mounted) {
+      price.dispose();
+      pay.dispose();
+      transport.dispose();
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {

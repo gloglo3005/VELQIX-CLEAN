@@ -78,9 +78,11 @@ class MissionService {
   final _api = ApiService.instance;
 
   // ── Client ────────────────────────────────────────────────────────────────
-  Future<ServicePricing> getPricing() async {
+  /// Tarifs publics ; avec [zone], le prix de la vérification dans cette zone.
+  Future<ServicePricing> getPricing({String? zone}) async {
     try {
-      final res = await _api.get('/pricing');
+      final query = (zone == null || zone.trim().isEmpty) ? '' : '?zone=${Uri.encodeQueryComponent(zone.trim())}';
+      final res = await _api.get('/pricing$query');
       if (res['success'] == true && res['data'] is Map) {
         return ServicePricing.fromJson(Map<String, dynamic>.from(res['data'] as Map));
       }

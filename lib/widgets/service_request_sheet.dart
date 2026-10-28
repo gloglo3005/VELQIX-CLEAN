@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/mission_model.dart';
 import '../models/models.dart';
 import '../services/mission_service.dart';
+import '../services/zone_service.dart';
 import '../theme/app_theme.dart';
 import 'auth_gate.dart';
 import 'widgets.dart' show PrimaryButton, formatFcfa;
@@ -66,6 +67,8 @@ class _ServiceSheet extends StatefulWidget {
 class _ServiceSheetState extends State<_ServiceSheet> {
   late String _type = widget.initialType;
   ServicePricing _pricing = ServicePricing.fallback;
+  PublicZones _zones = PublicZones.none;
+  String? _zone; // zone choisie par le client (seulement quand aucun bien n'est sélectionné)
   final _address = TextEditingController();
   final _notes = TextEditingController();
   final _surface = TextEditingController();
@@ -78,9 +81,21 @@ class _ServiceSheetState extends State<_ServiceSheet> {
   @override
   void initState() {
     super.initState();
-    MissionService.instance.getPricing().then((p) {
-      if (mounted) setState(() => _pricing = p);
+    _loadPricing();
+    ZoneService.instance.getPublicZones().then((z) {
+      if (mounted) setState(() => _zones = z);
     });
+  }
+
+  // Zone du bien (sa ville), sinon zone choisie par le client : elle détermine le prix affiché.
+  String? get _propertyZone {
+    final v = widget.property?.adresse.ville.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  Future<void> _loadPricing() async {
+    final p = await MissionService.instance.getPricing(zone: _propertyZone ?? _zone);
+    if (mounted) setState(() => _pricing = p);
   }
 
   @override
@@ -97,6 +112,10 @@ class _ServiceSheetState extends State<_ServiceSheet> {
       setState(() => _error = "Indiquez l'adresse concernée.");
       return;
     }
+    if (property == null && _zones.limited && _zones.zones.isNotEmpty && _zone == null) {
+      setState(() => _error = 'Choisissez la zone concernée.');
+      return;
+    }
     setState(() {
       _sending = true;
       _error = null;
@@ -107,12 +126,13 @@ class _ServiceSheetState extends State<_ServiceSheet> {
         propertyId: property?.id,
         address: property == null ? _address.text.trim() : null,
         notes: _notes.text.trim(),
-        details: _type == MissionType.entretien
-            ? {
-                'prestation': _cleaning,
-                if (_surface.text.trim().isNotEmpty) 'surface': _surface.text.trim(),
-              }
-            : const {},
+        details: {
+          if (_type == MissionType.entretien) ...{
+            'prestation': _cleaning,
+            if (_surface.text.trim().isNotEmpty) 'surface': _surface.text.trim(),
+          },
+          if (property == null && _zone != null) 'zone': _zone,
+        },
       );
       if (!mounted) return;
       setState(() => _created = m);
@@ -202,6 +222,27 @@ class _ServiceSheetState extends State<_ServiceSheet> {
         TextField(
           controller: _address,
           decoration: const InputDecoration(labelText: 'Adresse du bien', prefixIcon: Icon(Icons.place_outlined)),
+        ),
+      ],
+      if (property == null && _zones.limited && _zones.zones.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _zone,
+          decoration: const InputDecoration(labelText: 'Zone', prefixIcon: Icon(Icons.map_outlined)),
+          items: [for (final z in _zones.zones) DropdownMenuItem(value: z.name, child: Text(z.name))],
+          onChanged: (v) {
+            setState(() => _zone = v);
+            _loadPricing();
+          },
+        ),
+      ],
+      if (_zones.limited) ...[
+        const SizedBox(height: 8),
+        Text(
+          _zones.zones.isEmpty
+              ? "Aucune zone n'est desservie pour le moment."
+              : 'Zones desservies : ${_zones.zones.map((z) => z.name).join(', ')}.',
+          style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
         ),
       ],
       if (_type == MissionType.entretien) ...[
