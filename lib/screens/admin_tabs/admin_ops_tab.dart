@@ -397,16 +397,16 @@ class _PriceField {
 }
 
 const _priceFields = [
-  _PriceField('verificationPrice', 'Prix de la vérification', 'F', 'Vérification terrain', '3500'),
-  _PriceField('verificationAgentPay', 'Rémunération du démarcheur', 'F', 'Vérification terrain', '1500'),
-  _PriceField('verificationTransport', 'Transport estimé', 'F', 'Vérification terrain', '300'),
-  _PriceField('supportCost', 'Traitement et support (par mission)', 'F', 'Vérification terrain', '200'),
+  _PriceField('verificationPrice', 'Prix de la vérification', 'F', 'Vérification terrain', '5000'),
+  _PriceField('verificationAgentPay', 'Rémunération du démarcheur', 'F', 'Vérification terrain', '2500'),
+  _PriceField('verificationTransport', 'Transport estimé', 'F', 'Vérification terrain', '500'),
+  _PriceField('supportCost', 'Traitement et support (par mission)', 'F', 'Vérification terrain', '300'),
   _PriceField('paymentFeePercent', 'Frais de paiement (hypothèse)', '%', 'Commissions et frais', '3'),
   _PriceField('servicesFeePercent', 'Frais de service VelQix (devis)', '%', 'Commissions et frais'),
-  _PriceField('premiumDiscountPercent', 'Remise Premium sur les prestations', '%', 'Commissions et frais', '0'),
+  _PriceField('premiumDiscountPercent', 'Remise Premium sur les prestations', '%', 'Commissions et frais', '10'),
   _PriceField('premiumMonthly', 'Premium : 1 mois', 'F', 'Abonnements', '2000'),
-  _PriceField('premium6Months', 'Premium : 6 mois (prépayé)', 'F', 'Abonnements', '11000'),
-  _PriceField('premium1Year', 'Premium : 1 an (prépayé)', 'F', 'Abonnements', '20000'),
+  _PriceField('premium6Months', 'Premium : 6 mois (prépayé)', 'F', 'Abonnements', '10000'),
+  _PriceField('premium1Year', 'Premium : 1 an (prépayé)', 'F', 'Abonnements', '18000'),
   _PriceField('freeMaxListings', 'Annonces max. en Freemium', '', 'Limites des offres'),
   _PriceField('premiumMaxListings', 'Annonces max. en Premium', '', 'Limites des offres'),
   _PriceField('premiumFeaturedCredits', 'Crédits de mise en avant (Premium)', '', 'Limites des offres'),

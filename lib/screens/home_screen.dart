@@ -648,16 +648,14 @@ class _HomeScreenState extends State<HomeScreen> {
     // « Les plus populaires » (web) / « Coups de cœur » (mobile) : biens
     // immobiliers disponibles les plus consultés, hors annonces mises en avant
     // (affichées dans leur propre section).
-    // Les annonces en vedette (mises en avant) s'affichent ici. S'il n'y en a
-    // pas encore, on retombe sur les biens les plus consultés.
+    // Cette section n'affiche QUE les annonces mises en avant (propriétaires Premium).
+    // Tant que personne n'est Premium, elle reste vide et donc masquée.
     final immoDispo = _serverProps
         .where((p) => p.type == PropertyType.immobilier && p.isAvailable)
         .toList();
     final vedettes = immoDispo.where((p) => p.isFeatured).toList()
       ..sort((a, b) => b.vues.compareTo(a.vues));
-    final populaires = immoDispo.toList()
-      ..sort((a, b) => b.vues.compareTo(a.vues));
-    final popularTop = (vedettes.isNotEmpty ? vedettes : populaires).take(8).toList();
+    final popularTop = vedettes.take(8).toList();
 
     // ✅ Banières recalculées à chaque build → tr() utilise la locale courante
     final banners = [

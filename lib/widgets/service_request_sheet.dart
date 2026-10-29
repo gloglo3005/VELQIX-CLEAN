@@ -66,7 +66,9 @@ class _ServiceSheet extends StatefulWidget {
 
 class _ServiceSheetState extends State<_ServiceSheet> {
   late String _type = widget.initialType;
-  ServicePricing _pricing = ServicePricing.fallback;
+  // null = tarifs du serveur pas encore reçus : on n'affiche alors AUCUN prix
+  // (avant, un prix « de secours » s'affichait puis était remplacé par le vrai).
+  ServicePricing? _pricing;
   PublicZones _zones = PublicZones.none;
   String? _zone; // zone choisie par le client (seulement quand aucun bien n'est sélectionné)
   final _address = TextEditingController();
@@ -94,6 +96,8 @@ class _ServiceSheetState extends State<_ServiceSheet> {
   }
 
   Future<void> _loadPricing() async {
+    // Changement de zone : on masque l'ancien prix le temps de recevoir le nouveau.
+    if (mounted && _pricing != null) setState(() => _pricing = null);
     final p = await MissionService.instance.getPricing(zone: _propertyZone ?? _zone);
     if (mounted) setState(() => _pricing = p);
   }
@@ -176,7 +180,7 @@ class _ServiceSheetState extends State<_ServiceSheet> {
   }
 
   Widget _form() {
-    final price = _pricing.of(_type);
+    final price = _pricing?.of(_type);
     final property = widget.property;
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Demander un service', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -206,11 +210,13 @@ class _ServiceSheetState extends State<_ServiceSheet> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Prix : ${_priceText(price)}',
+          Text(price == null ? 'Prix : chargement…' : 'Prix : ${_priceText(price)}',
               style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primary)),
           const SizedBox(height: 2),
           Text(
-            price.onQuote
+            price == null
+                ? 'Récupération du tarif…'
+                : price.onQuote
                 ? "VelQix vous envoie un devis selon la surface, l'état du bien et la durée. Vous êtes libre de l'accepter ou non."
                 : 'Payé une seule fois, pour cette prestation. Indépendant de votre abonnement.',
             style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
@@ -274,9 +280,11 @@ class _ServiceSheetState extends State<_ServiceSheet> {
       ],
       const SizedBox(height: 16),
       PrimaryButton(
-        label: price.onQuote ? 'Demander un devis' : 'Demander (${formatFcfa(price.price!)})',
+        label: price == null
+            ? 'Chargement du tarif…'
+            : (price.onQuote ? 'Demander un devis' : 'Demander (${formatFcfa(price.price!)})'),
         isLoading: _sending,
-        onPressed: _send,
+        onPressed: price == null ? null : _send,
       ),
     ]);
   }

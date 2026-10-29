@@ -29,7 +29,8 @@ class ServicePricing {
 
   /// Valeurs de lancement du cahier des charges (modifiables depuis l'admin).
   static const fallback = ServicePricing(
-    verification: ServicePrice(price: 3500, agentPay: 1500, transport: 300),
+    // Mêmes valeurs que PRICING_DEFAULTS du backend (missionRules.ts) : plus d'écart 3500 / 5000.
+    verification: ServicePrice(price: 5000, agentPay: 2500, transport: 500),
     visite: ServicePrice(),
     entretien: ServicePrice(),
   );
