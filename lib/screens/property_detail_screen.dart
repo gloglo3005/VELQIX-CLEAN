@@ -20,6 +20,7 @@ import '../widgets/widgets.dart';
 import '../main.dart' show currencyNotifier, localeNotifier;
 // import 'payment_screen.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de transaction directe
 import 'messages_screen.dart';
+import 'my_listings_screen.dart';
 import 'owner_profile_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
@@ -60,9 +61,45 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     return null;
   }
 
+  // Propriétaire reconnu strictement : identifiants non vides, comparés sans espaces.
   bool get _isMyProperty {
-    final uid = AuthService.instance.currentUser?.id;
-    return uid != null && uid == widget.property.proprietaire.id;
+    final uid = (AuthService.instance.currentUser?.id ?? '').toString().trim();
+    final ownerId = widget.property.proprietaire.id.toString().trim();
+    return uid.isNotEmpty && uid == ownerId;
+  }
+
+  /// Barre du bas affichée au propriétaire à la place de « Contacter le propriétaire ».
+  Widget _ownerBottomBar(BuildContext context) {
+    return Row(children: [
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.verified_user_rounded, size: 18, color: AppTheme.primary),
+            const SizedBox(width: 8),
+            Text("C'est votre annonce",
+                style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary)),
+          ]),
+        ),
+      ),
+      const SizedBox(width: 10),
+      ElevatedButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.primary,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: const Text('Mes annonces'),
+      ),
+    ]);
   }
 
   // ⚠️ Avant : le bouton "Suivre" et les stats Abonnés/Suivi(e)s lisaient
@@ -773,9 +810,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            // Bouton chat
-                            GestureDetector(
+                            if (!_isMyProperty) const SizedBox(width: 10),
+                            // Bouton chat (jamais sur sa propre annonce)
+                            if (!_isMyProperty) GestureDetector(
                               onTap: () async {
                                 if (!await requireLogin(context, reason: 'contacter le propriétaire')) return;
                                 if (!context.mounted) return;
@@ -869,7 +906,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           color: AppTheme.surface,
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 12, offset: const Offset(0, -3))],
         ),
-        child: SizedBox(
+        child: _isMyProperty
+            ? _ownerBottomBar(context)
+            : SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () async {

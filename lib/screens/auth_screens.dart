@@ -405,11 +405,11 @@ class _LoginScreenState extends State<LoginScreen> {
             style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
         const SizedBox(height: 24),
         AppTextField(strongBorder: true, 
-          label: "Nom d'utilisateur",
-          hint: 'ama_kofi',
+          label: "Email ou nom d'utilisateur",
+          hint: 'ama@email.com ou ama_kofi',
           controller: _usernameCtrl,
-          prefixIcon: Icons.alternate_email_rounded,
-          keyboardType: TextInputType.text,
+          prefixIcon: Icons.person_outline_rounded,
+          keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 16),
         AppTextField(strongBorder: true, 
@@ -803,7 +803,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _telCtrl.addListener(_sanitizePhone);
+  }
+
+  // Téléphone : seulement des chiffres, avec « + » possible en première position.
+  // Les lettres (et tout autre caractère) sont supprimés dès la saisie ou le collage.
+  void _sanitizePhone() {
+    final raw = _telCtrl.text;
+    final buf = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      final c = raw[i];
+      final isDigit = c.codeUnitAt(0) >= 48 && c.codeUnitAt(0) <= 57;
+      if (isDigit || (c == '+' && buf.isEmpty)) buf.write(c);
+    }
+    final cleaned = buf.toString();
+    if (cleaned != raw) {
+      _telCtrl.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    _telCtrl.removeListener(_sanitizePhone);
     _nomCtrl.dispose();
     _prenomCtrl.dispose();
     _usernameCtrl.dispose();
@@ -1008,6 +1034,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final error = await AuthService.instance.register(
       password: _passCtrl.text,
+      username: isBusiness ? null : _usernameCtrl.text.trim(),
       nom: nomFinal,
       prenom: prenomFinal,
       email: _emailCtrl.text.trim(),
@@ -1212,8 +1239,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   prefixIcon: Icons.alternate_email_rounded,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Champ requis';
-                    if (v.contains(' ')) return 'Pas d\'espaces autorisés';
-                    if (v.length < 3) return 'Minimum 3 caractères';
+                    if (!RegExp(r'^[a-zA-Z0-9_.]{3,30}$').hasMatch(v.trim())) {
+                      return '3 à 30 caractères : lettres, chiffres, _ et .';
+                    }
                     return null;
                   },
                 ),
@@ -1276,11 +1304,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // ── Téléphone ──
               AppTextField(strongBorder: true, 
                 label: tr('auth_field_phone'),
-                hint: '+228 90 00 00 00',
+                hint: '+22890000000',
                 controller: _telCtrl,
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Champ requis' : null,
+                validator: (v) {
+                  final t = (v ?? '').trim();
+                  if (t.isEmpty) return 'Champ requis';
+                  if (!RegExp(r'^\+?\d{8,15}$').hasMatch(t)) {
+                    return 'Numéro invalide : chiffres uniquement (8 à 15)';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 14),
 

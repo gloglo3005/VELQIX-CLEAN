@@ -2,6 +2,7 @@
 // ✅ Diff vs original : intégration AdminSocketService + bandeau live notif
 // Sections métier : annonces, litiges.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
@@ -37,6 +38,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   List<UserModel> _users = [];
   int _totalUsers = 0;
   int _totalProperties = 0;
+  int _approvedProperties = 0; // annonces valides (approuvées) : chiffre de la carte « Annonces »
+  Timer? _statsDebounce;
   bool _loadingDashboard = true;
   String? _dashboardError;
 
@@ -46,6 +49,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       final list = await AdminService.instance.getUsers();
       if (mounted) setState(() => _users = list);
     } catch (_) {}
+  }
+
+  /// Recharge uniquement les compteurs (sans écran de chargement).
+  Future<void> _refreshStats() async {
+    try {
+      final res = await ApiService.instance.get('/admin/stats', auth: true);
+      if (res['success'] == true && res['data'] is Map && mounted) {
+        final d = res['data'] as Map;
+        setState(() {
+          _totalUsers = (d['totalUsers'] as num?)?.toInt() ?? _totalUsers;
+          _totalProperties = (d['totalProperties'] as num?)?.toInt() ?? _totalProperties;
+          _approvedProperties = (d['approvedProperties'] as num?)?.toInt() ?? _approvedProperties;
+        });
+      }
+    } catch (_) {}
+  }
+
+  /// Les compteurs étaient chargés une seule fois à l'ouverture : on les
+  /// rafraîchit dès qu'une annonce arrive, est approuvée ou rejetée.
+  void _scheduleStatsRefresh() {
+    _statsDebounce?.cancel();
+    _statsDebounce = Timer(const Duration(milliseconds: 600), _refreshStats);
   }
 
   Future<void> _loadDashboardData() async {
@@ -74,7 +99,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
       if (statsRes['success'] == true) {
         _totalUsers = statsRes['data']['totalUsers'] ?? _users.length;
-        _totalProperties = statsRes['data']['totalProperties'] ?? 0;
+        _totalProperties = (statsRes['data']['totalProperties'] as num?)?.toInt() ?? 0;
+        _approvedProperties = (statsRes['data']['approvedProperties'] as num?)?.toInt() ?? 0;
       }
 
       if (pendingPropsRes['success'] == true) {
@@ -112,6 +138,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     // ── NEW : Écouter les notifs live pour afficher le bandeau ──────────────
     adminLiveNotifNotifier.addListener(_onLiveNotif);
+
+    // Compteurs à jour : nouvelle annonce, approbation, rejet.
+    pendingPropertiesNotifier.addListener(_scheduleStatsRefresh);
+    publishedPropertiesNotifier.addListener(_scheduleStatsRefresh);
   }
 
   Future<void> _connectAdminSocket() async {
@@ -124,6 +154,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void dispose() {
     adminLiveNotifNotifier.removeListener(_onLiveNotif);
+    pendingPropertiesNotifier.removeListener(_scheduleStatsRefresh);
+    publishedPropertiesNotifier.removeListener(_scheduleStatsRefresh);
+    _statsDebounce?.cancel();
     AdminSocketService.instance.disconnect(); // NEW
     _tabController.dispose();
     super.dispose();
@@ -196,7 +229,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       );
     }
     final users = _users;
-    final properties = _totalProperties;
+    final properties = _approvedProperties; // annonces valides
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(

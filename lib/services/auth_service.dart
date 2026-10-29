@@ -243,12 +243,13 @@ class AuthService {
     final identifier = email ?? username ?? '';
 
     final res = await _api.post('/auth/login', {
-      'email': identifier,
+      'identifier': identifier, // email OU nom d'utilisateur
+      'email': identifier,      // compatibilité avec un ancien serveur
       'password': password,
     });
 
     if (res['success'] != true) {
-      return res['message'] ?? 'Email ou mot de passe invalide.';
+      return res['message'] ?? 'Identifiant ou mot de passe invalide.';
     }
 
     // Le serveur indique si ce mot de passe est temporaire (réinitialisé par un admin).

@@ -14,7 +14,8 @@ class ExploreScreen extends StatefulWidget {
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
-class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProviderStateMixin {
+class _ExploreScreenState extends State<ExploreScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   String _search = '';
   String _sortBy = 'recent';
@@ -29,8 +30,21 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
     _tabController = TabController(length: 2, vsync: this);
     // ✅ Écoute les approbations admin en temps réel
     publishedPropertiesNotifier.addListener(_onPublished);
+    WidgetsBinding.instance.addObserver(this);
     _loadProperties();
   }
+
+  // Au retour dans l'appli, on recharge : un bien approuvé entre-temps apparaît.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadProperties();
+  }
+
+  // Le curseur de prix à fond à droite = « pas de plafond » (avant : les biens
+  // à plus de 50 000 000 étaient cachés sans que l'utilisateur le sache).
+  static const double _priceCap = 50000000;
+
+  int _countType(PropertyType t) => _serverProps.where((p) => p.type == t).length;
 
   List<PropertyModel> _serverProps = [];
 
@@ -42,6 +56,7 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
   @override
   void dispose() {
     publishedPropertiesNotifier.removeListener(_onPublished);
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
   }
@@ -58,7 +73,8 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
           p.adresse.ville.toLowerCase().contains(_search.toLowerCase()) ||
           p.categorieLabel.toLowerCase().contains(_search.toLowerCase());
       final matchAvailable = !_onlyAvailable || p.isAvailable;
-      final matchPrice = p.prix >= _priceRange.start && p.prix <= _priceRange.end;
+      final matchPrice = p.prix >= _priceRange.start &&
+          (_priceRange.end >= _priceCap || p.prix <= _priceRange.end);
       final pays = p.adresse.pays.toLowerCase();
       final matchCountry = _filterCountryCode == null ||
           pays == _filterCountryCode!.toLowerCase() ||
@@ -164,14 +180,20 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
                   // Tabs
                   TabBar(
                     controller: _tabController,
-                    onTap: (_) => setState(() {}),
+                    onTap: (_) {
+                      setState(() {});
+                      _loadProperties();
+                    },
                     labelStyle: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
                     unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
                     labelColor: AppTheme.primary,
                     unselectedLabelColor: AppTheme.textSecondary,
                     indicatorColor: AppTheme.primary,
                     indicatorWeight: 3,
-                    tabs: [Tab(text: tr('explore_tab_immo')), Tab(text: tr('add_type_mobilier'))],
+                    tabs: [
+                      Tab(text: '${tr('explore_tab_immo')} (${_countType(PropertyType.immobilier)})'),
+                      Tab(text: '${tr('add_type_mobilier')} (${_countType(PropertyType.mobilier)})'),
+                    ],
                   ),
                 ],
               ),
@@ -200,14 +222,18 @@ class _ExploreScreenState extends State<ExploreScreen> with SingleTickerProvider
                           ]),
                         ),
                         Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            itemCount: _filtered.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (_, i) => PropertyCard(
-                              property: _filtered[i],
-                              horizontal: true,
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: _filtered[i]))),
+                          child: RefreshIndicator(
+                            onRefresh: _loadProperties,
+                            child: ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: _filtered.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              itemBuilder: (_, i) => PropertyCard(
+                                property: _filtered[i],
+                                horizontal: true,
+                                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: _filtered[i]))),
+                              ),
                             ),
                           ),
                         ),

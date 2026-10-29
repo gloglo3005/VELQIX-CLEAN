@@ -4,6 +4,54 @@ import 'dart:typed_data';
 
 String _createObjectUrl(html.File file) => html.Url.createObjectUrl(file);
 
+/// Ouvre un <input type="file"> et attend le choix de l'utilisateur.
+/// Renvoie une liste VIDE si l'utilisateur annule.
+/// Avant : seul « change » était écouté. Or le navigateur n'envoie rien quand on
+/// annule → l'appli attendait jusqu'à 10 minutes (bouton qui tourne, plus de
+/// sélection possible). On écoute maintenant « cancel », puis, pour les
+/// navigateurs qui ne l'envoient pas, le retour sur la page sans fichier choisi.
+Future<List<html.File>> _openFileInput(html.FileUploadInputElement input) async {
+  final completer = Completer<List<html.File>>();
+  final subs = <StreamSubscription>[];
+  var armed = false; // vrai dès que la page a perdu le focus (sélecteur ouvert)
+
+  void finish() {
+    if (completer.isCompleted) return;
+    final files = input.files;
+    completer.complete(files == null ? <html.File>[] : files.toList());
+  }
+
+  // Retour sur la page : on laisse 2 s à « change » pour arriver, sinon = annulé.
+  void scheduleCancelCheck() {
+    if (!armed || completer.isCompleted) return;
+    Future.delayed(const Duration(seconds: 2), finish);
+  }
+
+  subs.add(input.onChange.listen((_) => finish()));
+  input.addEventListener('cancel', (_) => finish());
+  subs.add(html.window.onBlur.listen((_) => armed = true));
+  subs.add(html.window.onFocus.listen((_) => scheduleCancelCheck()));
+  subs.add(html.document.onVisibilityChange.listen((_) {
+    if (html.document.hidden == true) {
+      armed = true;
+    } else {
+      scheduleCancelCheck();
+    }
+  }));
+  Future.delayed(const Duration(minutes: 10), finish);
+
+  html.document.body!.append(input);
+  await Future.delayed(const Duration(milliseconds: 100));
+  input.click();
+  final files = await completer.future;
+  for (final sub in subs) {
+    sub.cancel();
+  }
+  try { input.remove(); } catch (_) {}
+  return files;
+}
+
+
 /// Lit un fichier via FileReader.readAsDataURL → retourne "data:image/jpeg;base64,..."
 /// C'est le navigateur lui-même qui encode en base64 — pas de btoa manuel.
 Future<String> _readFileAsDataUrl(html.File file) async {
@@ -84,27 +132,11 @@ Future<String?> pickImageWeb({bool capture = false}) async {
 
 /// Galerie multi-sélection — retourne des data URIs natifs
 Future<List<String>> pickMultipleImagesWeb({int maxCount = 10}) async {
-  final completer = Completer<List<html.File>>();
   final input = html.FileUploadInputElement()
     ..accept = 'image/*'
     ..multiple = true
     ..style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px';
-
-  input.onChange.listen((_) {
-    if (!completer.isCompleted) {
-      final files = input.files;
-      completer.complete(files != null && files.isNotEmpty
-          ? files.take(maxCount).toList() : []);
-    }
-  });
-  Future.delayed(const Duration(minutes: 10), () {
-    if (!completer.isCompleted) completer.complete([]);
-  });
-  html.document.body!.append(input);
-  await Future.delayed(const Duration(milliseconds: 100));
-  input.click();
-  final htmlFiles = await completer.future;
-  try { input.remove(); } catch (_) {}
+  final htmlFiles = (await _openFileInput(input)).take(maxCount).toList();
 
   final results = <String>[];
   for (final f in htmlFiles) {
@@ -119,27 +151,13 @@ Future<List<String>> pickMultipleImagesWeb({int maxCount = 10}) async {
 
 /// Input HTML simple — retourne un data URI natif
 Future<String?> _pickWithInput({required bool capture}) async {
-  final completer = Completer<html.File?>();
   final input = html.FileUploadInputElement()
     ..accept = 'image/*'
     ..multiple = false
     ..style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px';
   if (capture) input.setAttribute('capture', 'environment');
-
-  input.onChange.listen((_) {
-    if (!completer.isCompleted) {
-      final files = input.files;
-      completer.complete(files != null && files.isNotEmpty ? files.first : null);
-    }
-  });
-  Future.delayed(const Duration(minutes: 10), () {
-    if (!completer.isCompleted) completer.complete(null);
-  });
-  html.document.body!.append(input);
-  await Future.delayed(const Duration(milliseconds: 100));
-  input.click();
-  final htmlFile = await completer.future;
-  try { input.remove(); } catch (_) {}
+  final picked = await _openFileInput(input);
+  final htmlFile = picked.isNotEmpty ? picked.first : null;
 
   if (htmlFile == null) return null;
   try {
@@ -155,25 +173,12 @@ Future<String?> _pickWithInput({required bool capture}) async {
 Future<String?> pickVideoWeb({bool capture = false}) async {
   if (!capture) {
     // Galerie : sélecteur fichier classique
-    final completer = Completer<html.File?>();
     final input = html.FileUploadInputElement()
       ..accept = 'video/*'
       ..multiple = false
       ..style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px';
-    input.onChange.listen((_) {
-      if (!completer.isCompleted) {
-        final files = input.files;
-        completer.complete(files != null && files.isNotEmpty ? files.first : null);
-      }
-    });
-    Future.delayed(const Duration(minutes: 10), () {
-      if (!completer.isCompleted) completer.complete(null);
-    });
-    html.document.body!.append(input);
-    await Future.delayed(const Duration(milliseconds: 100));
-    input.click();
-    final htmlFile = await completer.future;
-    try { input.remove(); } catch (_) {}
+    final picked = await _openFileInput(input);
+    final htmlFile = picked.isNotEmpty ? picked.first : null;
     if (htmlFile == null) return null;
     return _createObjectUrl(htmlFile);
   }
@@ -182,26 +187,13 @@ Future<String?> pickVideoWeb({bool capture = false}) async {
   final ua = html.window.navigator.userAgent.toLowerCase();
   final isMobile = ua.contains('android') || ua.contains('iphone') || ua.contains('ipad');
   if (isMobile) {
-    final completer = Completer<html.File?>();
     final input = html.FileUploadInputElement()
       ..accept = 'video/*'
       ..multiple = false
       ..style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;width:1px;height:1px';
     input.setAttribute('capture', 'camcorder');
-    input.onChange.listen((_) {
-      if (!completer.isCompleted) {
-        final files = input.files;
-        completer.complete(files != null && files.isNotEmpty ? files.first : null);
-      }
-    });
-    Future.delayed(const Duration(minutes: 10), () {
-      if (!completer.isCompleted) completer.complete(null);
-    });
-    html.document.body!.append(input);
-    await Future.delayed(const Duration(milliseconds: 100));
-    input.click();
-    final htmlFile = await completer.future;
-    try { input.remove(); } catch (_) {}
+    final picked = await _openFileInput(input);
+    final htmlFile = picked.isNotEmpty ? picked.first : null;
     if (htmlFile == null) return null;
     return _createObjectUrl(htmlFile);
   }
