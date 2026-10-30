@@ -1,9 +1,8 @@
 // lib/services/plan_service.dart
-// Formules Freemium / Premium par profil (particulier, professionnel, entreprise).
-// Les prix affichés viennent de GET /plans (configurables depuis l'admin) ; sans
-// réponse du serveur, on affiche les valeurs de lancement du cahier des charges.
+// Formules et abonnements. AUCUNE valeur par dÃ©faut : tout vient du serveur
+// (prix Premium : GET /premium/plan ; formules d'agence : GET /agency-plans).
+// Si le serveur ne rÃ©pond pas, une erreur claire est levÃ©e et l'Ã©cran propose de rÃ©essayer.
 
-import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 
 class PlanAudience {
@@ -21,43 +20,96 @@ class PlanAudience {
   }
 }
 
-class PlanModel {
-  final String id;
-  final String audience;
-  final String name;
-  final String tagline;
-  final bool premium;
-  final double? priceMonthly;  // null + premium = sur devis
-  final double? price6Months;  // formules prépayées
-  final double? price1Year;
+/// LibellÃ© d'une durÃ©e d'abonnement (30 j â†’ Â« 1 mois Â», etc.).
+String planDurationLabel(int days) {
+  switch (days) {
+    case 30:  return '1 mois';
+    case 180: return '6 mois';
+    case 365: return '1 an';
+    default:  return '$days jours';
+  }
+}
 
-  const PlanModel({
-    required this.id,
-    required this.audience,
-    required this.name,
-    required this.tagline,
-    this.premium = false,
-    this.priceMonthly,
-    this.price6Months,
-    this.price1Year,
+/// Une durÃ©e de Premium proposÃ©e par le serveur, avec son prix.
+class PremiumPeriod {
+  final String key; // month | 6months | year
+  final String label;
+  final int durationDays;
+  final double priceFcfa;
+  const PremiumPeriod({
+    required this.key,
+    required this.label,
+    required this.durationDays,
+    required this.priceFcfa,
   });
 
-  bool get isFree => !premium;
-  bool get onQuote => premium && priceMonthly == null;
-
-  factory PlanModel.fromJson(Map<String, dynamic> j) {
-    double? n(dynamic v) => v is num ? v.toDouble() : null;
-    return PlanModel(
-      id: (j['id'] ?? '').toString(),
-      audience: (j['audience'] ?? PlanAudience.particulier).toString(),
-      name: (j['name'] ?? '').toString(),
-      tagline: (j['tagline'] ?? '').toString(),
-      premium: j['premium'] == true,
-      priceMonthly: n(j['priceMonthly']),
-      price6Months: n(j['price6Months']),
-      price1Year: n(j['price1Year']),
+  static PremiumPeriod? tryParse(dynamic j) {
+    if (j is! Map) return null;
+    final key = (j['key'] ?? '').toString();
+    final days = j['durationDays'];
+    final price = j['priceFcfa'];
+    if (key.isEmpty || days is! num || price is! num || days <= 0 || price <= 0) return null;
+    final label = (j['label'] ?? '').toString();
+    return PremiumPeriod(
+      key: key,
+      label: label.isEmpty ? planDurationLabel(days.toInt()) : label,
+      durationDays: days.toInt(),
+      priceFcfa: price.toDouble(),
     );
   }
+}
+
+/// Formule d'abonnement d'agence (configurÃ©e depuis l'admin).
+class AgencyPlanModel {
+  final String id;
+  final String name;
+  final String? description;
+  final double priceFcfa;
+  final int durationDays;
+  final int? maxMembers;   // null = illimitÃ©
+  final int? maxListings;  // null = illimitÃ©
+  final bool advancedStats;
+  const AgencyPlanModel({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.priceFcfa,
+    required this.durationDays,
+    required this.maxMembers,
+    required this.maxListings,
+    required this.advancedStats,
+  });
+
+  static AgencyPlanModel? tryParse(dynamic j) {
+    if (j is! Map) return null;
+    final id = (j['id'] ?? '').toString();
+    final price = j['priceFcfa'];
+    final days = j['durationDays'];
+    if (id.isEmpty || price is! num || days is! num) return null;
+    final desc = (j['description'] ?? '').toString().trim();
+    return AgencyPlanModel(
+      id: id,
+      name: (j['name'] ?? '').toString(),
+      description: desc.isEmpty ? null : desc,
+      priceFcfa: price.toDouble(),
+      durationDays: days.toInt(),
+      maxMembers: j['maxMembers'] is num ? (j['maxMembers'] as num).toInt() : null,
+      maxListings: j['maxListings'] is num ? (j['maxListings'] as num).toInt() : null,
+      advancedStats: j['advancedStats'] == true,
+    );
+  }
+}
+
+class AgencyPlansInfo {
+  final bool paidEnabled;
+  final List<AgencyPlanModel> plans;
+  const AgencyPlansInfo({required this.paidEnabled, required this.plans});
+}
+
+class OrganizationRef {
+  final String id;
+  final String name;
+  const OrganizationRef({required this.id, required this.name});
 }
 
 class SubscriptionInfo {
@@ -72,89 +124,82 @@ class PlanService {
   static final PlanService instance = PlanService._();
   final _api = ApiService.instance;
 
-  /// Valeurs de lancement (hypothèses à tester auprès des utilisateurs togolais).
-  /// La formule de 5 ans n'est volontairement PAS proposée.
-  static const List<PlanModel> fallback = [
-    PlanModel(
-      id: 'particulier-gratuit', audience: PlanAudience.particulier, name: 'Gratuit',
-      tagline: 'Rechercher, publier une annonce de base et gérer ses contacts.',
-      priceMonthly: 0,
-    ),
-    PlanModel(
-      id: 'particulier-plus', audience: PlanAudience.particulier, name: 'Plus', premium: true,
-      tagline: 'Alertes avancées, statistiques, outils de gestion et avantages de visibilité définis.',
-      priceMonthly: 2000,
-    ),
-    PlanModel(
-      id: 'pro-gratuit', audience: PlanAudience.professionnel, name: 'Professionnel gratuit',
-      tagline: 'Profil professionnel, annonces de base et gestion simple des prospects.',
-      priceMonthly: 0,
-    ),
-    PlanModel(
-      id: 'pro-premium', audience: PlanAudience.professionnel, name: 'Professionnel Premium', premium: true,
-      tagline: 'Plus d\'annonces, statistiques, suivi des contacts et outils de gestion avancés.',
-      priceMonthly: 2000, price6Months: 11000, price1Year: 20000,
-    ),
-    PlanModel(
-      id: 'entreprise-gratuite', audience: PlanAudience.entreprise, name: 'Entreprise gratuite',
-      tagline: 'Profil entreprise et gestion simple.',
-      priceMonthly: 0,
-    ),
-    PlanModel(
-      id: 'entreprise-premium', audience: PlanAudience.entreprise, name: 'Entreprise Premium', premium: true,
-      tagline: 'Multi-utilisateurs, rôles, suivi d\'équipe, rapports et volumes d\'annonces adaptés.',
-    ),
-  ];
-
-  Future<List<PlanModel>> getPlans() async {
-    try {
-      final res = await _api.get('/plans');
-      if (res['success'] == true && res['data'] is List) {
-        final list = (res['data'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(PlanModel.fromJson)
-            .where((p) => p.id.isNotEmpty)
-            .toList();
-        if (list.isNotEmpty) return list;
-      }
-    } catch (e) {
-      debugPrint('Plans load error: $e');
+  /// Renvoie `data` si la rÃ©ponse est un succÃ¨s, sinon lÃ¨ve le message du serveur.
+  dynamic _data(Map<String, dynamic> res, String fallbackMessage) {
+    if (res['success'] != true) {
+      throw Exception((res['message'] ?? fallbackMessage).toString());
     }
-    return fallback;
+    return res['data'];
   }
 
-  /// period : 'month' | '6months' | 'year'. Retourne l'URL de paiement hébergé.
-  Future<String> checkout(String planId, String period) async {
-    final res = await _api.post('/subscriptions/checkout', {'planId': planId, 'period': period}, auth: true);
-    final url = res['success'] == true && res['data'] is Map ? (res['data'] as Map)['checkoutUrl'] : null;
-    if (url == null) throw Exception((res['message'] ?? 'Paiement indisponible.').toString());
+  /// DurÃ©es de Premium et prix, tels que configurÃ©s sur le serveur.
+  Future<List<PremiumPeriod>> getPremiumPeriods() async {
+    final d = _data(await _api.get('/premium/plan'), 'Tarifs indisponibles pour le moment.');
+    final raw = d is Map ? d['periods'] : null;
+    final list = (raw is List ? raw : const [])
+        .map(PremiumPeriod.tryParse)
+        .whereType<PremiumPeriod>()
+        .toList()
+      ..sort((a, b) => a.durationDays.compareTo(b.durationDays));
+    if (list.isEmpty) throw Exception('Aucune formule Premium disponible pour le moment.');
+    return list;
+  }
+
+  /// Formules d'abonnement d'agence (vide tant que l'admin n'a pas ouvert les abonnements).
+  Future<AgencyPlansInfo> getAgencyPlans() async {
+    final d = _data(await _api.get('/agency-plans'), 'Formules indisponibles pour le moment.');
+    if (d is! Map) throw Exception('RÃ©ponse invalide du serveur.');
+    final raw = d['plans'];
+    return AgencyPlansInfo(
+      paidEnabled: d['paidEnabled'] == true,
+      plans: (raw is List ? raw : const []).map(AgencyPlanModel.tryParse).whereType<AgencyPlanModel>().toList(),
+    );
+  }
+
+  /// period : 'month' | '6months' | 'year'. Retourne l'URL de paiement hÃ©bergÃ©.
+  Future<String> checkoutPremium(String period) async {
+    final d = _data(await _api.post('/premium/checkout', {'period': period}, auth: true), 'Paiement indisponible.');
+    final url = d is Map ? (d['paymentUrl'] ?? d['checkoutUrl']) : null;
+    if (url == null || url.toString().isEmpty) throw Exception('Paiement indisponible.');
     return url.toString();
   }
 
-  Future<String?> requestQuote(String planId, {String message = ''}) async {
-    final res = await _api.post('/subscriptions/quote-request', {'planId': planId, 'message': message}, auth: true);
-    return res['success'] == true ? null : (res['message'] ?? 'Demande impossible.').toString();
+  /// Agences dont l'utilisateur est membre.
+  Future<List<OrganizationRef>> getMyOrganizations() async {
+    final d = _data(await _api.get('/organizations/mine', auth: true), 'Entreprises indisponibles.');
+    if (d is! List) return <OrganizationRef>[];
+    return d
+        .whereType<Map>()
+        .map((o) => OrganizationRef(id: (o['id'] ?? '').toString(), name: (o['name'] ?? '').toString()))
+        .where((o) => o.id.isNotEmpty)
+        .toList();
   }
 
+  /// Abonnement d'une agence Ã  une formule. Retourne l'URL de paiement hÃ©bergÃ©.
+  Future<String> checkoutAgency(String organizationId, String planId) async {
+    final d = _data(
+      await _api.post('/organizations/$organizationId/subscription/checkout', {'planId': planId}, auth: true),
+      'Paiement indisponible.',
+    );
+    final url = d is Map ? (d['checkoutUrl'] ?? d['paymentUrl']) : null;
+    if (url == null || url.toString().isEmpty) throw Exception('Paiement indisponible.');
+    return url.toString();
+  }
+
+  /// Abonnement Premium de l'utilisateur connectÃ©.
   Future<SubscriptionInfo> getMySubscription() async {
-    try {
-      final res = await _api.get('/subscriptions/me', auth: true);
-      if (res['success'] == true && res['data'] is Map) {
-        final d = res['data'] as Map;
-        return SubscriptionInfo(
-          planName: (d['planName'] ?? 'Gratuit').toString(),
-          status: (d['status'] ?? 'aucun').toString(),
-          expiresAt: d['expiresAt'] != null ? DateTime.tryParse(d['expiresAt'].toString()) : null,
-        );
-      }
-    } catch (_) {}
+    final d = _data(await _api.get('/premium/status', auth: true), 'Abonnement indisponible.');
+    if (d is! Map) throw Exception('RÃ©ponse invalide du serveur.');
+    final rawExp = d['premiumExpiresAt'];
+    final exp = rawExp != null ? DateTime.tryParse(rawExp.toString())?.toLocal() : null;
+    if (d['isPremium'] == true) return SubscriptionInfo(planName: 'Premium', status: 'actif', expiresAt: exp);
+    if (exp != null) return SubscriptionInfo(planName: 'Premium', status: 'expire', expiresAt: exp);
     return const SubscriptionInfo();
   }
 
+  /// Paiements d'abonnement confirmÃ©s (Premium et agences).
   Future<List<Map<String, dynamic>>> getInvoices() async {
-    final res = await _api.get('/me/invoices', auth: true);
-    if (res['success'] != true) throw Exception((res['message'] ?? 'Factures indisponibles.').toString());
-    final d = res['data'];
+    final d = _data(await _api.get('/premium/invoices', auth: true), 'Factures indisponibles.');
     return d is List ? d.whereType<Map<String, dynamic>>().toList() : <Map<String, dynamic>>[];
   }
 }
