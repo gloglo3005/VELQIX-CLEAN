@@ -934,20 +934,6 @@ class _AgentSettingsScreen extends StatelessWidget {
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => showEditProfileSheet(ctx, u),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.phone_outlined),
-                    title: const Text('Téléphone'),
-                    subtitle: Text(u.telephone.isNotEmpty ? u.telephone : 'Non renseigné'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => showEditProfileSheet(ctx, u),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.public_rounded),
-                    title: const Text('Pays'),
-                    subtitle: Text((u.countryName ?? '').isNotEmpty ? u.countryName! : 'Non renseigné'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => showProfileCountryPicker(ctx, u),
-                  ),
                 ]);
               },
             ),
