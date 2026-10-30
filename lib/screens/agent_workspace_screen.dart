@@ -5,17 +5,27 @@
 // Parcours : voir la mission ET sa rémunération → accepter → se rendre sur place
 // → envoyer les preuves → suivre la validation et le paiement.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/mission_model.dart';
+import '../main.dart' show themeModeNotifier, localeNotifier;
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
+import '../services/notification_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/mission_service.dart';
 import '../services/property_service.dart';
 import '../services/web_file_picker.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart' show EmptyState, formatFcfa;
+import 'incoming_call_screen.dart';
 import 'main_shell.dart';
+import 'messages_screen.dart';
+import 'notifications_screen.dart';
+import 'support_screen.dart';
 
 class AgentWorkspaceScreen extends StatefulWidget {
   const AgentWorkspaceScreen({super.key});
@@ -23,7 +33,8 @@ class AgentWorkspaceScreen extends StatefulWidget {
   State<AgentWorkspaceScreen> createState() => _AgentWorkspaceScreenState();
 }
 
-class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen> with SingleTickerProviderStateMixin {
+class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tab;
   final Map<AgentScope, List<MissionModel>> _data = {};
   final Map<AgentScope, String?> _errors = {};
@@ -32,19 +43,93 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen> with Single
 
   String get _role => AuthService.instance.currentUserOrEmpty.role;
   bool get _isCleaner => _role == 'agent_entretien';
+  bool _openingIncomingCall = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tab = TabController(length: 4, vsync: this);
     _reloadMissions();
+
+    // Ces comptes n'ont pas accès à la partie publique : l'espace agent
+    // met donc lui-même en route notifications, messagerie et appels.
+    if (AuthService.instance.isLoggedIn) {
+      unawaited(PushNotificationService.instance.initialize());
+      unawaited(NotificationService.instance.loadNotifications());
+      unawaited(ChatService.instance.loadConversations());
+    }
+    latestNotificationNotifier.addListener(_handleLatestNotification);
+    incomingCallNotifier.addListener(_handleIncomingCall);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    latestNotificationNotifier.removeListener(_handleLatestNotification);
+    incomingCallNotifier.removeListener(_handleIncomingCall);
     _tab.dispose();
     super.dispose();
   }
+
+  /// Android coupe le socket en arrière-plan : on le relance au retour.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ChatService.instance.reconnectIfNeeded();
+    }
+  }
+
+  /// Notification reçue en temps réel : bandeau en bas de l'écran.
+  void _handleLatestNotification() {
+    final n = latestNotificationNotifier.value;
+    if (n == null || !mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Row(children: [
+            const Icon(Icons.notifications_active, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(n.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (n.message.isNotEmpty) Text(n.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+              ]),
+            ),
+          ]),
+        ));
+      latestNotificationNotifier.value = null;
+    });
+  }
+
+  /// Appel entrant (messagerie) : ouvre l'écran d'appel.
+  void _handleIncomingCall() {
+    final call = incomingCallNotifier.value;
+    if (call == null || !mounted || _openingIncomingCall) return;
+    _openingIncomingCall = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _openingIncomingCall = false;
+        return;
+      }
+      incomingCallNotifier.value = null;
+      try {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => IncomingCallScreen(callData: call)),
+        );
+      } catch (e) {
+        debugPrint('Incoming call navigation error: $e');
+      } finally {
+        _openingIncomingCall = false;
+      }
+    });
+  }
+
+  void _open(Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
   void _reloadMissions() {
     _load(AgentScope.available);
@@ -144,11 +229,28 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen> with Single
           Text(me.fullName, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400)),
         ]),
         actions: [
+          // Notifications (pastille = non lues)
+          ValueListenableBuilder<int>(
+            valueListenable: unreadNotifCountNotifier,
+            builder: (_, n, __) => IconButton(
+              tooltip: 'Notifications',
+              icon: _badged(Icons.notifications_outlined, n),
+              onPressed: () => _open(const NotificationsScreen()),
+            ),
+          ),
+          // Messagerie (pastille = messages non lus)
+          ValueListenableBuilder<List<Conversation>>(
+            valueListenable: conversationsNotifier,
+            builder: (_, convs, __) => IconButton(
+              tooltip: 'Messagerie',
+              icon: _badged(Icons.chat_bubble_outline_rounded, convs.fold<int>(0, (a, c) => a + c.unreadCount)),
+              onPressed: () => _open(const MessagesScreen()),
+            ),
+          ),
           IconButton(
-            tooltip: 'Parcourir les annonces',
-            icon: const Icon(Icons.storefront_rounded),
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => MainShell(username: AuthService.instance.loggedUsername))),
+            tooltip: 'Paramètres',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => _open(_AgentSettingsScreen(onLogout: _logout)),
           ),
           IconButton(tooltip: 'Se déconnecter', icon: const Icon(Icons.logout_rounded), onPressed: _logout),
         ],
@@ -172,6 +274,13 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen> with Single
       ]),
     );
   }
+
+  Widget _badged(IconData icon, int count) => Badge(
+        isLabelVisible: count > 0,
+        backgroundColor: Colors.red,
+        label: Text(count > 99 ? '99+' : '$count'),
+        child: Icon(icon),
+      );
 
   Widget _missionList(AgentScope scope) {
     if (_loading.contains(scope) && !_data.containsKey(scope)) {
@@ -718,6 +827,104 @@ class _AvailabilityTabState extends State<_AvailabilityTab> {
                 : const Text('Enregistrer'),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paramètres du compte opérationnel (langue, thème, aide, déconnexion)
+// ─────────────────────────────────────────────────────────────────────────────
+class _AgentSettingsScreen extends StatelessWidget {
+  final Future<void> Function() onLogout;
+  const _AgentSettingsScreen({required this.onLogout});
+
+  static const _languages = [
+    ('fr', '🇫🇷', 'Français'),
+    ('en', '🇬🇧', 'English'),
+    ('es', '🇪🇸', 'Español'),
+    ('pt', '🇵🇹', 'Português'),
+    ('de', '🇩🇪', 'Deutsch'),
+    ('it', '🇮🇹', 'Italiano'),
+    ('ar', '🇸🇦', 'العربية'),
+  ];
+
+  void _pickLanguage(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          for (final l in _languages)
+            ListTile(
+              leading: Text(l.$2, style: const TextStyle(fontSize: 24)),
+              title: Text(l.$3),
+              trailing: localeNotifier.value.languageCode == l.$1
+                  ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary)
+                  : null,
+              onTap: () {
+                localeNotifier.value = Locale(l.$1);
+                Navigator.pop(ctx);
+              },
+            ),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final me = AuthService.instance.currentUserOrEmpty;
+    final roleLabel = me.role == 'agent_entretien' ? "Agent d'entretien" : 'Démarcheur VelQix';
+    return Scaffold(
+      appBar: AppBar(title: Text('Paramètres', style: GoogleFonts.poppins(fontWeight: FontWeight.w700))),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(padding: const EdgeInsets.all(16), children: [
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_rounded)),
+                title: Text(me.fullName, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                subtitle: Text('$roleLabel\n${me.email}'),
+                isThreeLine: true,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ValueListenableBuilder<Locale>(
+              valueListenable: localeNotifier,
+              builder: (_, locale, __) => ListTile(
+                leading: const Icon(Icons.language_rounded),
+                title: const Text('Langue'),
+                subtitle: Text(_languages.firstWhere((l) => l.$1 == locale.languageCode, orElse: () => _languages.first).$3),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _pickLanguage(context),
+              ),
+            ),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeModeNotifier,
+              builder: (_, mode, __) => SwitchListTile(
+                secondary: const Icon(Icons.dark_mode_outlined),
+                title: const Text('Mode sombre'),
+                value: mode == ThemeMode.dark,
+                onChanged: (v) => themeModeNotifier.value = v ? ThemeMode.dark : ThemeMode.light,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline_rounded),
+              title: const Text('Aide et support'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: AppTheme.error, side: BorderSide(color: AppTheme.error.withOpacity(0.4))),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Se déconnecter'),
+              onPressed: onLogout,
+            ),
+          ]),
+        ),
       ),
     );
   }
