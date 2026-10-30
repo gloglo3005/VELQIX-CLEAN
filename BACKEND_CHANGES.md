@@ -296,3 +296,23 @@ L'écran Premium ne promet plus « Assurance transactions / protection contre le
 Le backend ne doit pas non plus présenter d'assurance ou de garantie de transaction tant que ce n'est pas défini
 juridiquement (§14.3, §22 : structure juridique et contrats à vérifier).
 
+---
+
+# Assistant VelqIA — questions sur la plateforme, selon le lieu
+
+Côté app (`lib/services/platform_knowledge.dart`), les questions de fonctionnement (publier, Premium,
+services, vérification, sécurité, paiement, disponibilité par pays…) reçoivent une réponse précise,
+adaptée au lieu cité (Lomé, ville ou pays, continent, « l'étranger »). Les recherches de biens et les
+questions hors base continuent d'aller vers `POST /api/ai/chat` (Gemini).
+
+Pour que Gemini réponde AUSSI correctement quand la question n'est pas dans la base, le `SYSTEM_PROMPT`
+de `ai.ts` doit reprendre les mêmes règles :
+- VelQix est conçue pour l'Afrique de l'Ouest (Togo = point de départ, FCFA par défaut) ; l'inscription
+  est ouverte à de nombreux pays ; ne JAMAIS affirmer qu'il existe des annonces ou des services terrain
+  dans une ville sans l'avoir cherché en base ou dans `GET /zones`.
+- Premium : jusqu'à 12 photos (2 en gratuit), statistiques détaillées, alertes personnalisables, gestion
+  étendue ; il ne donne PAS le statut « vérifié » et n'est pas une garantie. Tarif : lire `GET /premium/plan`.
+- Seule la vérification terrain (mission) donne `fieldVerified`. VelQix ne garantit pas les transactions
+  entre utilisateurs et ne promet aucune prise en charge des fraudes.
+- Répondre dans la langue de la question ; pour un lieu hors Afrique de l'Ouest, rester honnête sur la
+  couverture (consultation et compte possibles, services terrain limités aux zones desservies).

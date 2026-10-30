@@ -7,6 +7,10 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../models/models.dart';
 // import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/api_service.dart';
+import '../services/platform_knowledge.dart';
+import '../services/plan_service.dart';
+import '../services/premium_plan_service.dart';
+import '../services/zone_service.dart';
 import '../theme/app_theme.dart';
 import '../screens/property_detail_screen.dart';
 // ignore: unused_import
@@ -72,6 +76,8 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     {'label': '🚗 Voiture à louer', 'query': 'Voiture à louer'},
     {'label': '🏢 Appartement meublé', 'query': 'Appartement meublé'},
     {'label': '🌍 Bien au Togo', 'query': 'Bien disponible au Togo'},
+    {'label': '💎 Premium', 'query': 'Que comprend Premium ?'},
+    {'label': '🌐 Dans quels pays ?', 'query': 'VelQix est disponible dans quels pays ?'},
   ];
 
   @override
@@ -313,81 +319,121 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }).toList();
   }
 
-  // ─── FAQ codée en dur — pas d'appel API pour ces questions ───────────────
-  // Reprend le contenu déjà écrit dans SYSTEM_PROMPT côté backend (ai.ts),
-  // mais servi directement ici : si ça matche, réponse instantanée et
-  // gratuite. Sinon, on part sur Gemini (function-calling, vraie recherche
-  // en base). Ne couvre QUE les questions sur le fonctionnement de l'app —
-  // pas la recherche de biens, qui doit rester dynamique.
-  static const List<({List<String> keywords, String answer})> _faq = [
-    (
-      keywords: ['publier', 'poster annonce', 'ajouter bien', 'ajouter annonce', 'deposer annonce'],
-      answer: 'Pour publier une annonce : connectez-vous, appuyez sur "+" (Ajouter un bien), '
-          'remplissez le titre, la catégorie, le prix et les photos, puis soumettez. Votre annonce '
-          'est ensuite examinée par l\'équipe avant d\'être visible publiquement. Avec Premium, vos '
-          'annonces sont mises en avant.',
-    ),
-    (
-      keywords: ['premium', 'abonnement'],
-      answer: 'L\'abonnement Premium met vos annonces en tête de liste, permet plus de photos par '
-          'annonce, ajoute un badge "Premium" sur votre profil, donne accès aux statistiques de vues '
-          'et à un support prioritaire. Accessible dans Profil → Premium.',
-    ),
-    (
-      keywords: ['contacter vendeur', 'contacter proprietaire', 'comment contacter', 'joindre le vendeur', 'contacter'],
-      answer: 'Pour contacter un vendeur : ouvrez la page du bien, appuyez sur "Contacter" pour lui '
-          'envoyer un message texte ou vocal (ou appelez si le numéro est affiché). Tous vos messages '
-          'sont dans l\'onglet Messagerie.',
-    ),
-    (
-      keywords: ['favori', 'coup de coeur', 'sauvegarder annonce', 'mettre de cote'],
-      answer: 'Pour ajouter un bien en favori, appuyez sur le cœur sur sa fiche. Retrouvez tous vos '
-          'favoris dans Profil → Favoris — vous pouvez les retirer à tout moment de la même façon.',
-    ),
-    (
-      keywords: ['suivre', 'ne plus suivre', 'abonner a un proprietaire', 'suivre un vendeur'],
-      answer: 'Vous pouvez suivre un propriétaire depuis sa page de profil (bouton "Suivre") pour être '
-          'informé de ses nouvelles annonces. "Ne plus suivre" au même endroit pour arrêter.',
-    ),
-    (
-      keywords: ['avis', 'notation', 'noter un bien', 'commentaire annonce'],
-      answer: 'Les biens peuvent recevoir des avis et une note laissés par d\'autres utilisateurs, '
-          'visibles sur la fiche du bien — utile pour évaluer la fiabilité d\'une annonce ou d\'un '
-          'propriétaire.',
-    ),
-    (
-      keywords: ['securite', 'arnaque', 'plateforme fiable'],
-      answer: 'VelQix sécurise les échanges via : la validation de chaque annonce par l\'équipe de '
-          'modération avant publication, des paiements sécurisés intégrés, un système d\'avis et de '
-          'notation, et le signalement d\'annonces suspectes possible directement depuis leur fiche.',
-    ),
-    (
-      keywords: ['notification', 'alerte', 'badge notif'],
-      answer: 'Vous recevez une notification (avec badge sur la cloche) dès qu\'un nouveau message '
-          'arrive ou qu\'un événement vous concerne. Retrouvez l\'historique complet en appuyant sur '
-          'la cloche, en haut de l\'écran.',
-    ),
-    (
-      keywords: ['mot de passe', 'modifier profil', 'changer email', 'changer telephone', 'gerer mon compte'],
-      answer: 'Dans l\'onglet Profil, vous pouvez modifier votre profil (nom, email, téléphone), '
-          'changer votre mot de passe, et consulter vos annonces et favoris.',
-    ),
-    (
-      keywords: ['support', 'probleme technique', 'whatsapp', 'contacter support', 'aide urgente'],
-      answer: 'Besoin d\'aide ? Allez dans Profil → Support & Aide, envoyez un message via la '
-          'messagerie, ou signalez directement une annonce. Réponse sous 24-48h — pour les urgences, '
-          'contactez-nous via WhatsApp.',
-    ),
-  ];
+  // ─── Base de connaissances de la plateforme ──────────────────────────────
+  // Réponses précises aux questions sur le fonctionnement de VelQix, adaptées
+  // au lieu cité (Lomé, une ville du Togo, un autre pays, un continent,
+  // « l'étranger »…) — voir lib/services/platform_knowledge.dart.
+  // Les chiffres qui bougent (tarif Premium, zones desservies) sont lus sur
+  // le serveur. Les recherches de biens ne passent JAMAIS par ici : elles
+  // partent vers l'IA du serveur (Gemini + recherche en base).
+  String get _uiLang =>
+      localeNotifier.value.languageCode == 'en' ? 'en' : 'fr';
 
-  /// Cherche une réponse codée en dur pour les questions fréquentes sur le
-  /// fonctionnement de VelQix. Retourne null si rien ne correspond — dans ce
-  /// cas on part sur l'IA (voir _handleQuery).
-  String? _matchFaq(String normalizedQuery) {
-    for (final entry in _faq) {
-      if (_matchAny(normalizedQuery, entry.keywords)) return entry.answer;
+  Future<String> _answerFromKnowledge(PlatformMatch m) async {
+    String? premiumLine;
+    String? coverageLine;
+    if (m.topic == 'premium') {
+      premiumLine = await _premiumPriceLine(m.lang);
     }
-    return null;
+    if (m.topic == 'services' || m.topic == 'coverage' || m.topic == 'diaspora') {
+      coverageLine = await _zonesLine(m);
+    }
+    return PlatformKnowledge.render(
+      m,
+      premiumLine: premiumLine,
+      coverageLine: coverageLine,
+    );
+  }
+
+  /// Tarifs Premium lus sur le serveur (GET /premium/plan), avec repli sur
+  /// le tarif de référence de l'application.
+  Future<String?> _premiumPriceLine(String lang) async {
+    final fr = lang == 'fr';
+    try {
+      final periods = await PlanService.instance
+          .getPremiumPeriods()
+          .timeout(const Duration(seconds: 5));
+      if (periods.isNotEmpty) {
+        final list = periods
+            .map((p) => "${p.label} : ${_fmt(p.priceFcfa)} FCFA")
+            .join(' · ');
+        return fr ? "Tarifs actuels : $list." : "Current prices: $list.";
+      }
+    } catch (_) {
+      // serveur injoignable : on retombe sur le tarif de référence
+    }
+    final plan = PremiumPlanService.instance.plan.value;
+    final price =
+        "${_fmt(plan.priceFcfa)} FCFA / ${plan.durationDays} ${fr ? 'jours' : 'days'}";
+    return fr
+        ? "Tarif de référence : $price (le montant exact est confirmé sur l'écran de paiement)."
+        : "Reference price: $price (the exact amount is confirmed on the payment screen).";
+  }
+
+  /// Zones desservies lues sur le serveur (GET /zones) : permet de répondre
+  /// précisément à « le service de vérification existe-t-il à X ? ».
+  Future<String?> _zonesLine(PlatformMatch m) async {
+    final fr = m.lang == 'fr';
+    try {
+      final res = await ZoneService.instance
+          .getPublicZones()
+          .timeout(const Duration(seconds: 5));
+      // Pas de limite définie ou aucune zone : rien de précis à ajouter,
+      // le serveur reste juge au moment de la demande.
+      if (!res.limited || res.zones.isEmpty) return null;
+
+      final names = res.zones
+          .map((z) => z.name)
+          .where((n) => n.isNotEmpty)
+          .take(8)
+          .join(', ');
+      final g = m.geo;
+      final placeLevel =
+          g != null && (g.kind == 'togo' || g.kind == 'wa' || g.kind == 'africa');
+
+      // Le lieu cité n'est un critère que pour un bien situé en Afrique ;
+      // pour « je vis en France » ou « à l'étranger », on liste simplement.
+      if (g == null || !placeLevel) {
+        return fr
+            ? "📌 Zones desservies actuellement : $names."
+            : "📌 Currently served zones: $names.";
+      }
+
+      PublicZone? byName;
+      for (final z in res.zones) {
+        final zn = PlatformKnowledge.normalize(z.name);
+        if (zn.isNotEmpty && (zn.contains(g.token) || g.token.contains(zn))) {
+          byName = z;
+          break;
+        }
+      }
+      if (byName != null) {
+        final price = byName.verificationPrice > 0
+            ? (fr
+                ? " (vérification dès ${_fmt(byName.verificationPrice.toDouble())} FCFA)"
+                : " (verification from ${_fmt(byName.verificationPrice.toDouble())} FCFA)")
+            : '';
+        return fr
+            ? "✅ ${byName.name} fait partie des zones desservies$price."
+            : "✅ ${byName.name} is one of the served zones$price.";
+      }
+
+      final inCountry = g.code == null
+          ? <PublicZone>[]
+          : res.zones.where((z) => z.country.toUpperCase() == g.code).toList();
+      final label = fr ? g.labelFr : g.labelEn;
+      if (inCountry.isNotEmpty) {
+        final list = inCountry.map((z) => z.name).take(8).join(', ');
+        return fr
+            ? "📌 Zones desservies pour $label : $list. Si votre ville n'y figure pas, les services terrain n'y sont pas proposés pour l'instant."
+            : "📌 Served zones for $label: $list. If your city is not listed, field services are not offered there yet.";
+      }
+      return fr
+          ? "⚠️ Je ne vois pas $label parmi les zones desservies actuellement ($names). Vous pouvez y consulter et publier des annonces, mais les services terrain n'y sont pas proposés pour l'instant."
+          : "⚠️ I don't see $label among the currently served zones ($names). You can still browse and post listings there, but field services are not offered yet.";
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── Moteur IA — /api/ai/chat ────────────────────────────────────────────
@@ -401,12 +447,24 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     setState(() => _messages.add(_ChatMessage(type: _MsgType.user, text: q)));
     _scrollToBottom();
 
-    // FAQ codée en dur d'abord — réponse instantanée, aucun appel API
-    final faqAnswer = _matchFaq(_normalize(q));
-    if (faqAnswer != null) {
-      _addAiMessage(faqAnswer);
+    // Questions sur la plateforme → base de connaissances (réponse exacte,
+    // adaptée au lieu cité). Les recherches de biens ne sont jamais
+    // interceptées : elles partent vers l'IA du serveur.
+    final kb = PlatformKnowledge.match(q, defaultLang: _uiLang);
+    if (kb != null) {
+      setState(() => _isTyping = true);
+      _scrollToBottom();
+      String reply;
+      try {
+        reply = await _answerFromKnowledge(kb);
+      } catch (_) {
+        reply = PlatformKnowledge.render(kb);
+      }
+      if (!mounted) return;
+      setState(() => _isTyping = false);
+      _addAiMessage(reply);
       _history.add({'role': 'user', 'content': q});
-      _history.add({'role': 'assistant', 'content': faqAnswer});
+      _history.add({'role': 'assistant', 'content': reply});
       if (_history.length > 20) {
         _history.removeRange(0, _history.length - 20);
       }
@@ -505,10 +563,6 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       );
     }
   }
-
-  // ─── Helper : vérifier si une liste de mots-clés correspond ──────────────
-  bool _matchAny(String text, List<String> keywords) =>
-      keywords.any((k) => text.contains(k));
 
   // ─── Helper : formater les prix ───────────────────────────────────────────
   String _fmt(double v) {
@@ -1388,7 +1442,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _micPulseAnim.repeat(reverse: true);
 
     _speech.listen(
-      localeId: 'fr_FR',
+      localeId: _speechLocale(),
       onResult: (result) {
         if (!mounted) return;
         final transcript = result.recognizedWords;
@@ -1407,6 +1461,25 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       listenFor: const Duration(seconds: 15),
       pauseFor: const Duration(seconds: 2),
     );
+  }
+
+  /// Langue de la dictée = langue de l'application (et non plus toujours
+  /// le français).
+  String _speechLocale() {
+    switch (localeNotifier.value.languageCode) {
+      case 'en':
+        return 'en_US';
+      case 'es':
+        return 'es_ES';
+      case 'pt':
+        return 'pt_PT';
+      case 'de':
+        return 'de_DE';
+      case 'ar':
+        return 'ar_SA';
+      default:
+        return 'fr_FR';
+    }
   }
 
   String _formatPrice(double prix) {
