@@ -252,7 +252,6 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => _open(_AgentSettingsScreen(onLogout: _logout)),
           ),
-          IconButton(tooltip: 'Se déconnecter', icon: const Icon(Icons.logout_rounded), onPressed: _logout),
         ],
         bottom: TabBar(
           controller: _tab,
