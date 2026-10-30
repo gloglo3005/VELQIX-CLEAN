@@ -20,11 +20,12 @@ import '../services/mission_service.dart';
 import '../services/property_service.dart';
 import '../services/web_file_picker.dart';
 import '../theme/app_theme.dart';
-import '../widgets/widgets.dart' show EmptyState, formatFcfa;
+import '../widgets/widgets.dart' show EmptyState, UserAvatar, formatFcfa, userStateNotifier;
 import 'incoming_call_screen.dart';
 import 'main_shell.dart';
 import 'messages_screen.dart';
 import 'notifications_screen.dart';
+import 'profile_screen.dart' show showEditProfileSheet, showProfileCountryPicker;
 import 'support_screen.dart';
 
 class AgentWorkspaceScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tab = TabController(length: 4, vsync: this);
+    _tab = TabController(length: 4, vsync: this)..addListener(_onTabChanged);
     _reloadMissions();
 
     // Ces comptes n'ont pas accès à la partie publique : l'espace agent
@@ -68,6 +69,7 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
     WidgetsBinding.instance.removeObserver(this);
     latestNotificationNotifier.removeListener(_handleLatestNotification);
     incomingCallNotifier.removeListener(_handleIncomingCall);
+    _tab.removeListener(_onTabChanged);
     _tab.dispose();
     super.dispose();
   }
@@ -126,6 +128,10 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
         _openingIncomingCall = false;
       }
     });
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
   }
 
   void _open(Widget screen) =>
@@ -253,17 +259,29 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
             onPressed: () => _open(_AgentSettingsScreen(onLogout: _logout)),
           ),
         ],
-        bottom: TabBar(
-          controller: _tab,
-          isScrollable: true,
-          labelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(text: 'Missions'),
-            Tab(text: 'Mes missions'),
-            Tab(text: 'Mes gains'),
-            Tab(text: 'Disponibilité'),
-          ],
-        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab.index,
+        onDestinationSelected: (i) => _tab.animateTo(i),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.search_rounded),
+              selectedIcon: Icon(Icons.search_rounded),
+              label: 'Missions'),
+          NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment_rounded),
+              label: 'Mes missions'),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+              label: 'Mes gains'),
+          NavigationDestination(
+              icon: Icon(Icons.event_available_outlined),
+              selectedIcon: Icon(Icons.event_available_rounded),
+              label: 'Disponibilité'),
+        ],
       ),
       body: TabBarView(controller: _tab, children: [
         _missionList(AgentScope.available),
@@ -881,15 +899,59 @@ class _AgentSettingsScreen extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView(padding: const EdgeInsets.all(16), children: [
-            Card(
-              child: ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person_rounded)),
-                title: Text(me.fullName, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                subtitle: Text('$roleLabel\n${me.email}'),
-                isThreeLine: true,
-              ),
+            // ── Profil (photo, nom, téléphone, mot de passe, pays) ──────────
+            ValueListenableBuilder<int>(
+              valueListenable: userStateNotifier,
+              builder: (ctx, _, __) {
+                final u = AuthService.instance.currentUserOrEmpty;
+                return Column(children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(children: [
+                        UserAvatar(user: u, radius: 30),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(u.fullName,
+                                style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                            Text(roleLabel,
+                                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.primary)),
+                            Text(u.email,
+                                style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                            if (u.rating > 0 || u.totalAvis > 0)
+                              Text('${u.rating.toStringAsFixed(1)} ⭐ · ${u.totalAvis} avis',
+                                  style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                          ]),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.person_outline_rounded),
+                    title: const Text('Modifier le profil'),
+                    subtitle: const Text('Photo, nom, téléphone, mot de passe'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => showEditProfileSheet(ctx, u),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.phone_outlined),
+                    title: const Text('Téléphone'),
+                    subtitle: Text(u.telephone.isNotEmpty ? u.telephone : 'Non renseigné'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => showEditProfileSheet(ctx, u),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.public_rounded),
+                    title: const Text('Pays'),
+                    subtitle: Text((u.countryName ?? '').isNotEmpty ? u.countryName! : 'Non renseigné'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => showProfileCountryPicker(ctx, u),
+                  ),
+                ]);
+              },
             ),
-            const SizedBox(height: 8),
+            const Divider(height: 24),
             ValueListenableBuilder<Locale>(
               valueListenable: localeNotifier,
               builder: (_, locale, __) => ListTile(

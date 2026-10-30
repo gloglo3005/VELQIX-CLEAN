@@ -22,6 +22,180 @@ import '../main.dart' show themeModeNotifier, localeNotifier, countryCodeToLocal
 import '../services/app_translations.dart' show tr;
 import 'support_screen.dart';
 
+const List<Map<String, String>> kProfileCountries = [
+  {'code': 'TG', 'name': 'Togo'}, {'code': 'BJ', 'name': 'Bénin'},
+  {'code': 'GH', 'name': 'Ghana'}, {'code': 'CI', 'name': 'Côte d\'Ivoire'},
+  {'code': 'SN', 'name': 'Sénégal'}, {'code': 'ML', 'name': 'Mali'},
+  {'code': 'BF', 'name': 'Burkina Faso'}, {'code': 'NE', 'name': 'Niger'},
+  {'code': 'NG', 'name': 'Nigeria'}, {'code': 'CM', 'name': 'Cameroun'},
+  {'code': 'GA', 'name': 'Gabon'}, {'code': 'CD', 'name': 'Congo (RDC)'},
+  {'code': 'CG', 'name': 'Congo'}, {'code': 'KE', 'name': 'Kenya'},
+  {'code': 'TZ', 'name': 'Tanzanie'}, {'code': 'RW', 'name': 'Rwanda'},
+  {'code': 'ET', 'name': 'Éthiopie'}, {'code': 'ZA', 'name': 'Afrique du Sud'},
+  {'code': 'EG', 'name': 'Égypte'}, {'code': 'MA', 'name': 'Maroc'},
+  {'code': 'TN', 'name': 'Tunisie'}, {'code': 'DZ', 'name': 'Algérie'},
+  {'code': 'LY', 'name': 'Libye'}, {'code': 'SD', 'name': 'Soudan'},
+  {'code': 'SS', 'name': 'Soudan du Sud'}, {'code': 'CF', 'name': 'Rép. centrafricaine'},
+  {'code': 'TD', 'name': 'Tchad'}, {'code': 'AO', 'name': 'Angola'},
+  {'code': 'MZ', 'name': 'Mozambique'}, {'code': 'ZM', 'name': 'Zambie'},
+  {'code': 'ZW', 'name': 'Zimbabwe'}, {'code': 'MW', 'name': 'Malawi'},
+  {'code': 'NA', 'name': 'Namibie'}, {'code': 'BW', 'name': 'Botswana'},
+  {'code': 'LS', 'name': 'Lesotho'}, {'code': 'SZ', 'name': 'Eswatini'},
+  {'code': 'SC', 'name': 'Seychelles'}, {'code': 'MU', 'name': 'Maurice'},
+  {'code': 'CV', 'name': 'Cap-Vert'}, {'code': 'KM', 'name': 'Comores'},
+  {'code': 'ST', 'name': 'Sao Tomé-et-Principe'}, {'code': 'DJ', 'name': 'Djibouti'},
+  {'code': 'ER', 'name': 'Érythrée'}, {'code': 'UG', 'name': 'Ouganda'},
+  {'code': 'BI', 'name': 'Burundi'}, {'code': 'GN', 'name': 'Guinée'},
+  {'code': 'GW', 'name': 'Guinée-Bissau'}, {'code': 'GQ', 'name': 'Guinée équatoriale'},
+  {'code': 'SL', 'name': 'Sierra Leone'}, {'code': 'LR', 'name': 'Libéria'},
+  {'code': 'GM', 'name': 'Gambie'}, {'code': 'MG', 'name': 'Madagascar'},
+  {'code': 'MR', 'name': 'Mauritanie'}, {'code': 'SO', 'name': 'Somalie'},
+  {'code': 'FR', 'name': 'France'}, {'code': 'DE', 'name': 'Allemagne'},
+  {'code': 'GB', 'name': 'Royaume-Uni'}, {'code': 'US', 'name': 'États-Unis'},
+  {'code': 'CA', 'name': 'Canada'}, {'code': 'BR', 'name': 'Brésil'},
+  {'code': 'CN', 'name': 'Chine'}, {'code': 'IN', 'name': 'Inde'},
+  {'code': 'JP', 'name': 'Japon'}, {'code': 'AU', 'name': 'Australie'},
+  {'code': 'SA', 'name': 'Arabie Saoudite'}, {'code': 'AE', 'name': 'Émirats arabes unis'},
+  {'code': 'AR', 'name': 'Argentine'}, {'code': 'MX', 'name': 'Mexique'},
+  {'code': 'RU', 'name': 'Russie'}, {'code': 'TR', 'name': 'Turquie'},
+  {'code': 'ES', 'name': 'Espagne'}, {'code': 'IT', 'name': 'Italie'},
+  {'code': 'PT', 'name': 'Portugal'}, {'code': 'BE', 'name': 'Belgique'},
+  {'code': 'CH', 'name': 'Suisse'}, {'code': 'NL', 'name': 'Pays-Bas'},
+  {'code': 'SE', 'name': 'Suède'}, {'code': 'NO', 'name': 'Norvège'},
+  {'code': 'PL', 'name': 'Pologne'}, {'code': 'UA', 'name': 'Ukraine'},
+  {'code': 'QA', 'name': 'Qatar'}, {'code': 'KW', 'name': 'Koweït'},
+  {'code': 'SG', 'name': 'Singapour'}, {'code': 'MY', 'name': 'Malaisie'},
+  {'code': 'ID', 'name': 'Indonésie'}, {'code': 'TH', 'name': 'Thaïlande'},
+  {'code': 'VN', 'name': 'Viêt Nam'}, {'code': 'PH', 'name': 'Philippines'},
+  {'code': 'KR', 'name': 'Corée du Sud'}, {'code': 'PK', 'name': 'Pakistan'},
+  {'code': 'BD', 'name': 'Bangladesh'},
+];
+
+String _flagEmoji(String code) {
+  if (code.length != 2) return '🌍';
+  return code.toUpperCase().runes.map((r) => String.fromCharCode(r + 127397)).join();
+}
+
+/// Ouvre le formulaire d'édition du profil (photo, infos, mot de passe).
+Future<void> showEditProfileSheet(BuildContext context, UserModel user) async {
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => EditProfileSheet(user: user),
+  );
+  userStateNotifier.value++;
+}
+
+Future<void> showProfileCountryPicker(BuildContext context, UserModel user) async {
+  final searchCtrl = TextEditingController();
+  List<Map<String, String>> filtered = List.from(kProfileCountries);
+  String? currentCode = user.countryCode;
+
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => StatefulBuilder(
+      builder: (ctx, setModal) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: BoxDecoration(
+          color: AppTheme.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Text('Changer de pays', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
+                  const Spacer(),
+                  IconButton(icon: Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx), color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: searchCtrl,
+                decoration: InputDecoration(
+                  hintText: tr('prof_search_country'),
+                  hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint),
+                  prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint),
+                  filled: true, fillColor: Theme.of(context).colorScheme.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onChanged: (q) => setModal(() {
+                  filtered = kProfileCountries.where((c) =>
+                    c['name']!.toLowerCase().contains(q.toLowerCase()) ||
+                    c['code']!.toLowerCase().contains(q.toLowerCase())
+                  ).toList();
+                }),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final c = filtered[i];
+                  final isSel = currentCode == c['code'];
+                  return ListTile(
+                    leading: Text(_flagEmoji(c['code']!), style: const TextStyle(fontSize: 28)),
+                    title: Text(c['name']!, style: GoogleFonts.poppins(fontSize: 14, fontWeight: isSel ? FontWeight.w600 : FontWeight.w400, color: isSel ? AppTheme.primary : AppTheme.textPrimary)),
+                    trailing: isSel ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20) : null,
+                    onTap: () async {
+                      // ⚠️ Persiste réellement côté serveur (avant :
+                      // AuthService.updateUser() = cache local uniquement).
+                      final error = await AuthService.instance.updateProfile(
+                        nom: user.nom,
+                        prenom: user.prenom,
+                        telephone: user.telephone,
+                        countryCode: c['code'],
+                        countryName: c['name'],
+                      );
+                      if (error != null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(error, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                            backgroundColor: AppTheme.error,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ));
+                        }
+                        return;
+                      }
+                      // ✅ Changer la langue selon le pays sélectionné
+                      localeNotifier.value = countryCodeToLocale(c['code']);
+                      userStateNotifier.value++;
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Row(children: [
+                          Text(_flagEmoji(c['code']!), style: const TextStyle(fontSize: 16)),
+                          const SizedBox(width: 8),
+                          Text('Pays mis à jour : ${c['name']}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
+                        ]),
+                        backgroundColor: AppTheme.success,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ));
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
 // ✅ Converti en StatefulWidget pour se reconstruire après Premium/KYC
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -70,172 +244,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ─── Modifier le pays du profil ────────────────────────────────────────────
-  static const List<Map<String, String>> _allCountries = [
-    {'code': 'TG', 'name': 'Togo'}, {'code': 'BJ', 'name': 'Bénin'},
-    {'code': 'GH', 'name': 'Ghana'}, {'code': 'CI', 'name': 'Côte d\'Ivoire'},
-    {'code': 'SN', 'name': 'Sénégal'}, {'code': 'ML', 'name': 'Mali'},
-    {'code': 'BF', 'name': 'Burkina Faso'}, {'code': 'NE', 'name': 'Niger'},
-    {'code': 'NG', 'name': 'Nigeria'}, {'code': 'CM', 'name': 'Cameroun'},
-    {'code': 'GA', 'name': 'Gabon'}, {'code': 'CD', 'name': 'Congo (RDC)'},
-    {'code': 'CG', 'name': 'Congo'}, {'code': 'KE', 'name': 'Kenya'},
-    {'code': 'TZ', 'name': 'Tanzanie'}, {'code': 'RW', 'name': 'Rwanda'},
-    {'code': 'ET', 'name': 'Éthiopie'}, {'code': 'ZA', 'name': 'Afrique du Sud'},
-    {'code': 'EG', 'name': 'Égypte'}, {'code': 'MA', 'name': 'Maroc'},
-    {'code': 'TN', 'name': 'Tunisie'}, {'code': 'DZ', 'name': 'Algérie'},
-    {'code': 'LY', 'name': 'Libye'}, {'code': 'SD', 'name': 'Soudan'},
-    {'code': 'SS', 'name': 'Soudan du Sud'}, {'code': 'CF', 'name': 'Rép. centrafricaine'},
-    {'code': 'TD', 'name': 'Tchad'}, {'code': 'AO', 'name': 'Angola'},
-    {'code': 'MZ', 'name': 'Mozambique'}, {'code': 'ZM', 'name': 'Zambie'},
-    {'code': 'ZW', 'name': 'Zimbabwe'}, {'code': 'MW', 'name': 'Malawi'},
-    {'code': 'NA', 'name': 'Namibie'}, {'code': 'BW', 'name': 'Botswana'},
-    {'code': 'LS', 'name': 'Lesotho'}, {'code': 'SZ', 'name': 'Eswatini'},
-    {'code': 'SC', 'name': 'Seychelles'}, {'code': 'MU', 'name': 'Maurice'},
-    {'code': 'CV', 'name': 'Cap-Vert'}, {'code': 'KM', 'name': 'Comores'},
-    {'code': 'ST', 'name': 'Sao Tomé-et-Principe'}, {'code': 'DJ', 'name': 'Djibouti'},
-    {'code': 'ER', 'name': 'Érythrée'}, {'code': 'UG', 'name': 'Ouganda'},
-    {'code': 'BI', 'name': 'Burundi'}, {'code': 'GN', 'name': 'Guinée'},
-    {'code': 'GW', 'name': 'Guinée-Bissau'}, {'code': 'GQ', 'name': 'Guinée équatoriale'},
-    {'code': 'SL', 'name': 'Sierra Leone'}, {'code': 'LR', 'name': 'Libéria'},
-    {'code': 'GM', 'name': 'Gambie'}, {'code': 'MG', 'name': 'Madagascar'},
-    {'code': 'MR', 'name': 'Mauritanie'}, {'code': 'SO', 'name': 'Somalie'},
-    {'code': 'FR', 'name': 'France'}, {'code': 'DE', 'name': 'Allemagne'},
-    {'code': 'GB', 'name': 'Royaume-Uni'}, {'code': 'US', 'name': 'États-Unis'},
-    {'code': 'CA', 'name': 'Canada'}, {'code': 'BR', 'name': 'Brésil'},
-    {'code': 'CN', 'name': 'Chine'}, {'code': 'IN', 'name': 'Inde'},
-    {'code': 'JP', 'name': 'Japon'}, {'code': 'AU', 'name': 'Australie'},
-    {'code': 'SA', 'name': 'Arabie Saoudite'}, {'code': 'AE', 'name': 'Émirats arabes unis'},
-    {'code': 'AR', 'name': 'Argentine'}, {'code': 'MX', 'name': 'Mexique'},
-    {'code': 'RU', 'name': 'Russie'}, {'code': 'TR', 'name': 'Turquie'},
-    {'code': 'ES', 'name': 'Espagne'}, {'code': 'IT', 'name': 'Italie'},
-    {'code': 'PT', 'name': 'Portugal'}, {'code': 'BE', 'name': 'Belgique'},
-    {'code': 'CH', 'name': 'Suisse'}, {'code': 'NL', 'name': 'Pays-Bas'},
-    {'code': 'SE', 'name': 'Suède'}, {'code': 'NO', 'name': 'Norvège'},
-    {'code': 'PL', 'name': 'Pologne'}, {'code': 'UA', 'name': 'Ukraine'},
-    {'code': 'QA', 'name': 'Qatar'}, {'code': 'KW', 'name': 'Koweït'},
-    {'code': 'SG', 'name': 'Singapour'}, {'code': 'MY', 'name': 'Malaisie'},
-    {'code': 'ID', 'name': 'Indonésie'}, {'code': 'TH', 'name': 'Thaïlande'},
-    {'code': 'VN', 'name': 'Viêt Nam'}, {'code': 'PH', 'name': 'Philippines'},
-    {'code': 'KR', 'name': 'Corée du Sud'}, {'code': 'PK', 'name': 'Pakistan'},
-    {'code': 'BD', 'name': 'Bangladesh'},
-  ];
-
   Future<void> _showEditProfileModal(UserModel user) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _EditProfileSheet(user: user),
+      builder: (ctx) => EditProfileSheet(user: user),
     );
     // Rafraîchir après fermeture
     if (mounted) userStateNotifier.value++;
   }
 
   Future<void> _showCountryEditPicker(UserModel user) async {
-    final searchCtrl = TextEditingController();
-    List<Map<String, String>> filtered = List.from(_allCountries);
-    String? currentCode = user.countryCode;
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModal) => Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          decoration: BoxDecoration(
-            color: AppTheme.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.divider, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Text('Changer de pays', style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700, color: Theme.of(context).textTheme.bodyLarge?.color ?? AppTheme.textPrimary)),
-                    const Spacer(),
-                    IconButton(icon: Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx), color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: tr('prof_search_country'),
-                    hintStyle: GoogleFonts.poppins(fontSize: 14, color: AppTheme.textHint),
-                    prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textHint),
-                    filled: true, fillColor: Theme.of(context).colorScheme.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onChanged: (q) => setModal(() {
-                    filtered = _allCountries.where((c) =>
-                      c['name']!.toLowerCase().contains(q.toLowerCase()) ||
-                      c['code']!.toLowerCase().contains(q.toLowerCase())
-                    ).toList();
-                  }),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) {
-                    final c = filtered[i];
-                    final isSel = currentCode == c['code'];
-                    return ListTile(
-                      leading: Text(_getFlag(c['code']!), style: const TextStyle(fontSize: 28)),
-                      title: Text(c['name']!, style: GoogleFonts.poppins(fontSize: 14, fontWeight: isSel ? FontWeight.w600 : FontWeight.w400, color: isSel ? AppTheme.primary : AppTheme.textPrimary)),
-                      trailing: isSel ? Icon(Icons.check_circle_rounded, color: AppTheme.primary, size: 20) : null,
-                      onTap: () async {
-                        // ⚠️ Persiste réellement côté serveur (avant :
-                        // AuthService.updateUser() = cache local uniquement).
-                        final error = await AuthService.instance.updateProfile(
-                          nom: user.nom,
-                          prenom: user.prenom,
-                          telephone: user.telephone,
-                          countryCode: c['code'],
-                          countryName: c['name'],
-                        );
-                        if (error != null) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(error, style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
-                              backgroundColor: AppTheme.error,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ));
-                          }
-                          return;
-                        }
-                        // ✅ Changer la langue selon le pays sélectionné
-                        localeNotifier.value = countryCodeToLocale(c['code']);
-                        if (mounted) setState(() {});
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Row(children: [
-                            Text(_getFlag(c['code']!), style: const TextStyle(fontSize: 16)),
-                            const SizedBox(width: 8),
-                            Text('Pays mis à jour : ${c['name']}', style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
-                          ]),
-                          backgroundColor: AppTheme.success,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ));
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    await showProfileCountryPicker(context, user);
+    if (mounted) setState(() {});
   }
 
   // ─── Sélecteur de langue ────────────────────────────────────────────────────
@@ -755,15 +777,15 @@ class _MenuItem extends StatelessWidget {
 
 
 // ─── Modal d'édition du profil (StatefulWidget propre — évite assertion error) ─
-class _EditProfileSheet extends StatefulWidget {
+class EditProfileSheet extends StatefulWidget {
   final UserModel user;
-  const _EditProfileSheet({required this.user});
+  const EditProfileSheet({required this.user});
 
   @override
-  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+  State<EditProfileSheet> createState() => EditProfileSheetState();
 }
 
-class _EditProfileSheetState extends State<_EditProfileSheet> {
+class EditProfileSheetState extends State<EditProfileSheet> {
   late final TextEditingController _prenomCtrl;
   late final TextEditingController _nomCtrl;
   late final TextEditingController _emailCtrl;
