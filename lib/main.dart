@@ -14,6 +14,7 @@ import 'screens/admin_dashboard_screen.dart';
 import 'screens/auth_screens.dart';
 import 'screens/main_shell.dart';
 import 'screens/role_home.dart';
+import 'screens/shared_property_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
@@ -416,6 +417,24 @@ class _VelQixAppState extends State<VelQixApp> {
                 Locale('fr'),
                 Locale('en'),
               ],
+
+              /// =================================================
+              /// LIENS PARTAGÉS : https://velqix.vercel.app/bien/<id>
+              /// =================================================
+              /// Sans cette route, le navigateur ouvrait l'accueil au lieu du
+              /// bien. L'écran du bien s'empile au-dessus de l'accueil (qui
+              /// reste en dessous pour le bouton « retour »).
+              onGenerateRoute: (settings) {
+                final seg = Uri.tryParse(settings.name ?? '')?.pathSegments ??
+                    const <String>[];
+                if (seg.length == 2 && seg[0] == 'bien' && seg[1].isNotEmpty) {
+                  return MaterialPageRoute(
+                    settings: settings,
+                    builder: (_) => SharedPropertyScreen(propertyId: seg[1]),
+                  );
+                }
+                return null;
+              },
 
               home: FutureBuilder<bool>(
                 future: _startupFuture,
