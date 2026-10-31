@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../models/mission_model.dart';
 import '../models/models.dart';
 import '../services/mission_service.dart';
@@ -155,7 +156,7 @@ class _ServiceSheetState extends State<_ServiceSheet> {
     });
     try {
       final url = await MissionService.instance.checkout(m.id);
-      final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      final ok = await launchUrl(safeHttpsUri(url), mode: LaunchMode.externalApplication);
       if (!ok && mounted) setState(() => _error = "Impossible d'ouvrir la page de paiement.");
     } catch (e) {
       if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));

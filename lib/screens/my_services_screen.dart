@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../models/mission_model.dart';
 import '../services/mission_service.dart';
 import '../theme/app_theme.dart';
@@ -83,7 +84,7 @@ class _MyServicesScreenState extends State<MyServicesScreen> with WidgetsBinding
     setState(() => _busyId = m.id);
     try {
       final url = await MissionService.instance.checkout(m.id);
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(safeHttpsUri(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) _snack(e.toString().replaceFirst('Exception: ', ''), error: true);
     } finally {

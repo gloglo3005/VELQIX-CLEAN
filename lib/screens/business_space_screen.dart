@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../services/plan_service.dart';
 import '../services/spaces_service.dart';
 import '../theme/app_theme.dart';
@@ -384,7 +385,7 @@ class _ReportsState extends State<_Reports> {
   Future<void> _export() async {
     try {
       final url = await BusinessService.instance.exportReportUrl(_period);
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(safeHttpsUri(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) _snack(context, e.toString().replaceFirst('Exception: ', ''), error: true);
     }
@@ -463,7 +464,7 @@ class _ReportsState extends State<_Reports> {
                               style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700)),
                           onTap: (f['url'] ?? '').toString().isEmpty
                               ? null
-                              : () => launchUrl(Uri.parse(f['url'].toString()), mode: LaunchMode.externalApplication),
+                              : () { if (isSafeHttpsUrl(f['url'].toString())) launchUrl(Uri.parse(f['url'].toString()), mode: LaunchMode.externalApplication); },
                         ),
                     ]),
             ),

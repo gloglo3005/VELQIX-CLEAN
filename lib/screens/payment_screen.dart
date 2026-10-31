@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import '../services/auth_service.dart';
@@ -91,7 +92,7 @@ class _PaymentScreenState extends State<PaymentScreen> with WidgetsBindingObserv
     }
 
     final paymentUrl = result['data']?['paymentUrl'] as String?;
-    if (paymentUrl == null) {
+    if (paymentUrl == null || !isSafeHttpsUrl(paymentUrl)) {
       setState(() {
         _processing = false;
         _errorMsg = 'Réponse inattendue du serveur.';

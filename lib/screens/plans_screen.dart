@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../services/app_translations.dart' show tr;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../services/plan_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_gate.dart';
@@ -82,7 +83,7 @@ class _PlansScreenState extends State<PlansScreen> {
     setState(() => _busy = true);
     try {
       final url = await start();
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(safeHttpsUri(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) _snack(_msg(e), error: true);
     } finally {

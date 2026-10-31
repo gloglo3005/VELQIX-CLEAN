@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/safe_url.dart';
 import '../services/plan_service.dart';
 import '../services/spaces_service.dart';
 import '../theme/app_theme.dart';
@@ -298,8 +299,8 @@ class _ProSubscription extends StatelessWidget {
                               style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
                           onTap: (f['url'] ?? '').toString().isEmpty
                               ? null
-                              : () => launchUrl(Uri.parse(f['url'].toString()),
-                                  mode: LaunchMode.externalApplication),
+                              : () { if (isSafeHttpsUrl(f['url'].toString())) launchUrl(Uri.parse(f['url'].toString()),
+                                  mode: LaunchMode.externalApplication); },
                         ),
                     ]),
             ),
