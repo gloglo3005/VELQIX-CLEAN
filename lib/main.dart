@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -157,6 +158,11 @@ Future<void> firebaseMessagingBackgroundHandler(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Réveille le serveur Render DÈS le lancement : il s'endort après ~15 min
+  // d'inactivité et peut mettre jusqu'à ~1 min à répondre. La requête part
+  // tout de suite, en parallèle du reste du démarrage ; sa réponse est ignorée.
+  unawaited(_warmUpServer());
+
   /// =============================================================
   /// FLUTTER WEB
   /// =============================================================
@@ -168,32 +174,31 @@ Future<void> main() async {
   /// =============================================================
 
   // Le handler background FCM n'est enregistré que sur mobile.
-  if (!kIsWeb) {
-    try {
-      await Firebase.initializeApp();
-    } catch (e) {
-      debugPrint('Firebase init (main): $e');
-    }
-    FirebaseMessaging.onBackgroundMessage(
-      firebaseMessagingBackgroundHandler,
-    );
-  }
+  // Lancé maintenant, attendu plus bas (en parallèle des autres initialisations).
+  final Future<void> firebaseReady =
+      kIsWeb ? Future<void>.value() : _initFirebaseMobile();
 
   /// =============================================================
   /// DATE FORMATTING
   /// =============================================================
 
   // Seulement les langues de l'app (avant : toutes les locales du monde)
-  await initializeDateFormatting('fr');
-  await initializeDateFormatting('en');
+  final Future<void> datesReady = Future.wait([
+    initializeDateFormatting('fr'),
+    initializeDateFormatting('en'),
+  ]).then((_) {}).catchError((Object e) {
+    debugPrint('Date formatting init: $e');
+  });
 
   /// =============================================================
   /// DEVICE ORIENTATION
   /// =============================================================
 
-  await SystemChrome.setPreferredOrientations([
+  final Future<void> orientationReady = SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
-  ]);
+  ]).catchError((Object e) {
+    debugPrint('Orientation init: $e');
+  });
 
   /// =============================================================
   /// SYSTEM UI
@@ -232,7 +237,34 @@ Future<void> main() async {
   // runApp immédiatement : avant, main() attendait la connexion automatique
   // (appel réseau, jusqu'à 40 s si Render dormait) → écran blanc. La connexion
   // se fait maintenant derrière un écran de chargement (voir _startup).
+  // Firebase, formats de date et orientation avancent en parallèle : on
+  // attend ici qu'ils soient tous prêts avant d'afficher l'app.
+  await Future.wait([firebaseReady, datesReady, orientationReady]);
+
   runApp(const VelQixApp());
+}
+
+/// Initialise Firebase (mobile uniquement) puis enregistre le handler FCM.
+Future<void> _initFirebaseMobile() async {
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init (main): $e');
+  }
+  FirebaseMessaging.onBackgroundMessage(
+    firebaseMessagingBackgroundHandler,
+  );
+}
+
+/// Requête « de réveil » vers le serveur (réponse ignorée).
+Future<void> _warmUpServer() async {
+  try {
+    await http
+        .get(Uri.parse(ApiService.wsUrl))
+        .timeout(const Duration(seconds: 70));
+  } catch (_) {
+    // Sans importance : c'est seulement pour réveiller le serveur.
+  }
 }
 
 /// Démarrage RAPIDE : la session est restaurée depuis le cache local (quelques
