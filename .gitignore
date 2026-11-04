@@ -48,3 +48,4 @@ app.*.map.json
 # Fichiers locaux à ne pas versionner
 arborescence.txt
 node_modules/
+*.bak*
