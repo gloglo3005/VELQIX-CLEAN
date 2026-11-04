@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,27 +34,77 @@ class ApiService {
   static const String _kRefreshToken = 'jwt_refresh_token';
 
   // ── Gestion des tokens ───────────────────────────────────────────
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kToken);
+  // Les jetons sont dans le stockage sécurisé du système (Keychain iOS, Keystore Android),
+  // plus dans SharedPreferences (texte clair).
+  static const FlutterSecureStorage _secure = FlutterSecureStorage();
+
+  // Migration unique : les sessions existantes (jetons en SharedPreferences) sont recopiées
+  // dans le stockage sécurisé puis effacées des préférences, sans déconnecter l'utilisateur.
+  Future<void>? _legacyMigration;
+
+  Future<void> _ensureMigrated() => _legacyMigration ??= _migrateLegacyTokens();
+
+  Future<void> _migrateLegacyTokens() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in [_kToken, _kRefreshToken]) {
+        final legacy = prefs.getString(key);
+        if (legacy == null) continue;
+        if (await _secure.read(key: key) == null) {
+          await _secure.write(key: key, value: legacy);
+        }
+        await prefs.remove(key);
+      }
+    } catch (_) {
+      // Stockage sécurisé indisponible : les anciennes valeurs restent en place, nouvel essai au prochain appel.
+      _legacyMigration = null;
+    }
   }
 
-  Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kToken, token);
+  // Une clé de chiffrement devenue illisible (restauration de sauvegarde Android, par exemple)
+  // fait échouer la lecture : on repart d'un stockage vide, l'utilisateur se reconnecte.
+  Future<void> _resetSecureStorage() async {
+    try {
+      await _secure.deleteAll();
+    } catch (_) {}
   }
 
-  Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_kRefreshToken);
+  Future<String?> _readSecure(String key) async {
+    await _ensureMigrated();
+    try {
+      return await _secure.read(key: key);
+    } catch (_) {
+      await _resetSecureStorage();
+      return null;
+    }
   }
 
-  Future<void> saveRefreshToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kRefreshToken, token);
+  Future<void> _writeSecure(String key, String value) async {
+    await _ensureMigrated();
+    try {
+      await _secure.write(key: key, value: value);
+    } catch (_) {
+      await _resetSecureStorage();
+      await _secure.write(key: key, value: value);
+    }
   }
+
+  Future<String?> getToken() => _readSecure(_kToken);
+
+  Future<void> saveToken(String token) => _writeSecure(_kToken, token);
+
+  Future<String?> getRefreshToken() => _readSecure(_kRefreshToken);
+
+  Future<void> saveRefreshToken(String token) => _writeSecure(_kRefreshToken, token);
 
   Future<void> clearToken() async {
+    try {
+      await _secure.delete(key: _kToken);
+      await _secure.delete(key: _kRefreshToken);
+    } catch (_) {
+      await _resetSecureStorage();
+    }
+    // Anciennes copies en clair éventuelles (session non encore migrée).
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
     await prefs.remove(_kRefreshToken);
