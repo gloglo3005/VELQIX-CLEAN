@@ -287,17 +287,10 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
                 Text(widget.remoteUser.fullName,
                     style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
                 const SizedBox(height: 8),
-                Text(_status,
+                Text(_status == 'Appel terminé' ? _status : 'En attente...',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(fontSize: 14, color: Colors.white60)),
-                if (!_joined) ...[
-                  const SizedBox(height: 20),
-                  const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
-                  ),
-                ],
+                // (aucun indicateur : seul « En attente... » s'affiche)
               ],
             ),
           )),

@@ -266,21 +266,14 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                _remoteJoined ? _formattedDuration : _status,
+                _remoteJoined ? _formattedDuration : 'En attente...',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(fontSize: 15, color: Colors.white60),
               ),
             ),
 
             // ── Indicateur connexion ──────────────────────────────────────
-            if (!_joined) ...[
-              const SizedBox(height: 20),
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
-              ),
-            ],
+            // (aucun indicateur : seul « En attente... » s'affiche)
 
             const Spacer(),
 

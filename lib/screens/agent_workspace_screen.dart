@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/mission_model.dart';
 import '../main.dart' show themeModeNotifier, localeNotifier;
 import '../services/auth_service.dart';
+import '../services/chat_launcher.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
@@ -419,6 +420,13 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
                 tooltip: 'Appeler',
                 icon: const Icon(Icons.call_rounded, color: AppTheme.success, size: 20),
                 onPressed: () => _call(m.contactPhone),
+              ),
+            if ((m.clientId ?? '').isNotEmpty)
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Message',
+                icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppTheme.primary, size: 20),
+                onPressed: () => openChatWith(context, m.clientId!),
               ),
           ]),
         ],
