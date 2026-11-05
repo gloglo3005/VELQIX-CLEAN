@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'api_service.dart';
+import 'notification_router.dart';
 
 /// ===============================================================
 /// NOTIFICATION MODEL
@@ -169,6 +170,18 @@ class NotificationService {
     await androidPlugin?.requestNotificationsPermission();
 
     _localReady = true;
+
+    // App lancée (depuis l'état fermé) en touchant une notification locale.
+    try {
+      final launch = await _local.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp == true) {
+        NotificationRouter.instance.openFromPayload(
+          launch!.notificationResponse?.payload,
+        );
+      }
+    } catch (e) {
+      debugPrint('Notification launch details error: $e');
+    }
   }
 
   /// Réponse lorsque l'utilisateur touche une notification locale.
@@ -178,6 +191,8 @@ class NotificationService {
     debugPrint(
       'Notification locale ouverte: ${response.payload}',
     );
+
+    NotificationRouter.instance.openFromPayload(response.payload);
   }
 
   /// =============================================================
@@ -339,7 +354,7 @@ class NotificationService {
     await showLocalNotification(
       title: notification.title,
       body: notification.message,
-      payload: notification.id,
+      payload: NotificationRouter.encodePayload(notification),
     );
   }
 
@@ -358,7 +373,7 @@ class NotificationService {
     await showLocalNotification(
       title: notification.title,
       body: notification.message,
-      payload: notification.id,
+      payload: NotificationRouter.encodePayload(notification),
     );
   }
 

@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../models/models.dart';
 import '../services/chat_service.dart';
+import '../services/ringtone_service.dart';
 import '../widgets/widgets.dart';
 
 // Utilisé seulement si le serveur ne renvoie pas d'App ID.
@@ -54,6 +55,11 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     super.initState();
     _initAgora();
 
+    // Tonalité « ça sonne » pour l'appelant, jusqu'à la réponse.
+    if (widget.isCaller) {
+      RingtoneService.instance.start(volume: 0.6);
+    }
+
     if (widget.callId != null) {
       _callStatusSub = ChatService.instance.onCallStatus.listen((data) {
         if (data['callId'] == widget.callId &&
@@ -67,8 +73,35 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
 
   /// Affiche l'étape en cours à l'écran ET dans la console.
   void _setStatus(String s) {
+    // Le détail technique (token, état Agora...) reste dans la console :
+    // l'utilisateur ne voit qu'un message simple.
     debugPrint('AGORA $s');
-    if (mounted && !_remoteJoined) setState(() => _status = s);
+    final shown = _friendlyStatus(s);
+    if (!mounted || _remoteJoined) return;
+    // Une fois dans le canal, on garde « Ça sonne... » tant que personne
+    // ne répond, sauf vraie erreur.
+    if (_joined && shown == _genericStatus) return;
+    if (shown != _genericStatus) {
+      // Erreur : plus de raison de faire sonner.
+      RingtoneService.instance.stop();
+    }
+    setState(() => _status = shown);
+  }
+
+  String get _genericStatus =>
+      widget.isCaller ? 'Appel en cours...' : 'Connexion...';
+
+  String _friendlyStatus(String s) {
+    if (s.startsWith('Micro refusé') || s.startsWith('Caméra refusée')) {
+      return s;
+    }
+    if (s.startsWith('Connexion impossible')) {
+      return 'Connexion impossible. Vérifiez votre réseau.';
+    }
+    if (s.startsWith('Échec') || s.startsWith('Erreur Agora')) {
+      return 'Connexion impossible. Réessayez.';
+    }
+    return _genericStatus;
   }
 
   /// Exécute une étape et, si elle échoue, ajoute son nom à l'erreur.
@@ -115,7 +148,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
           // Le haut-parleur se règle une fois dans le canal.
           _engine?.setEnableSpeakerphone(_speakerOn).catchError((_) {});
           if (!mounted) return;
-          setState(() { _joined = true; _status = 'En attente...'; });
+          setState(() { _joined = true; _status = widget.isCaller ? 'Ça sonne...' : 'Connexion...'; });
         },
         onUserJoined: (connection, remoteUid, elapsed) {
           if (!mounted) return;
@@ -124,6 +157,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
             _remoteJoined = true;
             _status       = 'Connecté';
           });
+          RingtoneService.instance.stop();
           _startTimer();
         },
         onUserOffline: (connection, remoteUid, reason) {
@@ -189,6 +223,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
   Future<void> _endCall() async {
     if (_ending) return;
     _ending = true;
+    RingtoneService.instance.stop();
     _secondTimer?.cancel();
     _joinTimeout?.cancel();
     _callStatusSub?.cancel();
@@ -218,6 +253,7 @@ class _AgoraVideoCallScreenState extends State<AgoraVideoCallScreen> {
     _secondTimer?.cancel();
     _joinTimeout?.cancel();
     _callStatusSub?.cancel();
+    RingtoneService.instance.stop();
     _releaseEngine();
     super.dispose();
   }

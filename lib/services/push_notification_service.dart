@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import 'chat_service.dart';
 import 'notification_service.dart';
+import 'notification_router.dart';
 
 /// ===============================================================
 /// PUSH NOTIFICATION SERVICE
@@ -20,6 +21,10 @@ class PushNotificationService {
       ApiService.instance;
 
   bool _initialized = false;
+
+  /// Évite d'ouvrir deux fois la même notification (initialize() peut
+  /// être appelé plusieurs fois au démarrage).
+  final Set<String> _handledOpened = <String>{};
 
   FirebaseMessaging? _messaging;
 
@@ -237,7 +242,20 @@ class PushNotificationService {
 
     if (type == 'incoming_call') {
       await _handleCallMessage(data);
+      return;
     }
+
+    final messageId = message.messageId;
+    if (messageId != null && !_handledOpened.add(messageId)) {
+      return;
+    }
+
+    // Emmène l'utilisateur vers ce que la notification annonce.
+    await NotificationRouter.instance.open(
+      type: type ?? 'general',
+      data: data,
+      notificationId: data['notificationId']?.toString(),
+    );
   }
 
   /// =============================================================

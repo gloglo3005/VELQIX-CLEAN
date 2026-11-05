@@ -86,6 +86,11 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
   void _handleLatestNotification() {
     final n = latestNotificationNotifier.value;
     if (n == null || !mounted) return;
+    // Nouvelle mission, mission acceptée, rapport validé... : on recharge les
+    // listes pour que l'écran des missions soit à jour sans tirer pour rafraîchir.
+    if (n.type == 'mission') {
+      _reloadMissions();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

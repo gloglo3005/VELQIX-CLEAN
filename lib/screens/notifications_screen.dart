@@ -3,6 +3,7 @@ import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/notification_service.dart';
+import '../services/notification_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 
@@ -40,6 +41,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markRead(String id) => NotificationService.instance.markOneRead(id);
 
   Future<void> _markAllRead() => NotificationService.instance.markAllRead();
+
+  /// Touche sur une notification : marquée comme lue, puis on ouvre
+  /// l'écran concerné (conversation, annonce, mission...).
+  Future<void> _openNotification(NotificationModel n, String id) async {
+    if (!n.isRead) {
+      _markRead(id);
+    }
+    if (n.id.isEmpty) return;
+    await NotificationRouter.instance.openFromNotification(n, wait: false);
+  }
 
   Future<void> _dismiss(String id) async {
     await NotificationService.instance.markOneRead(id);
@@ -174,7 +185,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: const Icon(Icons.delete_outline_rounded, color: AppTheme.error),
                   ),
                   child: GestureDetector(
-                    onTap: () => _markRead(id),
+                    onTap: () => _openNotification(n, id),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.all(14),
