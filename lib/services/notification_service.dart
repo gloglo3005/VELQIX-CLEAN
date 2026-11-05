@@ -158,6 +158,17 @@ class NotificationService {
         _local.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
+    // Canal utilisé par les push du serveur (messages, appels, missions) :
+    // sans lui, Android les classe dans un canal par défaut, sans son fiable.
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'velqix_messages',
+        'VELQIX Messages et appels',
+        description: 'Messages, appels et missions',
+        importance: Importance.max,
+      ),
+    );
+
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         'velqix_notifications',

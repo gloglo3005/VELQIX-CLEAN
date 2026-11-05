@@ -16,6 +16,7 @@ import '../services/auth_service.dart';
 import '../services/chat_launcher.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
+import '../services/notification_router.dart';
 import '../services/push_notification_service.dart';
 import '../services/mission_service.dart';
 import '../services/property_service.dart';
@@ -98,6 +99,11 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
           behavior: SnackBarBehavior.floating,
+          // Toucher « Voir » emmène vers la conversation / la mission concernée.
+          action: SnackBarAction(
+            label: 'Voir',
+            onPressed: () => NotificationRouter.instance.openFromNotification(n, markRead: true),
+          ),
           content: Row(children: [
             const Icon(Icons.notifications_active, color: Colors.white),
             const SizedBox(width: 12),
