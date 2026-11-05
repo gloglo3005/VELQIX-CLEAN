@@ -3,9 +3,9 @@ import '../main.dart' show localeNotifier;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/notification_service.dart';
-import '../services/notification_router.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
+import 'availability_requests_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -40,17 +40,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markRead(String id) => NotificationService.instance.markOneRead(id);
 
-  Future<void> _markAllRead() => NotificationService.instance.markAllRead();
-
-  /// Touche sur une notification : marquée comme lue, puis on ouvre
-  /// l'écran concerné (conversation, annonce, mission...).
-  Future<void> _openNotification(NotificationModel n, String id) async {
-    if (!n.isRead) {
-      _markRead(id);
-    }
-    if (n.id.isEmpty) return;
-    await NotificationRouter.instance.openFromNotification(n, wait: false);
+  /// Écran à ouvrir quand on touche la notification (null = rien à ouvrir).
+  /// Demande de confirmation / de visite -> écran « Visites et confirmations »,
+  /// où l'on peut répondre à la demande.
+  Widget? _destinationFor(NotificationModel n) {
+    final type = n.type.toLowerCase();
+    final title = n.title.toLowerCase();
+    final data = n.data ?? const <String, dynamic>{};
+    final hasRequestKey =
+        data.keys.any((k) => k.toString().toLowerCase().contains('request'));
+    final isAvailabilityRequest = type.contains('availab') ||
+        type.contains('visit') ||
+        type.contains('confirm') ||
+        hasRequestKey ||
+        title.contains('confirmation') ||
+        title.contains('demande de visite');
+    if (isAvailabilityRequest) return const AvailabilityRequestsScreen();
+    return null;
   }
+
+  /// Touche une notification : elle est marquée lue (comme avant), puis on
+  /// ouvre l'écran correspondant s'il y en a un.
+  void _open(NotificationModel n, String id) {
+    _markRead(id);
+    final destination = _destinationFor(n);
+    if (destination == null || !mounted) return;
+    Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
+  }
+
+  Future<void> _markAllRead() => NotificationService.instance.markAllRead();
 
   Future<void> _dismiss(String id) async {
     await NotificationService.instance.markOneRead(id);
@@ -185,7 +203,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: const Icon(Icons.delete_outline_rounded, color: AppTheme.error),
                   ),
                   child: GestureDetector(
-                    onTap: () => _openNotification(n, id),
+                    onTap: () => _open(n, id),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.all(14),
@@ -239,6 +257,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textHint)),
                           ]),
                         ),
+                        // Flèche : indique que la notification est cliquable.
+                        if (_destinationFor(n) != null)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 6),
+                            child: Icon(Icons.chevron_right_rounded, size: 22, color: AppTheme.textHint),
+                          ),
                       ]),
                     ),
                   ),

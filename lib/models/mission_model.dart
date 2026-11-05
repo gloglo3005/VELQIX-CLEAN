@@ -89,8 +89,6 @@ class MissionModel {
   final String address;
   final String zone;
   final String clientName;
-  final String? clientId; // pour écrire au client (agent assigné)
-  final String? agentId;  // pour écrire à l'agent (client)
   final String contactName;   // visible seulement une fois la mission acceptée
   final String contactPhone;  // idem
   final double price;         // prix payé par le client / devis
@@ -114,8 +112,6 @@ class MissionModel {
     this.address = '',
     this.zone = '',
     this.clientName = '',
-    this.clientId,
-    this.agentId,
     this.contactName = '',
     this.contactPhone = '',
     this.price = 0,
@@ -150,8 +146,6 @@ class MissionModel {
       address: (j['address'] ?? p['address'] ?? '').toString(),
       zone: (j['zone'] ?? '').toString(),
       clientName: (j['clientName'] ?? '').toString(),
-      clientId: (j['clientId'] ?? '').toString().isEmpty ? null : j['clientId'].toString(),
-      agentId: (j['agentId'] ?? '').toString().isEmpty ? null : j['agentId'].toString(),
       contactName: (j['contactName'] ?? '').toString(),
       contactPhone: (j['contactPhone'] ?? '').toString(),
       price: _num(j['price']),

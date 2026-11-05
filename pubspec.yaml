@@ -34,6 +34,7 @@ dependencies:
 
   # Reconnaissance vocale
   speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0   # voix de VelqIA (mode vocal)
 
   # Sélection image/vidéo natif Android/iOS
   image_picker: ^1.1.2
@@ -51,7 +52,6 @@ dependencies:
   flutter_local_notifications: ^22.3.1
   video_player: ^2.11.1
   cached_network_image: ^3.4.1   # cache disque des photos (hors connexion)
-  flutter_secure_storage: ^10.3.4
 
 dev_dependencies:
   flutter_test:

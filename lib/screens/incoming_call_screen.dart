@@ -9,7 +9,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/chat_service.dart';
-import '../services/ringtone_service.dart';
 import '../widgets/widgets.dart';
 import 'agora_call_screen.dart';
 import 'agora_video_call_screen.dart';
@@ -46,8 +45,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void initState() {
     super.initState();
-    // Sonnerie + vibrations tant que l'appel n'est ni accepté ni refusé.
-    RingtoneService.instance.start(vibrate: true);
     // Si l'appelant raccroche ou que l'appel expire (30s sans réponse) avant
     // qu'on ait répondu, on referme cet écran tout seul.
     _statusSub = ChatService.instance.onCallStatus.listen((data) {
@@ -60,13 +57,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void dispose() {
     _statusSub?.cancel();
-    RingtoneService.instance.stop();
     super.dispose();
   }
 
   Future<void> _accept() async {
     if (_responding) return;
-    RingtoneService.instance.stop();
     setState(() => _responding = true);
     final ok = await ChatService.instance.acceptCall(_callId);
     if (!mounted) return;
@@ -95,7 +90,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   void _reject() {
-    RingtoneService.instance.stop();
     ChatService.instance.rejectCall(_callId);
     Navigator.of(context).pop();
   }

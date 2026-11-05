@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
-import '../services/notification_router.dart';
 import '../services/push_notification_service.dart';
 import '../services/premium_plan_service.dart';
 import '../theme/app_theme.dart';
@@ -205,16 +204,6 @@ class _MainShellState
             ),
             behavior:
                 SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'Voir',
-              onPressed: () {
-                NotificationRouter.instance.openFromNotification(
-                  notification,
-                  markRead: true,
-                  wait: false,
-                );
-              },
-            ),
           ),
         );
 

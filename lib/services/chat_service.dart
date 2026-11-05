@@ -291,9 +291,7 @@ class ChatService {
     required String calleeId,
     required String type, // 'audio' | 'video'
   }) async {
-    // Le socket peut être encore en train de se (re)connecter : on l'attend un peu
-    // au lieu d'échouer tout de suite (« Impossible de joindre... »).
-    if (!await waitConnected(timeout: const Duration(seconds: 5)) || _socket == null) return null;
+    if (_socket == null || !_isConnected) return null;
     final completer = Completer<Map<String, dynamic>?>();
     _socket!.emitWithAck(
       'call:invite',

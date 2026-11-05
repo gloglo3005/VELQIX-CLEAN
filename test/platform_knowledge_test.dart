@@ -122,4 +122,21 @@ void main() {
       expect(out, isNot(contains('s\'en charge')));
     });
   });
+
+  group('Compréhension tolérante (secours)', () {
+    test('fautes de frappe', () {
+      expect(PlatformKnowledge.bestGuess('abonnemant premium combien')?.topic, 'premium');
+      expect(PlatformKnowledge.bestGuess('comment signaller une annonce louche')?.topic, 'report');
+      expect(PlatformKnowledge.bestGuess('j ai oublié mon mot de pass')?.topic, 'account');
+    });
+
+    test('une recherche de bien n\'est jamais prise pour une question', () {
+      expect(PlatformKnowledge.bestGuess('maison à Lomé avec visite'), isNull);
+      expect(PlatformKnowledge.bestGuess('appartement meublé Cotonou'), isNull);
+    });
+
+    test('phrase sans rapport : pas de réponse inventée', () {
+      expect(PlatformKnowledge.bestGuess('il fait beau aujourd hui'), isNull);
+    });
+  });
 }

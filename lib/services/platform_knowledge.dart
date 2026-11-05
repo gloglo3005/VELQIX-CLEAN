@@ -300,6 +300,107 @@ class PlatformKnowledge {
   }
 
   // ───────────────────────────────────────────────────────────────────────
+  // Compréhension tolérante (secours)
+  // ───────────────────────────────────────────────────────────────────────
+  // Utilisée UNIQUEMENT quand l'IA du serveur est injoignable : elle devine le
+  // sujet malgré les fautes de frappe, les mots dans le désordre ou une
+  // formulation différente de celle de la base (« abonnemant premium »,
+  // « signaller une annonce »…). match() reste la voie rapide et précise.
+  static const _stopWords = {
+    'le', 'la', 'les', 'un', 'une', 'des', 'de', 'du', 'et', 'ou', 'au', 'aux', 'en', 'dans',
+    'sur', 'pour', 'par', 'avec', 'que', 'qui', 'quoi', 'est', 'ce', 'ca', 'cela', 'je', 'tu',
+    'il', 'elle', 'on', 'nous', 'vous', 'ils', 'mon', 'ma', 'mes', 'ton', 'ta', 'son', 'sa',
+    'ses', 'me', 'te', 'se', 'ne', 'pas', 'plus', 'si', 'comment', 'quel', 'quelle', 'quels',
+    'quelles', 'faire', 'fait', 'veux', 'voudrais', 'peux', 'puis', 'dois', 'savoir', 'the',
+    'an', 'of', 'to', 'in', 'for', 'and', 'is', 'are', 'do', 'does', 'can', 'my', 'you', 'how',
+    'what', 'where', 'which', 'velqix', 'velqia', 'app', 'application', 'appli', 'plateforme',
+    'platform', 'annonce', 'annonces', 'bien', 'biens', 'listing',
+  };
+
+  static Map<String, Set<String>>? _vocab;
+
+  /// mot de la base -> sujets où il apparaît (construit une fois).
+  static Map<String, Set<String>> _buildVocab() {
+    final v = <String, Set<String>>{};
+    for (final t in _topics) {
+      for (final phrase in [...t.fr, ...t.en]) {
+        for (final w in phrase.replaceAll('*', '').split(' ')) {
+          if (w.length < 3 || _stopWords.contains(w)) continue;
+          v.putIfAbsent(w, () => <String>{}).add(t.id);
+        }
+      }
+    }
+    return v;
+  }
+
+  static int _distance(String a, String b) {
+    if (a == b) return 0;
+    if ((a.length - b.length).abs() > 2) return 99;
+    var prev = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 1; i <= a.length; i++) {
+      final cur = List<int>.filled(b.length + 1, 0);
+      cur[0] = i;
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        final best = [prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost]
+            .reduce((x, y) => x < y ? x : y);
+        cur[j] = best;
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  static bool _wordsMatch(String token, String word) {
+    if (token == word) return true;
+    // Début de mot (pluriels, conjugaisons) : le mot le plus court doit être assez long et
+    // représenter l'essentiel de l'autre (« sign » ne doit pas valoir « signaller »).
+    final shorter = token.length <= word.length ? token : word;
+    final longer = token.length <= word.length ? word : token;
+    if (shorter.length >= 5 &&
+        shorter.length >= longer.length * 0.6 &&
+        longer.startsWith(shorter)) {
+      return true;
+    }
+    if (token.length >= 5 && _distance(token, word) <= 1) return true;
+    if (token.length >= 8 && _distance(token, word) <= 2) return true;
+    return false;
+  }
+
+  /// Devine le sujet d'une question formulée librement. Renvoie null si rien
+  /// n'est assez net ou si la phrase ressemble à une recherche de bien.
+  static PlatformMatch? bestGuess(String query, {String defaultLang = 'fr'}) {
+    final n = normalize(query);
+    if (n.isEmpty) return null;
+    final padded = ' $n ';
+    // Une recherche de bien (« maison à Lomé ») ne doit pas devenir une question de plateforme.
+    if (_any(padded, _propertyWords) && !_any(padded, _platformWords)) return null;
+
+    final vocab = _vocab ??= _buildVocab();
+    final scores = <String, double>{};
+    for (final token in n.split(' ')) {
+      if (token.length < 3 || _stopWords.contains(token)) continue;
+      // Pour ce mot, le meilleur poids obtenu par sujet (un mot rare vaut plus).
+      final perTopic = <String, double>{};
+      vocab.forEach((word, topics) {
+        if (!_wordsMatch(token, word)) return;
+        final weight = 1.0 / topics.length;
+        for (final id in topics) {
+          if (weight > (perTopic[id] ?? 0)) perTopic[id] = weight;
+        }
+      });
+      perTopic.forEach((id, w) => scores[id] = (scores[id] ?? 0) + w);
+    }
+    if (scores.isEmpty) return null;
+
+    final ranked = scores.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final best = ranked.first;
+    if (best.value < 0.5) return null;
+    if (ranked.length > 1 && ranked[1].value >= best.value * 0.85) return null; // trop ambigu
+    return PlatformMatch(best.key, _guessLang(n, defaultLang: defaultLang), detectGeo(query));
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
   // Rendu
   // ───────────────────────────────────────────────────────────────────────
   /// [premiumLine] : tarifs lus sur le serveur (ex. « 1 mois : 2 000 FCFA »).

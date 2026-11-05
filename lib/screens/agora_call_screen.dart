@@ -6,7 +6,6 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import '../services/chat_service.dart';
-import '../services/ringtone_service.dart';
 import '../widgets/widgets.dart';
 
 // ── Config Agora ─────────────────────────────────────────────────────────────
@@ -50,11 +49,6 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     super.initState();
     _initAgora();
 
-    // Tonalité « ça sonne » pour l'appelant, jusqu'à la réponse.
-    if (widget.isCaller) {
-      RingtoneService.instance.start(volume: 0.6);
-    }
-
     // Si un callId a été fourni : si l'appel est rejeté/terminé côté serveur
     // avant que le distant ne rejoigne le canal, on ferme cet écran.
     if (widget.callId != null) {
@@ -71,35 +65,8 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
   /// Affiche l'étape en cours à l'écran ET dans la console.
   /// Sert à voir exactement où ça bloque.
   void _setStatus(String s) {
-    // Le détail technique (token, état Agora...) reste dans la console :
-    // l'utilisateur ne voit qu'un message simple.
     debugPrint('AGORA $s');
-    final shown = _friendlyStatus(s);
-    if (!mounted || _remoteJoined) return;
-    // Une fois dans le canal, on garde « Ça sonne... » tant que personne
-    // ne répond, sauf vraie erreur.
-    if (_joined && shown == _genericStatus) return;
-    if (shown != _genericStatus) {
-      // Erreur : plus de raison de faire sonner.
-      RingtoneService.instance.stop();
-    }
-    setState(() => _status = shown);
-  }
-
-  String get _genericStatus =>
-      widget.isCaller ? 'Appel en cours...' : 'Connexion...';
-
-  String _friendlyStatus(String s) {
-    if (s.startsWith('Micro refusé') || s.startsWith('Caméra refusée')) {
-      return s;
-    }
-    if (s.startsWith('Connexion impossible')) {
-      return 'Connexion impossible. Vérifiez votre réseau.';
-    }
-    if (s.startsWith('Échec') || s.startsWith('Erreur Agora')) {
-      return 'Connexion impossible. Réessayez.';
-    }
-    return _genericStatus;
+    if (mounted && !_remoteJoined) setState(() => _status = s);
   }
 
   /// Exécute une étape et, si elle échoue, ajoute son nom à l'erreur.
@@ -144,12 +111,11 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
           // Le haut-parleur se règle une fois dans le canal.
           _engine?.setEnableSpeakerphone(_speakerOn).catchError((_) {});
           if (!mounted) return;
-          setState(() { _joined = true; _status = widget.isCaller ? 'Ça sonne...' : 'Connexion...'; });
+          setState(() { _joined = true; _status = 'En attente...'; });
         },
         onUserJoined: (connection, remoteUid, elapsed) {
           if (!mounted) return;
           setState(() { _remoteJoined = true; _status = 'Connecté'; });
-          RingtoneService.instance.stop();
           _startTimer();
         },
         onUserOffline: (connection, remoteUid, reason) {
@@ -212,7 +178,6 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
   Future<void> _endCall() async {
     if (_ending) return;
     _ending = true;
-    RingtoneService.instance.stop();
     _timer?.cancel();
     _joinTimeout?.cancel();
     _callStatusSub?.cancel();
@@ -236,7 +201,6 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
     _timer?.cancel();
     _joinTimeout?.cancel();
     _callStatusSub?.cancel();
-    RingtoneService.instance.stop();
     _releaseEngine();
     super.dispose();
   }
@@ -266,14 +230,21 @@ class _AgoraCallScreenState extends State<AgoraCallScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
-                _remoteJoined ? _formattedDuration : 'En attente...',
+                _remoteJoined ? _formattedDuration : _status,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(fontSize: 15, color: Colors.white60),
               ),
             ),
 
             // ── Indicateur connexion ──────────────────────────────────────
-            // (aucun indicateur : seul « En attente... » s'affiche)
+            if (!_joined) ...[
+              const SizedBox(height: 20),
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2),
+              ),
+            ],
 
             const Spacer(),
 

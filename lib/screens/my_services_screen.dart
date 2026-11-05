@@ -6,9 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/safe_url.dart';
 import '../models/mission_model.dart';
-import '../services/chat_launcher.dart';
 import '../services/mission_service.dart';
-import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/service_request_sheet.dart';
 import '../widgets/widgets.dart' show EmptyState, formatFcfa;
@@ -29,23 +27,13 @@ class _MyServicesScreenState extends State<MyServicesScreen> with WidgetsBinding
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    latestNotificationNotifier.addListener(_onNotification);
     _load();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    latestNotificationNotifier.removeListener(_onNotification);
     super.dispose();
-  }
-
-  // Notification de mission (devis prêt, agent assigné, paiement reçu...) :
-  // la liste se met à jour toute seule.
-  void _onNotification() {
-    if (latestNotificationNotifier.value?.type == 'mission' && mounted) {
-      _load(silent: true);
-    }
   }
 
   // Retour de la page de paiement : on recharge pour voir le nouveau statut
@@ -221,17 +209,6 @@ class _MyServicesScreenState extends State<MyServicesScreen> with WidgetsBinding
           const SizedBox(height: 6),
           Text('Rapport : ${m.reportNote}',
               style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary)),
-        ],
-        if ((m.agentId ?? '').isNotEmpty && m.status != MissionStatus.annulee) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => openChatWith(context, m.agentId!),
-              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
-              label: const Text("Écrire à l'agent"),
-            ),
-          ),
         ],
         if (busy)
           const Padding(

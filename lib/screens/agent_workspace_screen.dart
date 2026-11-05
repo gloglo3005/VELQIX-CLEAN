@@ -13,10 +13,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/mission_model.dart';
 import '../main.dart' show themeModeNotifier, localeNotifier;
 import '../services/auth_service.dart';
-import '../services/chat_launcher.dart';
 import '../services/chat_service.dart';
 import '../services/notification_service.dart';
-import '../services/notification_router.dart';
 import '../services/push_notification_service.dart';
 import '../services/mission_service.dart';
 import '../services/property_service.dart';
@@ -88,22 +86,12 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
   void _handleLatestNotification() {
     final n = latestNotificationNotifier.value;
     if (n == null || !mounted) return;
-    // Nouvelle mission, mission acceptée, rapport validé... : on recharge les
-    // listes pour que l'écran des missions soit à jour sans tirer pour rafraîchir.
-    if (n.type == 'mission') {
-      _reloadMissions();
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
           behavior: SnackBarBehavior.floating,
-          // Toucher « Voir » emmène vers la conversation / la mission concernée.
-          action: SnackBarAction(
-            label: 'Voir',
-            onPressed: () => NotificationRouter.instance.openFromNotification(n, markRead: true),
-          ),
           content: Row(children: [
             const Icon(Icons.notifications_active, color: Colors.white),
             const SizedBox(width: 12),
@@ -426,13 +414,6 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
                 tooltip: 'Appeler',
                 icon: const Icon(Icons.call_rounded, color: AppTheme.success, size: 20),
                 onPressed: () => _call(m.contactPhone),
-              ),
-            if ((m.clientId ?? '').isNotEmpty)
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Message',
-                icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppTheme.primary, size: 20),
-                onPressed: () => openChatWith(context, m.clientId!),
               ),
           ]),
         ],
