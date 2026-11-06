@@ -6,6 +6,7 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'availability_requests_screen.dart';
+import '../services/notification_router.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -63,9 +64,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   /// ouvre l'écran correspondant s'il y en a un.
   void _open(NotificationModel n, String id) {
     _markRead(id);
+    if (!mounted) return;
+    // Demande de visite / confirmation : écran dédié (on peut y répondre).
     final destination = _destinationFor(n);
-    if (destination == null || !mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
+    if (destination != null) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
+      return;
+    }
+    // Tous les autres types (message, annonce approuvée, abonné, mission, premium…) :
+    // le routeur ouvre la conversation, la fiche du bien, le profil, etc.
+    // wait:false = pas de délai de démarrage à froid ; markRead:false = déjà marquée lue ci-dessus.
+    NotificationRouter.instance.openFromNotification(n, markRead: false, wait: false);
   }
 
   Future<void> _markAllRead() => NotificationService.instance.markAllRead();

@@ -58,6 +58,11 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   bool _speechInitStarted = false;
   bool _startVoiceAfterInit = false;
   String _voicePartial = '';
+  // Dernier texte reconnu pendant l'écoute en cours + garde « une seule soumission ».
+  String _voiceTranscript = '';
+  bool _awaitingResult = false;
+  Timer? _finalizeTimer;
+  String? _resolvedLocale; // locale de reconnaissance réellement disponible sur l'appareil
   late AnimationController _micPulseAnim;
   final stt.SpeechToText _speech = stt.SpeechToText();
 
@@ -110,6 +115,69 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     // micro (voir _toggleVoice).
   }
 
+  /// Termine l'écoute en cours et envoie UNE SEULE fois la phrase reconnue.
+  /// Appelée soit par le résultat final du moteur, soit (après un court délai de
+  /// grâce) par le statut « done » : sur Android/Web le statut « done » arrive
+  /// souvent AVANT le résultat final, et envoyer à ce moment-là coupait la phrase.
+  void _finishListening() {
+    _finalizeTimer?.cancel();
+    if (!mounted || !_awaitingResult) return;
+    _awaitingResult = false;
+    final captured = _voiceTranscript.trim();
+    _voiceTranscript = '';
+    try { _speech.stop(); } catch (_) {}
+    setState(() { _isListening = false; _voicePartial = ''; });
+    _micPulseAnim.stop();
+    _micPulseAnim.reset();
+    if (captured.isNotEmpty) {
+      _inputCtrl.clear();
+      _emptyListens = 0;
+      // Envoi automatique ; la réponse sera dite à voix haute
+      _speakNext = true;
+      Future.microtask(() => _handleQuery(captured));
+    } else if (_voiceMode) {
+      // Mode vocal : personne n'a parlé. On réécoute 1 fois, puis on s'arrête.
+      _emptyListens++;
+      if (_emptyListens >= 2) {
+        _stopVoiceMode();
+        _addAiMessage(_uiLang == 'en'
+            ? 'Voice mode stopped: I did not hear anything. Tap the voice button to start again.'
+            : 'Mode vocal arrêté : je n\'ai rien entendu. Appuyez sur le bouton vocal pour reprendre.');
+      } else {
+        Future.delayed(const Duration(milliseconds: 300), _resumeListening);
+      }
+    }
+  }
+
+  /// Annule l'écoute sans rien envoyer.
+  void _cancelListening() {
+    _finalizeTimer?.cancel();
+    _awaitingResult = false;
+    _voiceTranscript = '';
+    try { _speech.cancel(); } catch (_) {}
+  }
+
+  /// Choisit la locale de reconnaissance réellement supportée (ex. fr_FR, fr_TG, fr-FR…)
+  /// au lieu d'imposer « fr_FR » : un localeId inconnu donne une reconnaissance approximative.
+  Future<void> _resolveSpeechLocale() async {
+    final wanted = _speechLocale(); // ex. fr_FR
+    final lang = wanted.split('_').first.toLowerCase();
+    try {
+      final locales = await _speech.locales();
+      String norm(String id) => id.replaceAll('-', '_').toLowerCase();
+      for (final l in locales) {
+        if (norm(l.localeId) == norm(wanted)) { _resolvedLocale = l.localeId; return; }
+      }
+      for (final l in locales) {
+        if (norm(l.localeId).startsWith('${lang}_') || norm(l.localeId) == lang) {
+          _resolvedLocale = l.localeId;
+          return;
+        }
+      }
+    } catch (_) {}
+    _resolvedLocale = null; // moteur par défaut de l'appareil
+  }
+
   /// Initialise la reconnaissance vocale
   void _initSpeech() {
     _speech.initialize(
@@ -117,32 +185,20 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         if (!mounted) return;
         if (status == stt.SpeechToText.doneStatus ||
             status == stt.SpeechToText.notListeningStatus) {
-          final captured = _voicePartial.isNotEmpty ? _voicePartial : _inputCtrl.text.trim();
-          setState(() { _isListening = false; _voicePartial = ''; });
-          _micPulseAnim.stop();
-          _micPulseAnim.reset();
-          if (captured.isNotEmpty) {
-            _inputCtrl.clear();
-            _emptyListens = 0;
-            // ✅ Envoi automatique dès que la voix est capturée ; la réponse sera dite à voix haute
-            _speakNext = true;
-            Future.microtask(() => _handleQuery(captured));
-          } else if (_voiceMode) {
-            // Mode vocal : personne n'a parlé. On réécoute 1 fois, puis on s'arrête.
-            _emptyListens++;
-            if (_emptyListens >= 2) {
-              _stopVoiceMode();
-              _addAiMessage(_uiLang == 'en'
-                  ? 'Voice mode stopped: I did not hear anything. Tap the voice button to start again.'
-                  : 'Mode vocal arrêté : je n\'ai rien entendu. Appuyez sur le bouton vocal pour reprendre.');
-            } else {
-              Future.delayed(const Duration(milliseconds: 300), _resumeListening);
-            }
-          }
+          if (!_awaitingResult) return; // déjà traité (résultat final reçu)
+          // On laisse 700 ms au moteur pour livrer le résultat FINAL avant de conclure.
+          _finalizeTimer?.cancel();
+          _finalizeTimer = Timer(const Duration(milliseconds: 700), _finishListening);
         }
       },
       onError: (error) {
         if (!mounted) return;
+        // Erreurs « normales » (aucune voix / silence) : on conclut avec ce qui a été capté.
+        if (_awaitingResult && _voiceTranscript.trim().isNotEmpty) {
+          _finishListening();
+          return;
+        }
+        _cancelListening();
         setState(() { _isListening = false; _voicePartial = ''; });
         _micPulseAnim.stop();
         _micPulseAnim.reset();
@@ -151,6 +207,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     ).then((available) {
       if (!mounted) return;
       setState(() => _speechAvailable = available);
+      if (available) _resolveSpeechLocale();
       // L'appui sur le micro qui a déclenché l'initialisation démarre
       // maintenant l'écoute (ou affiche « micro indisponible »).
       if (_startVoiceAfterInit) {
@@ -165,6 +222,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _fabAnim.dispose();
     _pulseAnim.dispose();
     _panelAnim.dispose();
+    _finalizeTimer?.cancel();
     _micPulseAnim.dispose();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
@@ -1332,7 +1390,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                     GestureDetector(
                       onTap: () {
                         final text = _voicePartial;
-                        _speech.stop();
+                        _cancelListening();
                         setState(() { _isListening = false; _voicePartial = ''; });
                         _micPulseAnim.stop();
                         _micPulseAnim.reset();
@@ -1365,7 +1423,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                   // Bouton Annuler
                   GestureDetector(
                     onTap: () {
-                      _speech.stop();
+                      _cancelListening();
                       setState(() { _isListening = false; _voicePartial = ''; });
                       _micPulseAnim.stop();
                       _micPulseAnim.reset();
@@ -1549,37 +1607,38 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }
 
     if (_isListening) {
+      // Appui sur le micro pendant l'écoute = « j'ai fini » : on envoie ce qui a été dit.
       _speech.stop();
-      setState(() { _isListening = false; _voicePartial = ''; });
-      _micPulseAnim.stop();
-      _micPulseAnim.reset();
+      _finalizeTimer?.cancel();
+      _finalizeTimer = Timer(const Duration(milliseconds: 700), _finishListening);
       return;
     }
 
+    _voiceTranscript = '';
+    _awaitingResult = true;
     setState(() { _isListening = true; _voicePartial = ''; });
     _micPulseAnim.repeat(reverse: true);
 
     _speech.listen(
-      localeId: _speechLocale(),
+      localeId: _resolvedLocale ?? _speechLocale(),
       onResult: (result) {
-        if (!mounted) return;
+        if (!mounted || !_awaitingResult) return;
         final transcript = result.recognizedWords;
-        setState(() => _voicePartial = transcript);
-        if (result.finalResult && transcript.isNotEmpty) {
-          _speech.stop();
-          setState(() { _isListening = false; _voicePartial = ''; });
-          _micPulseAnim.stop();
-          _micPulseAnim.reset();
-          _inputCtrl.clear();
-          // ✅ Soumission automatique dès que la voix est reconnue ; réponse à voix haute
-          _emptyListens = 0;
-          _speakNext = true;
-          Future.microtask(() => _handleQuery(transcript));
+        // On garde toujours le texte le plus récent (le résultat final remplace les partiels).
+        if (transcript.isNotEmpty) _voiceTranscript = transcript;
+        setState(() => _voicePartial = _voiceTranscript);
+        if (result.finalResult) {
+          _finishListening(); // envoi unique, phrase complète
         }
       },
-      cancelOnError: true,
-      listenFor: const Duration(seconds: 15),
-      pauseFor: const Duration(seconds: 2),
+      listenFor: const Duration(seconds: 60),
+      // Pause plus longue : 2 s coupait la phrase dès qu'on reprenait son souffle.
+      pauseFor: const Duration(seconds: 4),
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      ),
     );
   }
 
@@ -1674,7 +1733,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _emptyListens = 0;
     _tts.stop();
     if (_isListening) {
-      _speech.stop();
+      _cancelListening();
       _micPulseAnim.stop();
       _micPulseAnim.reset();
     }
