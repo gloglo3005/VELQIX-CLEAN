@@ -260,7 +260,7 @@ Future<void> _initFirebaseMobile() async {
 Future<void> _warmUpServer() async {
   try {
     await http
-        .get(Uri.parse(ApiService.wsUrl))
+        .get(Uri.parse('${ApiService.baseUrl}/health'))
         .timeout(const Duration(seconds: 70));
   } catch (_) {
     // Sans importance : c'est seulement pour réveiller le serveur.
