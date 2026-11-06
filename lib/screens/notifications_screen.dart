@@ -259,8 +259,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                         // Flèche : indique que la notification est cliquable.
                         if (_destinationFor(n) != null)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 6),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
                             child: Icon(Icons.chevron_right_rounded, size: 22, color: AppTheme.textHint),
                           ),
                       ]),
