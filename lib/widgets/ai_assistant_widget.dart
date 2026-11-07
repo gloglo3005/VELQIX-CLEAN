@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -1620,7 +1621,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _micPulseAnim.repeat(reverse: true);
 
     _speech.listen(
-      localeId: _resolvedLocale ?? _speechLocale(),
+      localeId: _listenLocaleId(),
       onResult: (result) {
         if (!mounted || !_awaitingResult) return;
         final transcript = result.recognizedWords;
@@ -1744,6 +1745,16 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         _voicePartial = '';
       });
     }
+  }
+
+  /// Identifiant de langue passé au moteur vocal.
+  /// ⚠️ Sur le WEB, l'API du navigateur exige le format « fr-FR » (tiret). Avec « fr_FR »
+  /// (underscore) Chrome ignore la langue et reconnaît dans la langue du navigateur/système
+  /// (souvent l'anglais) : c'est ce qui écrivait du texte anglais sans rapport avec ce qui est dit.
+  /// En local ça « marchait » seulement parce que le navigateur de développement était en français.
+  String _listenLocaleId() {
+    final id = _resolvedLocale ?? _speechLocale();
+    return kIsWeb ? id.replaceAll('_', '-') : id;
   }
 
   /// Langue de la dictée = langue de l'application (et non plus toujours
