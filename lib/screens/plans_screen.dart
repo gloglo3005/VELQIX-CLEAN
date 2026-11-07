@@ -1,10 +1,10 @@
 // lib/screens/plans_screen.dart
 // Formules et tarifs. Les prix et les formules viennent TOUS du serveur :
-//   â€¢ Particuliers / Professionnels : Premium (GET /premium/plan, durÃ©es 1 mois / 6 mois / 1 an)
-//   â€¢ Entreprises : formules d'agence configurÃ©es par l'admin (GET /agency-plans)
-// Aucune valeur de secours : si le serveur est injoignable, l'Ã©cran le dit et propose de rÃ©essayer.
-// Le Freemium est durable (pas un essai) ; le Premium fait gagner du temps et de la visibilitÃ©,
-// mais ne rend PAS un bien Â« vÃ©rifiÃ© Â».
+//   • Particuliers / Professionnels : Premium (GET /premium/plan, durées 1 mois / 6 mois / 1 an)
+//   • Entreprises : formules d'agence configurées par l'admin (GET /agency-plans)
+// Aucune valeur de secours : si le serveur est injoignable, l'écran le dit et propose de réessayer.
+// Le Freemium est durable (pas un essai) ; le Premium fait gagner du temps et de la visibilité,
+// mais ne rend PAS un bien « vérifié ».
 
 import 'package:flutter/material.dart';
 import '../services/app_translations.dart' show tr;
@@ -30,20 +30,20 @@ class _PlansScreenState extends State<PlansScreen> {
   Future<List<PremiumPeriod>>? _premiumF;
   Future<AgencyPlansInfo>? _agencyF;
 
-  // Matrice du cahier des charges : fonctionnalitÃ© â†’ (Freemium, Premium)
+  // Matrice du cahier des charges : fonctionnalité → (Freemium, Premium)
   static const _matrix = <List<String>>[
     ['Recherche et consultation des annonces', 'Oui', 'Oui'],
-    ['CrÃ©ation de compte et profil', 'Oui', 'Oui'],
+    ['Création de compte et profil', 'Oui', 'Oui'],
     ["Publication d'annonces de base", 'Gratuite', 'Incluse'],
-    ['Modification et gestion des annonces', 'Basique', 'AvancÃ©e'],
+    ['Modification et gestion des annonces', 'Basique', 'Avancée'],
     ['Favoris et alertes', 'Basiques', 'Personnalisables'],
-    ['Statistiques de consultation', 'Simples', 'DÃ©taillÃ©es'],
-    ['Mise en avant des annonces', "Paiement Ã  l'unitÃ©", 'Avantages ou crÃ©dits selon le forfait'],
-    ['Gestion de plusieurs biens', 'LimitÃ©e', 'Ã‰tendue'],
-    ['Export et rapports professionnels', 'Non ou limitÃ©', 'Selon le forfait'],
-    ["Gestion d'Ã©quipe", 'Non', 'Pour les entreprises'],
-    ["VÃ©rification physique d'un bien", 'Payante', 'Payante, Ã©ventuellement Ã  tarif prÃ©fÃ©rentiel'],
-    ['Entretien et visites accompagnÃ©es', 'Payants', 'Payants'],
+    ['Statistiques de consultation', 'Simples', 'Détaillées'],
+    ['Mise en avant des annonces', "Paiement à l'unité", 'Avantages ou crédits selon le forfait'],
+    ['Gestion de plusieurs biens', 'Limitée', 'Étendue'],
+    ['Export et rapports professionnels', 'Non ou limité', 'Selon le forfait'],
+    ["Gestion d'équipe", 'Non', 'Pour les entreprises'],
+    ["Vérification physique d'un bien", 'Payante', 'Payante, éventuellement à tarif préférentiel'],
+    ['Entretien et visites accompagnées', 'Payants', 'Payants'],
   ];
 
   @override
@@ -52,7 +52,7 @@ class _PlansScreenState extends State<PlansScreen> {
     _ensureLoaded();
   }
 
-  /// Charge (une seule fois) les donnÃ©es de l'onglet affichÃ©.
+  /// Charge (une seule fois) les données de l'onglet affiché.
   void _ensureLoaded() {
     if (_audience == PlanAudience.entreprise) {
       _agencyF ??= PlanService.instance.getAgencyPlans();
@@ -78,7 +78,7 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 
   Future<void> _pay(Future<String> Function() start) async {
-    if (!await requireLogin(context, reason: 'souscrire Ã  cette formule')) return;
+    if (!await requireLogin(context, reason: 'souscrire à cette formule')) return;
     if (!mounted) return;
     setState(() => _busy = true);
     try {
@@ -96,11 +96,11 @@ class _PlansScreenState extends State<PlansScreen> {
   Future<void> _chooseAgency(AgencyPlanModel plan) => _pay(() async {
         final orgs = await PlanService.instance.getMyOrganizations();
         if (orgs.isEmpty) {
-          throw Exception("CrÃ©ez d'abord votre espace entreprise pour souscrire Ã  une formule.");
+          throw Exception("Créez d'abord votre espace entreprise pour souscrire à une formule.");
         }
         OrganizationRef? org = orgs.length == 1 ? orgs.first : null;
         if (org == null) {
-          if (!mounted) throw Exception('OpÃ©ration annulÃ©e.');
+          if (!mounted) throw Exception('Opération annulée.');
           org = await showDialog<OrganizationRef>(
             context: context,
             builder: (ctx) => SimpleDialog(
@@ -111,7 +111,7 @@ class _PlansScreenState extends State<PlansScreen> {
               ],
             ),
           );
-          if (org == null) throw Exception('OpÃ©ration annulÃ©e.');
+          if (org == null) throw Exception('Opération annulée.');
         }
         return PlanService.instance.checkoutAgency(org.id, plan.id);
       });
@@ -124,7 +124,7 @@ class _PlansScreenState extends State<PlansScreen> {
             style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
       ),
       body: ListView(children: [
-        // En-tÃªte VelQix Premium : pleine largeur (dÃ©gradÃ© bleu + mÃ©daille)
+        // En-tête VelQix Premium : pleine largeur (dégradé bleu + médaille)
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
@@ -202,8 +202,8 @@ class _PlansScreenState extends State<PlansScreen> {
             name: pro ? 'Professionnel Premium' : 'Plus',
             price: '${formatFcfa(sel.priceFcfa)} / ${sel.label}',
             tagline: pro
-                ? "Plus d'annonces, statistiques, suivi des contacts et outils de gestion avancÃ©s."
-                : 'Alertes avancÃ©es, statistiques, outils de gestion et avantages de visibilitÃ© dÃ©finis.',
+                ? "Plus d'annonces, statistiques, suivi des contacts et outils de gestion avancés."
+                : 'Alertes avancées, statistiques, outils de gestion et avantages de visibilité définis.',
             premium: true,
             saving: _saving(periods, sel),
             action: ElevatedButton(
@@ -216,14 +216,14 @@ class _PlansScreenState extends State<PlansScreen> {
     );
   }
 
-  /// Ã‰conomie par rapport au tarif mensuel (calculÃ©e sur les prix du serveur).
+  /// Économie par rapport au tarif mensuel (calculée sur les prix du serveur).
   String? _saving(List<PremiumPeriod> all, PremiumPeriod p) {
     final months = p.key == '6months' ? 6 : (p.key == 'year' ? 12 : 0);
     if (months == 0) return null;
     final monthly = all.where((x) => x.key == 'month');
     if (monthly.isEmpty) return null;
     final pct = ((1 - p.priceFcfa / (monthly.first.priceFcfa * months)) * 100).round();
-    return pct > 0 ? 'Ã‰conomisez $pct %' : null;
+    return pct > 0 ? 'Économisez $pct %' : null;
   }
 
   // â”€â”€â”€ Entreprises : formules d'agence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -246,9 +246,9 @@ class _PlansScreenState extends State<PlansScreen> {
                 tagline: plan.description ?? '',
                 premium: true,
                 details: [
-                  plan.maxMembers == null ? 'Membres illimitÃ©s' : "Jusqu'Ã  ${plan.maxMembers} membres",
-                  plan.maxListings == null ? 'Annonces illimitÃ©es' : "Jusqu'Ã  ${plan.maxListings} annonces",
-                  if (plan.advancedStats) 'Statistiques avancÃ©es',
+                  plan.maxMembers == null ? 'Membres illimités' : "Jusqu'à ${plan.maxMembers} membres",
+                  plan.maxListings == null ? 'Annonces illimitées' : "Jusqu'à ${plan.maxListings} annonces",
+                  if (plan.advancedStats) 'Statistiques avancées',
                 ],
                 action: ElevatedButton(
                   onPressed: _busy ? null : () => _chooseAgency(plan),
@@ -260,7 +260,7 @@ class _PlansScreenState extends State<PlansScreen> {
     );
   }
 
-  // â”€â”€â”€ Ã‰lÃ©ments communs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Éléments communs ─────────────────────────────────────────────────────
   Widget _freeCard() {
     late final String name;
     late final String tagline;
@@ -275,7 +275,7 @@ class _PlansScreenState extends State<PlansScreen> {
         break;
       default:
         name = 'Gratuit';
-        tagline = 'Rechercher, publier une annonce de base et gÃ©rer ses contacts.';
+        tagline = 'Rechercher, publier une annonce de base et gérer ses contacts.';
     }
     return _planCard(
       name: name,
@@ -309,7 +309,7 @@ class _PlansScreenState extends State<PlansScreen> {
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary)),
           const SizedBox(height: 12),
-          OutlinedButton(onPressed: _retry, child: const Text('RÃ©essayer')),
+          OutlinedButton(onPressed: _retry, child: const Text('Réessayer')),
         ]),
       );
 
@@ -399,7 +399,7 @@ class _PlansScreenState extends State<PlansScreen> {
         Padding(
           padding: const EdgeInsets.all(10),
           child: Row(children: [
-            Expanded(flex: 5, child: Text('FonctionnalitÃ©', style: head)),
+            Expanded(flex: 5, child: Text('Fonctionnalité', style: head)),
             Expanded(flex: 3, child: Text('Freemium', style: head)),
             Expanded(flex: 4, child: Text('Premium', style: head)),
           ]),

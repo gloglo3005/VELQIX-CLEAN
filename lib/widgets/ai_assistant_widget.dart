@@ -524,7 +524,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
           _fallbackSearch(q);
         }
       } else if (response.statusCode == 503) {
-        // Gemini temporairement surchargé (voir backend: GEMINI_UNAVAILABLE).
+        // Assistant temporairement surchargé (voir backend: AI_UNAVAILABLE).
         // On l'affiche clairement au lieu de faire croire qu'aucun bien n'existe.
         String msg = '⏳ L\'assistant est temporairement surchargé, réessayez dans quelques instants.';
         try {

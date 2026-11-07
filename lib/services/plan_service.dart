@@ -1,7 +1,7 @@
 // lib/services/plan_service.dart
-// Formules et abonnements. AUCUNE valeur par dÃ©faut : tout vient du serveur
+// Formules et abonnements. AUCUNE valeur par défaut : tout vient du serveur
 // (prix Premium : GET /premium/plan ; formules d'agence : GET /agency-plans).
-// Si le serveur ne rÃ©pond pas, une erreur claire est levÃ©e et l'Ã©cran propose de rÃ©essayer.
+// Si le serveur ne répond pas, une erreur claire est levée et l'écran propose de réessayer.
 
 import 'api_service.dart';
 
@@ -20,7 +20,7 @@ class PlanAudience {
   }
 }
 
-/// LibellÃ© d'une durÃ©e d'abonnement (30 j â†’ Â« 1 mois Â», etc.).
+/// Libellé d'une durée d'abonnement (30 j → « 1 mois », etc.).
 String planDurationLabel(int days) {
   switch (days) {
     case 30:  return '1 mois';
@@ -30,7 +30,7 @@ String planDurationLabel(int days) {
   }
 }
 
-/// Une durÃ©e de Premium proposÃ©e par le serveur, avec son prix.
+/// Une durée de Premium proposée par le serveur, avec son prix.
 class PremiumPeriod {
   final String key; // month | 6months | year
   final String label;
@@ -59,15 +59,15 @@ class PremiumPeriod {
   }
 }
 
-/// Formule d'abonnement d'agence (configurÃ©e depuis l'admin).
+/// Formule d'abonnement d'agence (configurée depuis l'admin).
 class AgencyPlanModel {
   final String id;
   final String name;
   final String? description;
   final double priceFcfa;
   final int durationDays;
-  final int? maxMembers;   // null = illimitÃ©
-  final int? maxListings;  // null = illimitÃ©
+  final int? maxMembers;   // null = illimité
+  final int? maxListings;  // null = illimité
   final bool advancedStats;
   const AgencyPlanModel({
     required this.id,
@@ -124,7 +124,7 @@ class PlanService {
   static final PlanService instance = PlanService._();
   final _api = ApiService.instance;
 
-  /// Renvoie `data` si la rÃ©ponse est un succÃ¨s, sinon lÃ¨ve le message du serveur.
+  /// Renvoie `data` si la réponse est un succès, sinon lève le message du serveur.
   dynamic _data(Map<String, dynamic> res, String fallbackMessage) {
     if (res['success'] != true) {
       throw Exception((res['message'] ?? fallbackMessage).toString());
@@ -132,7 +132,7 @@ class PlanService {
     return res['data'];
   }
 
-  /// DurÃ©es de Premium et prix, tels que configurÃ©s sur le serveur.
+  /// Durées de Premium et prix, tels que configurés sur le serveur.
   Future<List<PremiumPeriod>> getPremiumPeriods() async {
     final d = _data(await _api.get('/premium/plan'), 'Tarifs indisponibles pour le moment.');
     final raw = d is Map ? d['periods'] : null;
@@ -148,7 +148,7 @@ class PlanService {
   /// Formules d'abonnement d'agence (vide tant que l'admin n'a pas ouvert les abonnements).
   Future<AgencyPlansInfo> getAgencyPlans() async {
     final d = _data(await _api.get('/agency-plans'), 'Formules indisponibles pour le moment.');
-    if (d is! Map) throw Exception('RÃ©ponse invalide du serveur.');
+    if (d is! Map) throw Exception('Réponse invalide du serveur.');
     final raw = d['plans'];
     return AgencyPlansInfo(
       paidEnabled: d['paidEnabled'] == true,
@@ -156,7 +156,7 @@ class PlanService {
     );
   }
 
-  /// period : 'month' | '6months' | 'year'. Retourne l'URL de paiement hÃ©bergÃ©.
+  /// period : 'month' | '6months' | 'year'. Retourne l'URL de paiement hébergé.
   Future<String> checkoutPremium(String period) async {
     final d = _data(await _api.post('/premium/checkout', {'period': period}, auth: true), 'Paiement indisponible.');
     final url = d is Map ? (d['paymentUrl'] ?? d['checkoutUrl']) : null;
@@ -175,7 +175,7 @@ class PlanService {
         .toList();
   }
 
-  /// Abonnement d'une agence Ã  une formule. Retourne l'URL de paiement hÃ©bergÃ©.
+  /// Abonnement d'une agence à une formule. Retourne l'URL de paiement hébergé.
   Future<String> checkoutAgency(String organizationId, String planId) async {
     final d = _data(
       await _api.post('/organizations/$organizationId/subscription/checkout', {'planId': planId}, auth: true),
@@ -186,10 +186,10 @@ class PlanService {
     return url.toString();
   }
 
-  /// Abonnement Premium de l'utilisateur connectÃ©.
+  /// Abonnement Premium de l'utilisateur connecté.
   Future<SubscriptionInfo> getMySubscription() async {
     final d = _data(await _api.get('/premium/status', auth: true), 'Abonnement indisponible.');
-    if (d is! Map) throw Exception('RÃ©ponse invalide du serveur.');
+    if (d is! Map) throw Exception('Réponse invalide du serveur.');
     final rawExp = d['premiumExpiresAt'];
     final exp = rawExp != null ? DateTime.tryParse(rawExp.toString())?.toLocal() : null;
     if (d['isPremium'] == true) return SubscriptionInfo(planName: 'Premium', status: 'actif', expiresAt: exp);
@@ -197,7 +197,7 @@ class PlanService {
     return const SubscriptionInfo();
   }
 
-  /// Paiements d'abonnement confirmÃ©s (Premium et agences).
+  /// Paiements d'abonnement confirmés (Premium et agences).
   Future<List<Map<String, dynamic>>> getInvoices() async {
     final d = _data(await _api.get('/premium/invoices', auth: true), 'Factures indisponibles.');
     return d is List ? d.whereType<Map<String, dynamic>>().toList() : <Map<String, dynamic>>[];
