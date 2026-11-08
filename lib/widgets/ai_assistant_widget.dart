@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 import '../models/models.dart';
 // import '../services/mock_data.dart'; // 🚫 DÉSACTIVÉ (25/08/2026) : plus de données factices
 import '../services/api_service.dart';
@@ -57,8 +59,23 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   bool _speechInitStarted = false;
   bool _startVoiceAfterInit = false;
   String _voicePartial = '';
+  // Dernier texte reconnu pendant l'écoute en cours + garde « une seule soumission ».
+  String _voiceTranscript = '';
+  bool _awaitingResult = false;
+  Timer? _finalizeTimer;
+  String? _resolvedLocale; // locale de reconnaissance réellement disponible sur l'appareil
   late AnimationController _micPulseAnim;
   final stt.SpeechToText _speech = stt.SpeechToText();
+
+  // ── Mode vocal : VelqIA répond À VOIX HAUTE ───────────────────────────
+  // _voiceMode  = conversation mains libres (j'écoute, je réponds, j'écoute…).
+  // _speakNext  = la prochaine question vient du micro : on y répond oralement.
+  final FlutterTts _tts = FlutterTts();
+  bool _ttsReady = false;
+  bool _voiceMode = false;
+  bool _speakNext = false;
+  bool _isSpeaking = false;
+  int _emptyListens = 0; // écoutes sans voix d'affilée (mode vocal)
 
   final List<_ChatMessage> _messages = [];
   final TextEditingController _inputCtrl = TextEditingController();
@@ -99,6 +116,69 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     // micro (voir _toggleVoice).
   }
 
+  /// Termine l'écoute en cours et envoie UNE SEULE fois la phrase reconnue.
+  /// Appelée soit par le résultat final du moteur, soit (après un court délai de
+  /// grâce) par le statut « done » : sur Android/Web le statut « done » arrive
+  /// souvent AVANT le résultat final, et envoyer à ce moment-là coupait la phrase.
+  void _finishListening() {
+    _finalizeTimer?.cancel();
+    if (!mounted || !_awaitingResult) return;
+    _awaitingResult = false;
+    final captured = _voiceTranscript.trim();
+    _voiceTranscript = '';
+    try { _speech.stop(); } catch (_) {}
+    setState(() { _isListening = false; _voicePartial = ''; });
+    _micPulseAnim.stop();
+    _micPulseAnim.reset();
+    if (captured.isNotEmpty) {
+      _inputCtrl.clear();
+      _emptyListens = 0;
+      // Envoi automatique ; la réponse sera dite à voix haute
+      _speakNext = true;
+      Future.microtask(() => _handleQuery(captured));
+    } else if (_voiceMode) {
+      // Mode vocal : personne n'a parlé. On réécoute 1 fois, puis on s'arrête.
+      _emptyListens++;
+      if (_emptyListens >= 2) {
+        _stopVoiceMode();
+        _addAiMessage(_uiLang == 'en'
+            ? 'Voice mode stopped: I did not hear anything. Tap the voice button to start again.'
+            : 'Mode vocal arrêté : je n\'ai rien entendu. Appuyez sur le bouton vocal pour reprendre.');
+      } else {
+        Future.delayed(const Duration(milliseconds: 300), _resumeListening);
+      }
+    }
+  }
+
+  /// Annule l'écoute sans rien envoyer.
+  void _cancelListening() {
+    _finalizeTimer?.cancel();
+    _awaitingResult = false;
+    _voiceTranscript = '';
+    try { _speech.cancel(); } catch (_) {}
+  }
+
+  /// Choisit la locale de reconnaissance réellement supportée (ex. fr_FR, fr_TG, fr-FR…)
+  /// au lieu d'imposer « fr_FR » : un localeId inconnu donne une reconnaissance approximative.
+  Future<void> _resolveSpeechLocale() async {
+    final wanted = _speechLocale(); // ex. fr_FR
+    final lang = wanted.split('_').first.toLowerCase();
+    try {
+      final locales = await _speech.locales();
+      String norm(String id) => id.replaceAll('-', '_').toLowerCase();
+      for (final l in locales) {
+        if (norm(l.localeId) == norm(wanted)) { _resolvedLocale = l.localeId; return; }
+      }
+      for (final l in locales) {
+        if (norm(l.localeId).startsWith('${lang}_') || norm(l.localeId) == lang) {
+          _resolvedLocale = l.localeId;
+          return;
+        }
+      }
+    } catch (_) {}
+    _resolvedLocale = null; // moteur par défaut de l'appareil
+  }
+
   /// Initialise la reconnaissance vocale
   void _initSpeech() {
     _speech.initialize(
@@ -106,26 +186,29 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         if (!mounted) return;
         if (status == stt.SpeechToText.doneStatus ||
             status == stt.SpeechToText.notListeningStatus) {
-          final captured = _voicePartial.isNotEmpty ? _voicePartial : _inputCtrl.text.trim();
-          setState(() { _isListening = false; _voicePartial = ''; });
-          _micPulseAnim.stop();
-          _micPulseAnim.reset();
-          if (captured.isNotEmpty) {
-            _inputCtrl.clear();
-            // ✅ Envoi automatique dès que la voix est capturée
-            Future.microtask(() => _handleQuery(captured));
-          }
+          if (!_awaitingResult) return; // déjà traité (résultat final reçu)
+          // On laisse 700 ms au moteur pour livrer le résultat FINAL avant de conclure.
+          _finalizeTimer?.cancel();
+          _finalizeTimer = Timer(const Duration(milliseconds: 700), _finishListening);
         }
       },
       onError: (error) {
         if (!mounted) return;
+        // Erreurs « normales » (aucune voix / silence) : on conclut avec ce qui a été capté.
+        if (_awaitingResult && _voiceTranscript.trim().isNotEmpty) {
+          _finishListening();
+          return;
+        }
+        _cancelListening();
         setState(() { _isListening = false; _voicePartial = ''; });
         _micPulseAnim.stop();
         _micPulseAnim.reset();
+        if (_voiceMode) _stopVoiceMode(); // micro refusé / erreur : on évite de boucler
       },
     ).then((available) {
       if (!mounted) return;
       setState(() => _speechAvailable = available);
+      if (available) _resolveSpeechLocale();
       // L'appui sur le micro qui a déclenché l'initialisation démarre
       // maintenant l'écoute (ou affiche « micro indisponible »).
       if (_startVoiceAfterInit) {
@@ -140,12 +223,15 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _fabAnim.dispose();
     _pulseAnim.dispose();
     _panelAnim.dispose();
+    _finalizeTimer?.cancel();
     _micPulseAnim.dispose();
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     if (_isListening) {
       _speech.stop();
     }
+    _voiceMode = false;
+    _tts.stop();
     super.dispose();
   }
 
@@ -159,6 +245,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       }
     } else {
       _panelAnim.reverse();
+      _stopVoiceMode(); // on se tait et on arrête d'écouter quand le panneau se ferme
     }
   }
 
@@ -444,6 +531,10 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     final q = text.trim();
     _inputCtrl.clear();
 
+    // Réponse parlée si la question vient du micro ou si le mode vocal est actif.
+    final speak = _speakNext || _voiceMode;
+    _speakNext = false;
+
     setState(() => _messages.add(_ChatMessage(type: _MsgType.user, text: q)));
     _scrollToBottom();
 
@@ -463,6 +554,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       if (!mounted) return;
       setState(() => _isTyping = false);
       _addAiMessage(reply);
+      if (speak) _speak(reply);
       _history.add({'role': 'user', 'content': q});
       _history.add({'role': 'assistant', 'content': reply});
       if (_history.length > 20) {
@@ -506,6 +598,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
           // Réponse textuelle
           if (aiText != null && aiText.isNotEmpty) {
             _addAiMessage(aiText);
+            if (speak) _speak(aiText);
             _history.add({'role': 'assistant', 'content': aiText});
           }
 
@@ -518,13 +611,15 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
             _addAiMessage('✅ ${props.length} bien${props.length > 1 ? 's' : ''} trouvé${props.length > 1 ? 's' : ''} :');
             _addPropertiesMessage(props.take(5).toList());
           } else if (aiText == null || aiText.isEmpty) {
-            _addAiMessage('Je n\'ai pas pu trouver de réponse. Reformulez votre question.');
+            const none = 'Je n\'ai pas pu trouver de réponse. Reformulez votre question.';
+            _addAiMessage(none);
+            if (speak) _speak(none);
           }
         } else {
-          _fallbackSearch(q);
+          _fallbackOrGuess(q, speak);
         }
       } else if (response.statusCode == 503) {
-        // Assistant temporairement surchargé (voir backend: AI_UNAVAILABLE).
+        // Gemini temporairement surchargé (voir backend: GEMINI_UNAVAILABLE).
         // On l'affiche clairement au lieu de faire croire qu'aucun bien n'existe.
         String msg = '⏳ L\'assistant est temporairement surchargé, réessayez dans quelques instants.';
         try {
@@ -535,18 +630,37 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         } catch (_) {
           // corps non-JSON ou inattendu, on garde le message par défaut
         }
-        _addAiMessage(msg);
+        if (!_answerFromGuess(q, speak)) {
+          _addAiMessage(msg);
+          if (speak) _speak(msg);
+        }
       } else {
-        _fallbackSearch(q);
+        _fallbackOrGuess(q, speak);
       }
     } catch (_) {
-      setState(() => _isTyping = false);
-      _fallbackSearch(q);
+      if (mounted) setState(() => _isTyping = false);
+      _fallbackOrGuess(q, speak);
     }
   }
 
+  /// Secours quand l'IA du serveur est injoignable : on devine d'abord le
+  /// sujet (fautes de frappe, autre formulation), puis on cherche des biens.
+  bool _answerFromGuess(String q, bool speak) {
+    final guess = PlatformKnowledge.bestGuess(q, defaultLang: _uiLang);
+    if (guess == null) return false;
+    final reply = PlatformKnowledge.render(guess);
+    _addAiMessage(reply);
+    if (speak) _speak(reply);
+    return true;
+  }
+
+  void _fallbackOrGuess(String q, bool speak) {
+    if (_answerFromGuess(q, speak)) return;
+    _fallbackSearch(q, speak: speak);
+  }
+
   /// Recherche locale de fallback si l'API Claude n'est pas disponible
-  void _fallbackSearch(String q) {
+  void _fallbackSearch(String q, {bool speak = false}) {
     final ql = q.toLowerCase()
         .replaceAll('é', 'e').replaceAll('è', 'e').replaceAll('ê', 'e')
         .replaceAll('à', 'a').replaceAll('â', 'a')
@@ -554,13 +668,15 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
     final results = _searchProperties(ql);
     if (results.isNotEmpty) {
-      _addAiMessage('✅ J\'ai trouvé **${results.length} bien${results.length > 1 ? 's' : ''}** correspondant à votre recherche :');
+      final found = '✅ J\'ai trouvé **${results.length} bien${results.length > 1 ? 's' : ''}** correspondant à votre recherche :';
+      _addAiMessage(found);
+      if (speak) _speak(found);
       _addPropertiesMessage(results.take(5).toList());
     } else {
-      _addAiMessage(
-        '🔍 Aucun bien trouvé pour **"$q"**.\n\n'
-        'Essayez : *maison Lomé*, *voiture location*, *appartement meublé Bénin*...'
-      );
+      final none = '🔍 Aucun bien trouvé pour **"$q"**.\n\n'
+          'Essayez : *maison Lomé*, *voiture location*, *appartement meublé Bénin*...';
+      _addAiMessage(none);
+      if (speak) _speak('Aucun bien trouvé pour $q. Essayez maison Lomé, voiture location ou appartement meublé Bénin.');
     }
   }
 
@@ -1181,6 +1297,41 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ── Bandeau "mode vocal" ───────────────────────────────────────
+        if (_voiceMode && !_isListening)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B7A4E).withOpacity(0.12),
+              border: Border(
+                top: BorderSide(color: const Color(0xFF1B7A4E).withOpacity(0.3), width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(_isSpeaking ? Icons.volume_up_rounded : Icons.graphic_eq_rounded,
+                    size: 18, color: const Color(0xFF1B7A4E)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _isSpeaking
+                        ? (_uiLang == 'en' ? 'VelqIA is speaking…' : 'VelqIA vous répond…')
+                        : (_uiLang == 'en' ? 'Voice mode on: thinking…' : 'Mode vocal activé…'),
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _stopVoiceMode,
+                  child: Text(
+                    _uiLang == 'en' ? 'Stop' : 'Arrêter',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, fontWeight: FontWeight.w600, color: Colors.redAccent),
+                  ),
+                ),
+              ],
+            ),
+          ),
         // ── Bandeau "écoute en cours" ──────────────────────────────────
         if (_isListening)
           AnimatedBuilder(
@@ -1240,7 +1391,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                     GestureDetector(
                       onTap: () {
                         final text = _voicePartial;
-                        _speech.stop();
+                        _cancelListening();
                         setState(() { _isListening = false; _voicePartial = ''; });
                         _micPulseAnim.stop();
                         _micPulseAnim.reset();
@@ -1273,7 +1424,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                   // Bouton Annuler
                   GestureDetector(
                     onTap: () {
-                      _speech.stop();
+                      _cancelListening();
                       setState(() { _isListening = false; _voicePartial = ''; });
                       _micPulseAnim.stop();
                       _micPulseAnim.reset();
@@ -1343,6 +1494,32 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 ),
               ),
           const SizedBox(width: 8),
+          // Bouton « mode vocal » : je parle, VelqIA répond à voix haute, puis je réécoute
+          GestureDetector(
+            onTap: _toggleVoiceMode,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _voiceMode
+                    ? const Color(0xFF1B7A4E).withOpacity(0.25)
+                    : AppTheme.primary.withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _voiceMode
+                      ? const Color(0xFF1B7A4E)
+                      : AppTheme.primary.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                _voiceMode ? Icons.record_voice_over_rounded : Icons.headset_mic_rounded,
+                color: _voiceMode ? const Color(0xFF1B7A4E) : const Color(0xFFE6C766),
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           // Bouton micro – reconnaissance vocale réelle
           GestureDetector(
             onTap: _toggleVoice,
@@ -1431,36 +1608,153 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }
 
     if (_isListening) {
+      // Appui sur le micro pendant l'écoute = « j'ai fini » : on envoie ce qui a été dit.
       _speech.stop();
-      setState(() { _isListening = false; _voicePartial = ''; });
-      _micPulseAnim.stop();
-      _micPulseAnim.reset();
+      _finalizeTimer?.cancel();
+      _finalizeTimer = Timer(const Duration(milliseconds: 700), _finishListening);
       return;
     }
 
+    _voiceTranscript = '';
+    _awaitingResult = true;
     setState(() { _isListening = true; _voicePartial = ''; });
     _micPulseAnim.repeat(reverse: true);
 
     _speech.listen(
-      localeId: _speechLocale(),
+      localeId: _listenLocaleId(),
       onResult: (result) {
-        if (!mounted) return;
+        if (!mounted || !_awaitingResult) return;
         final transcript = result.recognizedWords;
-        setState(() => _voicePartial = transcript);
-        if (result.finalResult && transcript.isNotEmpty) {
-          _speech.stop();
-          setState(() { _isListening = false; _voicePartial = ''; });
-          _micPulseAnim.stop();
-          _micPulseAnim.reset();
-          _inputCtrl.clear();
-          // ✅ Soumission automatique dès que la voix est reconnue
-          Future.microtask(() => _handleQuery(transcript));
+        // On garde toujours le texte le plus récent (le résultat final remplace les partiels).
+        if (transcript.isNotEmpty) _voiceTranscript = transcript;
+        setState(() => _voicePartial = _voiceTranscript);
+        if (result.finalResult) {
+          _finishListening(); // envoi unique, phrase complète
         }
       },
-      cancelOnError: true,
-      listenFor: const Duration(seconds: 15),
-      pauseFor: const Duration(seconds: 2),
+      listenFor: const Duration(seconds: 60),
+      // Pause plus longue : 2 s coupait la phrase dès qu'on reprenait son souffle.
+      pauseFor: const Duration(seconds: 4),
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      ),
     );
+  }
+
+  // ─── Mode vocal : VelqIA parle ───────────────────────────────────────────
+  Future<void> _initTts() async {
+    if (_ttsReady) return;
+    _ttsReady = true;
+    try {
+      // Fin de la lecture : en mode vocal, on repart à l'écoute (conversation mains libres).
+      _tts.setCompletionHandler(() {
+        if (!mounted) return;
+        setState(() => _isSpeaking = false);
+        if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
+      });
+      _tts.setCancelHandler(() {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+      _tts.setErrorHandler((_) {
+        if (!mounted) return;
+        setState(() => _isSpeaking = false);
+        if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
+      });
+    } catch (_) {
+      // synthèse vocale indisponible sur cet appareil : l'app reste utilisable à l'écrit
+    }
+  }
+
+  /// Texte propre pour la voix : sans markdown, emojis, liens ni symboles.
+  String _cleanForSpeech(String text) {
+    var t = text
+        .replaceAll(RegExp(r'https?://\S+'), ' ')
+        .replaceAll(RegExp(r'[*_`#>]+'), '')
+        .replaceAll(RegExp(r'[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]', unicode: true), ' ')
+        .replaceAll('•', '. ')
+        .replaceAll(RegExp(r'\s*\n+\s*'), '. ')
+        .replaceAll(RegExp(r'(\.\s*){2,}'), '. ')
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+    // Réponse longue : on lit le début (jusqu'à une fin de phrase) et le texte reste à l'écran.
+    const maxChars = 520;
+    if (t.length > maxChars) {
+      final cut = t.lastIndexOf('. ', maxChars);
+      t = cut > 120 ? t.substring(0, cut + 1) : t.substring(0, maxChars);
+    }
+    return t;
+  }
+
+  Future<void> _speak(String text) async {
+    final clean = _cleanForSpeech(text);
+    if (clean.isEmpty) {
+      if (_voiceMode) Future.delayed(const Duration(milliseconds: 300), _resumeListening);
+      return;
+    }
+    try {
+      await _initTts();
+      await _tts.stop();
+      await _tts.setLanguage(_speechLocale().replaceAll('_', '-'));
+      if (mounted) setState(() => _isSpeaking = true);
+      await _tts.speak(clean);
+    } catch (_) {
+      if (mounted) setState(() => _isSpeaking = false);
+      // la voix a échoué : en mode vocal on continue quand même à écouter
+      if (_voiceMode) Future.delayed(const Duration(milliseconds: 300), _resumeListening);
+    }
+  }
+
+  /// Reprend l'écoute en mode vocal (jamais pendant que VelqIA parle ou réfléchit).
+  void _resumeListening() {
+    if (!mounted || !_voiceMode || !_isOpen) return;
+    if (_isListening || _isSpeaking || _isTyping) return;
+    _toggleVoice();
+  }
+
+  /// Bouton « mode vocal » : lance ou arrête la conversation mains libres.
+  void _toggleVoiceMode() {
+    if (_voiceMode) {
+      _stopVoiceMode();
+      return;
+    }
+    setState(() {
+      _voiceMode = true;
+      _emptyListens = 0;
+    });
+    _tts.stop();
+    if (!_isListening) _toggleVoice();
+  }
+
+  void _stopVoiceMode() {
+    if (!_voiceMode && !_isSpeaking && !_isListening) return;
+    _voiceMode = false;
+    _speakNext = false;
+    _emptyListens = 0;
+    _tts.stop();
+    if (_isListening) {
+      _cancelListening();
+      _micPulseAnim.stop();
+      _micPulseAnim.reset();
+    }
+    if (mounted) {
+      setState(() {
+        _isSpeaking = false;
+        _isListening = false;
+        _voicePartial = '';
+      });
+    }
+  }
+
+  /// Identifiant de langue passé au moteur vocal.
+  /// ⚠️ Sur le WEB, l'API du navigateur exige le format « fr-FR » (tiret). Avec « fr_FR »
+  /// (underscore) Chrome ignore la langue et reconnaît dans la langue du navigateur/système
+  /// (souvent l'anglais) : c'est ce qui écrivait du texte anglais sans rapport avec ce qui est dit.
+  /// En local ça « marchait » seulement parce que le navigateur de développement était en français.
+  String _listenLocaleId() {
+    final id = _resolvedLocale ?? _speechLocale();
+    return kIsWeb ? id.replaceAll('_', '-') : id;
   }
 
   /// Langue de la dictée = langue de l'application (et non plus toujours
