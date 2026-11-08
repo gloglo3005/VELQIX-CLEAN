@@ -331,6 +331,76 @@ class PlatformKnowledge {
     return out;
   }
 
+  // Devinette tolerante aux fautes de frappe (secours quand le serveur IA
+  // est injoignable). Retourne null pour une recherche de bien.
+  static int _lev(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    var prev = List<int>.generate(b.length + 1, (i) => i);
+    for (var i = 1; i <= a.length; i++) {
+      final cur = List<int>.filled(b.length + 1, 0);
+      cur[0] = i;
+      for (var j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        var v = prev[j] + 1;
+        if (cur[j - 1] + 1 < v) v = cur[j - 1] + 1;
+        if (prev[j - 1] + cost < v) v = prev[j - 1] + cost;
+        cur[j] = v;
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  static bool _fuzzyHit(String word, String phrase) {
+    final star = phrase.endsWith('*');
+    final k = star ? phrase.substring(0, phrase.length - 1) : phrase;
+    if (k.contains(' ') || k.length < 5) return false;
+    final w = star && word.length > k.length ? word.substring(0, k.length) : word;
+    final tol = k.length >= 7 ? 2 : 1;
+    return _lev(w, k) <= tol;
+  }
+
+  static int _fuzzyScore(List<String> words, List<String> phrases) {
+    var hits = 0;
+    for (final p in phrases) {
+      if (words.any((w) => _fuzzyHit(w, p))) hits++;
+    }
+    return hits;
+  }
+
+  static PlatformMatch? bestGuess(String query, {String defaultLang = 'fr'}) {
+    final exact = match(query, defaultLang: defaultLang);
+    if (exact != null) return exact;
+
+    final n = normalize(query);
+    if (n.isEmpty) return null;
+    final padded = ' $n ';
+    if (_any(padded, _propertyWords) && !_any(padded, _platformWords)) {
+      return null;
+    }
+
+    final words = n.split(' ').where((w) => w.length >= 4).toList();
+    if (words.isEmpty) return null;
+
+    String? bestTopic;
+    var bestScore = 0;
+    var bestLang = _guessLang(n, defaultLang: defaultLang);
+    for (final t in _topics) {
+      final sf = _fuzzyScore(words, t.fr);
+      final se = _fuzzyScore(words, t.en);
+      final s = sf >= se ? sf : se;
+      if (s > bestScore) {
+        bestScore = s;
+        bestTopic = t.id;
+        if (sf != se) bestLang = sf > se ? 'fr' : 'en';
+      }
+    }
+    if (bestTopic == null) return null;
+    return PlatformMatch(bestTopic, bestLang, detectGeo(query));
+  }
+
   static String _geoText(GeoMention g, bool fr, String topic) {
     final raw = fr ? g.labelFr : g.labelEn;
     final label = raw[0].toUpperCase() + raw.substring(1);

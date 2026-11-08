@@ -52,6 +52,7 @@ dependencies:
   video_player: ^2.11.1
   cached_network_image: ^3.4.1   # cache disque des photos (hors connexion)
   flutter_secure_storage: ^10.3.4
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   flutter_test:
