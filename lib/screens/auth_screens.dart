@@ -32,11 +32,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       bgColor: const Color(0xFFE7F1EC),
     ),
     _OnboardPage(
-      icon: Icons.directions_car_filled_rounded,
+      icon: Icons.apartment_rounded,
       color: const Color(0xFF1B5E20),
-      image: 'assets/images/hero_slide_2.jpg', // moto
-      title: 'Biens mobiliers\net immobiliers',
-      subtitle: 'Voitures, équipements, maisons, appartements… Publiez et trouvez tout sur une seule plateforme.',
+      image: 'assets/images/hero_slide_4.jpg', // terrasse
+      title: 'Maisons, appartements\net terrains',
+      subtitle: 'Maisons, appartements, terrains, bureaux… Publiez et trouvez tout sur une seule plateforme.',
       bgColor: const Color(0xFFE8F5E9),
     ),
     _OnboardPage(
@@ -510,12 +510,11 @@ class AuthBrandPanel extends StatelessWidget {
                 style: GoogleFonts.poppins(
                     fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
             const SizedBox(height: 12),
-            Text('La plateforme de référence pour vos biens immobiliers et vos véhicules.',
+            Text('La plateforme de référence pour vos biens immobiliers.',
                 style: GoogleFonts.poppins(
                     fontSize: 15, color: Colors.white.withOpacity(0.85), height: 1.6)),
             const SizedBox(height: 36),
             point(Icons.home_work_rounded, 'Maisons, appartements, hôtels et terrains'),
-            point(Icons.directions_car_rounded, 'Voitures, motos et camions'),
             point(Icons.support_agent_rounded, "Démarcheurs et agents d'entretien à votre service"),
           ],
         ),
@@ -589,8 +588,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'Agence immobilière',
     'Promoteur immobilier',
     'Constructeur / BTP',
-    'Location de véhicules',
-    'Location d\'équipements',
     'Commerce général',
     'Hôtellerie / Tourisme',
     'Autre',

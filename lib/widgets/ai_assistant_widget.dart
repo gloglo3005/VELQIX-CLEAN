@@ -90,7 +90,6 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   // Suggestions rapides
   final List<Map<String, String>> _suggestions = [
     {'label': '🏠 Maison à Lomé', 'query': 'Maison à Lomé'},
-    {'label': '🚗 Voiture à louer', 'query': 'Voiture à louer'},
     {'label': '🏢 Appartement meublé', 'query': 'Appartement meublé'},
     {'label': '🌍 Bien au Togo', 'query': 'Bien disponible au Togo'},
     {'label': '💎 Premium', 'query': 'Que comprend Premium ?'},
@@ -674,9 +673,9 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       _addPropertiesMessage(results.take(5).toList());
     } else {
       final none = '🔍 Aucun bien trouvé pour **"$q"**.\n\n'
-          'Essayez : *maison Lomé*, *voiture location*, *appartement meublé Bénin*...';
+          'Essayez : *maison Lomé*, *terrain Kpalimé*, *appartement meublé Bénin*...';
       _addAiMessage(none);
-      if (speak) _speak('Aucun bien trouvé pour $q. Essayez maison Lomé, voiture location ou appartement meublé Bénin.');
+      if (speak) _speak('Aucun bien trouvé pour $q. Essayez maison Lomé, terrain Kpalimé ou appartement meublé Bénin.');
     }
   }
 

@@ -565,11 +565,11 @@ class PlatformKnowledge {
       '📝 **Publier une annonce**\n'
           'Connectez-vous → « + » (Ajouter un bien) → titre, catégorie, prix, adresse (pays et ville), photos (2 gratuites, 12 avec Premium), vidéo facultative (30 Mo max) → soumettez.\n\n'
           'L\'équipe valide l\'annonce avant sa mise en ligne. La publication de base est gratuite.\n'
-          'Catégories : maison, appartement, hôtel, terrain, bureau, entrepôt, chambre, studio, local commercial ; véhicules : voiture, moto, camion.',
+          'Catégories : maison, appartement, hôtel, terrain, bureau, entrepôt, chambre, studio, local commercial.',
       '📝 **Post a listing**\n'
           'Sign in → « + » (Add a property) → title, category, price, address (country and city), photos (2 free, 12 with Premium), optional video (30 MB max) → submit.\n\n'
           'The team approves the listing before it goes live. Basic posting is free.\n'
-          'Categories: house, apartment, hotel, land, office, warehouse, room, studio, commercial space; vehicles: car, motorbike, truck.',
+          'Categories: house, apartment, hotel, land, office, warehouse, room, studio, commercial space.',
       geo: true,
     ),
     _Topic(
@@ -750,8 +750,8 @@ class PlatformKnowledge {
         'what is velqix', 'about velqix', 'how does velqix work', 'how does it work',
         'how to use velqix', 'who are you',
       ],
-      '🏠 **VelQix** est une plateforme de location et de vente de biens (immobilier, véhicules) pour l\'Afrique de l\'Ouest : annonces modérées, messagerie et appels intégrés, avis et notes, vérification terrain en option, abonnement Premium.\n\nDites-moi ce que vous cherchez (type de bien, ville, budget), ou posez-moi une question sur le fonctionnement de la plateforme.',
-      '🏠 **VelQix** is a rental and sales platform (real estate, vehicles) for West Africa: moderated listings, built-in messaging and calls, reviews and ratings, optional field verification, Premium subscription.\n\nTell me what you are looking for (property type, city, budget), or ask me anything about how the platform works.',
+      '🏠 **VelQix** est une plateforme de location et de vente de biens (immobilier) pour l\'Afrique de l\'Ouest : annonces modérées, messagerie et appels intégrés, avis et notes, vérification terrain en option, abonnement Premium.\n\nDites-moi ce que vous cherchez (type de bien, ville, budget), ou posez-moi une question sur le fonctionnement de la plateforme.',
+      '🏠 **VelQix** is a rental and sales platform (real estate) for West Africa: moderated listings, built-in messaging and calls, reviews and ratings, optional field verification, Premium subscription.\n\nTell me what you are looking for (property type, city, budget), or ask me anything about how the platform works.',
       geo: true,
     ),
   ];

@@ -1,0 +1,1 @@
+Supprimer du projet : assets/images/hero_slide_2.jpg (photo de voiture, plus utilisée)

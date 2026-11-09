@@ -21,10 +21,10 @@ class _AnimatedBrandBackgroundState extends State<AnimatedBrandBackground>
 
   static const _icons = <_FloatIcon>[
     _FloatIcon(Icons.home_rounded, 0.12, 0.18, 34, 1),
-    _FloatIcon(Icons.directions_car_rounded, 0.78, 0.12, 30, 2),
+    _FloatIcon(Icons.villa_rounded, 0.78, 0.12, 30, 2),
     _FloatIcon(Icons.apartment_rounded, 0.86, 0.46, 38, 1),
     _FloatIcon(Icons.key_rounded, 0.08, 0.62, 28, 2),
-    _FloatIcon(Icons.two_wheeler_rounded, 0.70, 0.80, 30, 1),
+    _FloatIcon(Icons.landscape_rounded, 0.70, 0.80, 30, 1),
     _FloatIcon(Icons.hotel_rounded, 0.30, 0.88, 28, 2),
   ];
 

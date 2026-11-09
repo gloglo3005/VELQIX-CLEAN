@@ -662,10 +662,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: tr('banner1_title'), subtitle: tr('banner1_sub'),
         gradient: const [Color(0xFF0F5132), Color(0xFF1B7A4E)],
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
-      _BannerSlide(icon: Icons.directions_car_rounded,
-        title: tr('banner2_title'), subtitle: tr('banner2_sub'),
-        gradient: const [Color(0xFF0A3622), Color(0xFF0F5132)],
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExploreScreen()))),
       _BannerSlide(icon: Icons.verified_user_rounded,
         title: tr('banner3_title'), subtitle: tr('banner3_sub'),
         gradient: const [Color(0xFF0A3622), Color(0xFF1B7A4E)],
@@ -960,13 +956,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(tr('home_no_results'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
                       Text(
-                        'Essayez avec d\'autres mots.\nPar exemple : "villa", "lomé", "voiture 2022"',
+                        'Essayez avec d\'autres mots.\nPar exemple : "villa", "lomé", "terrain"',
                         style: GoogleFonts.poppins(fontSize: 13, color: Theme.of(context).textTheme.bodySmall?.color ?? AppTheme.textSecondary, height: 1.6),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
                       Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center,
-                        children: ['Villa', 'Appartement', 'Voiture', 'Lomé', 'Agoè', 'Location', 'Terrain']
+                        children: ['Villa', 'Appartement', 'Lomé', 'Agoè', 'Location', 'Terrain']
                             .map((s) => GestureDetector(
                               onTap: () => _applySuggestion(s),
                               child: Container(
@@ -1204,10 +1200,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Même ordre que `banners` dans build()
   static const _heroSlideImages = <String>[
     'assets/images/hero_slide_1.jpg', // terrain  → Louez & Vendez
-    'assets/images/hero_slide_2.jpg', // moto     → Voitures, motos & équipements
     'assets/images/hero_slide_4.jpg', // terrasse → Transactions sécurisées
     'assets/images/hero_slide_5.jpg', // hôtel    → Premium
-    'assets/images/hero_slide_3.jpg', // voiture  → Publiez votre annonce
+    'assets/images/hero_slide_3.jpg', // poignée de main → Publiez votre annonce
     'assets/images/hero.jpg',         // photo d'origine + accroche d'origine (repli en ligne)
   ];
 
