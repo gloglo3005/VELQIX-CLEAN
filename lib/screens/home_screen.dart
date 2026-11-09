@@ -884,11 +884,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             icon: Icons.home_work_rounded,
                             value: '${_serverProps.where((p) => p.type == PropertyType.immobilier).length}',
                             label: tr('home_annonces')),
-                        const SizedBox(width: 10),
-                        _QuickStat(
-                            icon: Icons.apartment_rounded,
-                            value: '${_serverProps.where((p) => p.type == PropertyType.immobilier).length}',
-                            label: tr('home_immobilier')),
                       ]),
                     ],
                     const SizedBox(height: 20),
