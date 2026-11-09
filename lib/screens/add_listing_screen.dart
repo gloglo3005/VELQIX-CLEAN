@@ -50,12 +50,12 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   // Cahier des charges §8.1 / §4.2 : le lancement se concentre sur l'immobilier
   // (chambres, studios, maisons, appartements, terrains, locaux commerciaux,
-  // bureaux). Le type « Mobilier » n'est plus proposé.
+  // bureaux, hôtels). Le type « Mobilier » n'est plus proposé.
   final _immoCats = [
     PropertyCategory.chambre, PropertyCategory.studio,
     PropertyCategory.maison, PropertyCategory.appartement,
     PropertyCategory.terrain, PropertyCategory.localCommercial,
-    PropertyCategory.bureau,
+    PropertyCategory.bureau, PropertyCategory.hotel,
   ];
   final _mobilCats = [
     PropertyCategory.voiture, PropertyCategory.moto,
