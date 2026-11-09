@@ -1635,7 +1635,11 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       // Pause plus longue : 2 s coupait la phrase dès qu'on reprenait son souffle.
       pauseFor: const Duration(seconds: 4),
       listenOptions: stt.SpeechListenOptions(
-        partialResults: true,
+        // WEB : le plugin passe alors la reconnaissance du navigateur en mode « continu » et
+        // concatène TOUS les résultats intermédiaires. Sur Chrome Android chaque révision de la
+        // phrase devient une entrée : « cherche » + « cherche maison » + « cherche maison au »
+        // → phrase répétée. On désactive donc les partiels sur le web : un seul résultat propre.
+        partialResults: !kIsWeb,
         cancelOnError: false,
         listenMode: stt.ListenMode.dictation,
       ),
