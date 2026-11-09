@@ -50,7 +50,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   // Cahier des charges §8.1 / §4.2 : le lancement se concentre sur l'immobilier
   // (chambres, studios, maisons, appartements, terrains, locaux commerciaux,
-  // bureaux). Le type « Mobilier » (véhicules) reste proposé à la publication.
+  // bureaux). Le type « Mobilier » n'est plus proposé.
   final _immoCats = [
     PropertyCategory.chambre, PropertyCategory.studio,
     PropertyCategory.maison, PropertyCategory.appartement,
@@ -679,10 +679,6 @@ class _AddListingScreenState extends State<AddListingScreen> {
         Expanded(child: _TypeCard(label: tr('add_type_immo'), icon: Icons.home_work_rounded,
             value: PropertyType.immobilier, selected: _type,
             onTap: (v) => setState(() { _type = v; _category = _immoCats.first; }))),
-        const SizedBox(width: 12),
-        Expanded(child: _TypeCard(label: tr('add_type_mobilier'), icon: Icons.directions_car_rounded,
-            value: PropertyType.mobilier, selected: _type,
-            onTap: (v) => setState(() { _type = v; _category = _mobilCats.first; }))),
       ]),
       const SizedBox(height: 24),
       Text(tr('add_category'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),

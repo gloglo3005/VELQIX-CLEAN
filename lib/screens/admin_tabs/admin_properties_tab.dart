@@ -173,7 +173,6 @@ class _AdminPropertiesTabState extends State<AdminPropertiesTab> {
                 items: const [
                   MapEntry('all', 'Tous types'),
                   MapEntry('immobilier', 'Immobilier'),
-                  MapEntry('mobilier', 'Véhicules'),
                 ],
               ),
               const SizedBox(height: 6),

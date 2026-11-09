@@ -27,7 +27,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 1, vsync: this);
     // ✅ Écoute les approbations admin en temps réel
     publishedPropertiesNotifier.addListener(_onPublished);
     WidgetsBinding.instance.addObserver(this);
@@ -79,10 +79,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       final matchCountry = _filterCountryCode == null ||
           pays == _filterCountryCode!.toLowerCase() ||
           pays == (_filterCountryName ?? '').toLowerCase();
-      // Immobilier et mobilier ne sont plus mélangés : un onglet = un type de bien
-      final matchTab = _tabController.index == 0
-          ? p.type == PropertyType.immobilier
-          : p.type == PropertyType.mobilier;
+      // La plateforme ne propose plus que l'immobilier
+      final matchTab = p.type == PropertyType.immobilier;
       return matchSearch && matchAvailable && matchPrice && matchTab && matchCountry;
     }).toList();
 
@@ -177,24 +175,6 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Tabs
-                  TabBar(
-                    controller: _tabController,
-                    onTap: (_) {
-                      setState(() {});
-                      _loadProperties();
-                    },
-                    labelStyle: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-                    unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
-                    labelColor: AppTheme.primary,
-                    unselectedLabelColor: AppTheme.textSecondary,
-                    indicatorColor: AppTheme.primary,
-                    indicatorWeight: 3,
-                    tabs: [
-                      Tab(text: '${tr('explore_tab_immo')} (${_countType(PropertyType.immobilier)})'),
-                      Tab(text: '${tr('add_type_mobilier')} (${_countType(PropertyType.mobilier)})'),
-                    ],
-                  ),
                 ],
               ),
             ),

@@ -279,7 +279,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(children: [
         seg(PropertyType.immobilier, tr('add_type_immo'), Icons.home_work_rounded),
-        seg(PropertyType.mobilier, tr('add_type_mobilier'), Icons.directions_car_rounded),
       ]),
     );
   }
@@ -887,13 +886,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(children: [
                         _QuickStat(
                             icon: Icons.home_work_rounded,
-                            value: '${_serverProps.length}',
+                            value: '${_serverProps.where((p) => p.type == PropertyType.immobilier).length}',
                             label: tr('home_annonces')),
-                        const SizedBox(width: 10),
-                        _QuickStat(
-                            icon: Icons.directions_car_rounded,
-                            value: '${_serverProps.where((p) => p.type == PropertyType.mobilier).length}',
-                            label: tr('home_mobilier')),
                         const SizedBox(width: 10),
                         _QuickStat(
                             icon: Icons.apartment_rounded,
@@ -1079,11 +1073,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _buildTypeToggle(),
-                    ),
-                    const SizedBox(height: 12),
                     SizedBox(
                       height: 38,
                       child: ListView.separated(
