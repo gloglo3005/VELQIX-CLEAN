@@ -75,6 +75,8 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   // Les moteurs vocaux (Chrome ~15 s, Android ~4000 car.) coupent les longs blocs.
   List<String> _ttsQueue = [];
   DateTime _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _ttsGen = 0;            // invalide les événements / minuteurs d'une lecture déjà remplacée
+  Timer? _ttsWatchdog;        // filet de sécurité si le moteur ne signale jamais la fin d'une phrase
   bool _ttsReady = false;
   bool _voiceMode = false;
   bool _speakNext = false;
@@ -234,7 +236,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       _speech.stop();
     }
     _voiceMode = false;
-    _ttsQueue = []; _tts.stop();
+    _ttsGen++; _ttsWatchdog?.cancel(); _ttsQueue = []; _tts.stop();
     super.dispose();
   }
 
@@ -1656,31 +1658,16 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _ttsReady = true;
     try {
       // Fin de la lecture : en mode vocal, on repart à l'écoute (conversation mains libres).
-      _tts.setCompletionHandler(() {
-        if (!mounted) return;
-        // Événement tardif de la lecture qu'on vient d'interrompre : on l'ignore.
-        if (DateTime.now().difference(_ttsLastSpeakAt).inMilliseconds < 250) return;
-        // Il reste des phrases à lire : on enchaîne.
-        if (_ttsQueue.isNotEmpty) {
-          _speakNextChunk();
-          return;
-        }
-        setState(() => _isSpeaking = false);
-        if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
-      });
+      _tts.setCompletionHandler(() => _onTtsChunkDone());
       _tts.setCancelHandler(() {
-        if (mounted) setState(() => _isSpeaking = false);
-      });
-      _tts.setErrorHandler((_) {
-        if (!mounted) return;
-        // Une phrase a échoué : on passe à la suivante plutôt que de couper toute la réponse.
-        if (_ttsQueue.isNotEmpty) {
-          _speakNextChunk();
-          return;
-        }
+        // Annulation tardive de la lecture qu'on vient de remplacer : on l'ignore,
+        // sinon l'app croirait que la voix s'est arrêtée et relancerait le micro (ce qui coupe la voix).
+        if (!mounted || _ttsQueue.isNotEmpty) return;
+        if (DateTime.now().difference(_ttsLastSpeakAt).inMilliseconds < 600) return;
         setState(() => _isSpeaking = false);
-        if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
       });
+      // Une phrase en erreur : on passe à la suivante plutôt que de couper toute la réponse.
+      _tts.setErrorHandler((_) => _onTtsChunkDone());
     } catch (_) {
       // synthèse vocale indisponible sur cet appareil : l'app reste utilisable à l'écrit
     }
@@ -1743,23 +1730,48 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
 
   /// Arrête la lecture ET vide la file (sinon la phrase suivante repartirait).
   Future<void> _stopTts() async {
+    _ttsGen++;
+    _ttsWatchdog?.cancel();
     _ttsQueue = [];
     try { await _tts.stop(); } catch (_) {}
   }
 
+  /// Une phrase est terminée (ou en erreur) : on lit la suivante, ou on conclut.
+  void _onTtsChunkDone() {
+    if (!mounted) return;
+    // Événement tardif de la lecture qu'on vient d'interrompre : on l'ignore.
+    if (DateTime.now().difference(_ttsLastSpeakAt).inMilliseconds < 250) return;
+    _ttsWatchdog?.cancel();
+    if (_ttsQueue.isNotEmpty) {
+      _speakNextChunk();
+      return;
+    }
+    setState(() => _isSpeaking = false);
+    if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
+  }
+
   Future<void> _speakNextChunk() async {
     if (_ttsQueue.isEmpty) return;
+    final gen = _ttsGen;
     final chunk = _ttsQueue.removeAt(0);
     _ttsLastSpeakAt = DateTime.now();
+    // Filet de sécurité : si le moteur ne signale jamais la fin (bug connu des navigateurs
+    // mobiles), on force le passage à la suite au lieu de laisser la lecture bloquée.
+    _ttsWatchdog?.cancel();
+    final maxMs = 4000 + chunk.length * 130;
+    _ttsWatchdog = Timer(Duration(milliseconds: maxMs), () async {
+      if (!mounted || gen != _ttsGen) return;
+      try { await _tts.stop(); } catch (_) {}
+      if (!mounted || gen != _ttsGen) return;
+      _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0); // l'événement de stop ne doit pas être ignoré
+      _onTtsChunkDone();
+    });
     try {
       await _tts.speak(chunk);
     } catch (_) {
-      if (_ttsQueue.isNotEmpty) {
-        _speakNextChunk();
-      } else if (mounted) {
-        setState(() => _isSpeaking = false);
-        if (_voiceMode) Future.delayed(const Duration(milliseconds: 300), _resumeListening);
-      }
+      if (gen != _ttsGen) return;
+      _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0);
+      _onTtsChunkDone();
     }
   }
 
@@ -1803,7 +1815,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       _voiceMode = true;
       _emptyListens = 0;
     });
-    _ttsQueue = []; _tts.stop();
+    _ttsGen++; _ttsWatchdog?.cancel(); _ttsQueue = []; _tts.stop();
     if (!_isListening) _toggleVoice();
   }
 
@@ -1812,7 +1824,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _voiceMode = false;
     _speakNext = false;
     _emptyListens = 0;
-    _ttsQueue = []; _tts.stop();
+    _ttsGen++; _ttsWatchdog?.cancel(); _ttsQueue = []; _tts.stop();
     if (_isListening) {
       _cancelListening();
       _micPulseAnim.stop();
