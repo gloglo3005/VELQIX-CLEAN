@@ -501,9 +501,13 @@ class AuthBrandPanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(84 * 0.22),
-              child: Image.asset('assets/images/logo.png', width: 84, height: 84, fit: BoxFit.contain),
+            // Logo décalé vers le haut (32 px) : plus d'air entre le logo et le titre
+            Transform.translate(
+              offset: const Offset(0, -32),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(84 * 0.22),
+                child: Image.asset('assets/images/logo.png', width: 84, height: 84, fit: BoxFit.contain),
+              ),
             ),
             const SizedBox(height: 28),
             Text('Louez. Achetez. Gérez.',
