@@ -690,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: Image.asset(
                             'assets/images/logo.png',
-                            height: MediaQuery.of(context).size.width >= 900 ? 64 : 52,
+                            height: MediaQuery.of(context).size.width >= 900 ? 46 : 36,
                             fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) => Text('TOIT D’OR',
                                 style: GoogleFonts.poppins(

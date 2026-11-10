@@ -1680,6 +1680,8 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         .replaceAll(RegExp(r'[*_`#>]+'), '')
         .replaceAll(RegExp(r'[\u{1F000}-\u{1FAFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]', unicode: true), ' ')
         .replaceAll('•', '. ')
+        .replaceAll(':.', ':')
+        .replaceAllMapped(RegExp(r'(^|\n)\s*[-–]\s+'), (m) => m[1]!)
         .replaceAll(RegExp(r'\s*\n+\s*'), '. ')
         .replaceAll(RegExp(r'(\.\s*){2,}'), '. ')
         .replaceAll(RegExp(r'\s{2,}'), ' ')
@@ -1687,9 +1689,13 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     return t;
   }
 
-  /// Découpe le texte en morceaux courts (≤ ~150 caractères) aux fins de phrases.
+  /// Découpe le texte en morceaux courts (85 car. sur le web) aux fins de phrases.
   List<String> _splitForSpeech(String text) {
-    const maxLen = 150;
+    // ≤ 90 caractères ≈ 5-8 s de lecture : sur Chrome Android le plugin web fait pause()/resume()
+    // toutes les 14 s, ce qui INTERROMPT la lecture. Aucun morceau ne doit donc approcher 14 s
+    // (les grands nombres comme « 450 000 000 » rallongent beaucoup la lecture).
+    // Application native : pas de pause()/resume() parasite → morceaux plus longs, moins de coupures.
+    final maxLen = kIsWeb ? 85 : 300;
     final sentences = text
         .split(RegExp(r'(?<=[.!?…;:])\s+'))
         .map((e) => e.trim())
@@ -1741,6 +1747,12 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     if (!mounted) return;
     // Événement tardif de la lecture qu'on vient d'interrompre : on l'ignore.
     if (DateTime.now().difference(_ttsLastSpeakAt).inMilliseconds < 250) return;
+    _advanceTts();
+  }
+
+  /// Passe à la phrase suivante (ou conclut) sans condition.
+  void _advanceTts() {
+    if (!mounted) return;
     _ttsWatchdog?.cancel();
     if (_ttsQueue.isNotEmpty) {
       _speakNextChunk();
@@ -1758,20 +1770,21 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     // Filet de sécurité : si le moteur ne signale jamais la fin (bug connu des navigateurs
     // mobiles), on force le passage à la suite au lieu de laisser la lecture bloquée.
     _ttsWatchdog?.cancel();
-    final maxMs = 4000 + chunk.length * 130;
+    final maxMs = 5000 + chunk.length * 140;
     _ttsWatchdog = Timer(Duration(milliseconds: maxMs), () async {
       if (!mounted || gen != _ttsGen) return;
+      // On vide l'état du moteur (il peut être resté « en pause »), puis on reprend.
+      _ttsLastSpeakAt = DateTime.now(); // les événements du stop ci-dessous seront ignorés
       try { await _tts.stop(); } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted || gen != _ttsGen) return;
-      _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0); // l'événement de stop ne doit pas être ignoré
-      _onTtsChunkDone();
+      _advanceTts();
     });
     try {
       await _tts.speak(chunk);
     } catch (_) {
       if (gen != _ttsGen) return;
-      _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0);
-      _onTtsChunkDone();
+      _advanceTts();
     }
   }
 
