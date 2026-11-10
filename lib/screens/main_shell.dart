@@ -367,7 +367,7 @@ class _MainShellState
       children: [
         _buildMainContent(context),
 
-        /// Assistant IA Assistante TOIT D’OR : bouton flottant + panneau de chat.
+        /// Assistant TOIT D’OR : bouton flottant + panneau de chat.
         /// Il ne capte que les touches sur le bouton et le panneau :
         /// le reste de l'écran reste utilisable.
         const AiAssistantWidget(),
