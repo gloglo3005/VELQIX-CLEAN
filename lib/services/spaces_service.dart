@@ -1,6 +1,6 @@
 // lib/services/spaces_service.dart
 // Profil ≠ rôles : un même COMPTE peut donner accès à plusieurs espaces
-// (personnel, Velqix Pro, Velqix Business) selon les autorisations du serveur.
+// (personnel, TOIT D’OR Pro, TOIT D’OR Business) selon les autorisations du serveur.
 // Une même personne peut ainsi être propriétaire et professionnelle sans créer
 // plusieurs comptes.
 

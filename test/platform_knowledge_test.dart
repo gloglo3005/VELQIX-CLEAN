@@ -68,7 +68,7 @@ void main() {
 
   group('Couverture géographique', () {
     test('quels pays', () {
-      final m = PlatformKnowledge.match('VelQix est disponible dans quels pays ?');
+      final m = PlatformKnowledge.match('TOIT D’OR est disponible dans quels pays ?');
       expect(m?.topic, 'coverage');
     });
 

@@ -34,7 +34,7 @@ class MissionType {
 }
 
 class MissionStatus {
-  static const devis = 'devis';                 // en attente du devis VelQix
+  static const devis = 'devis';                 // en attente du devis TOIT D’OR
   static const devisPropose = 'devis_propose';  // devis prêt : le client accepte et paie
   static const attentePaiement = 'attente_paiement';
   static const disponible = 'disponible';       // payée, visible par les agents

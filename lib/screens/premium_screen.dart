@@ -330,7 +330,7 @@ class _PremiumSuccessDialog extends StatelessWidget {
             child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 44),
           ),
           const SizedBox(height: 20),
-          Text(isFree ? 'Bienvenue sur VelQix !' : 'Félicitations ! 🎉',
+          Text(isFree ? 'Bienvenue sur TOIT D’OR !' : 'Félicitations ! 🎉',
               style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
           const SizedBox(height: 8),
           Text(isFree

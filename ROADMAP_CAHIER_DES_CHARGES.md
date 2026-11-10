@@ -5,7 +5,7 @@ Légende : ✅ fait côté app · 🟡 app prête, **dépend du backend** (voir 
 | Réf. | Exigence | État | Détail |
 |---|---|---|---|
 | §10.3 | Le paiement ne donne jamais le statut « vérifié » | ✅ | `isVelqixApproved = fieldVerified` ; Premium retiré du calcul ; « Vedette » → « Mise en avant » |
-| §14.3 | Limites des garanties annoncées sans détour | ✅ | Fin des promesses « VelQix s'en charge en cas de fraude » et « Assurance transactions » ; encadré de limites sur chaque annonce |
+| §14.3 | Limites des garanties annoncées sans détour | ✅ | Fin des promesses « TOIT D’OR s'en charge en cas de fraude » et « Assurance transactions » ; encadré de limites sur chaque annonce |
 | §6.4 | Une vérification précise ce qu'elle couvre | ✅ | Date, agent, périmètre et limites (pas une preuve de propriété) affichés ; texte démarcheur corrigé |
 | §7.1-7.2 | Statuts de disponibilité + date de l'information | ✅ | `AvailabilityState` (7 états), badge sur les cartes, encadré sur la fiche |
 | §7.2 | « Confirmée » uniquement si l'annonceur a confirmé | 🟡 | Sans `lastConfirmedAt` : « Déclaré disponible ». Fenêtre « récemment » = 7 j, à rendre configurable |
@@ -26,7 +26,7 @@ Légende : ✅ fait côté app · 🟡 app prête, **dépend du backend** (voir 
 
 ---
 
-# Cahier des charges VelQix (version précédente) — avancement
+# Cahier des charges TOIT D’OR (version précédente) — avancement
 
 Principe retenu : **améliorer l'existant sans changer les menus ni les fonctions actuelles**.
 
@@ -34,10 +34,10 @@ Principe retenu : **améliorer l'existant sans changer les menus ni les fonction
 | Section du cahier | Réalisation |
 |---|---|
 | 2 / 4 — Services payants séparés de l'abonnement | Feuille « Demander un service » (vérification, visite accompagnée, entretien), prix affichés, devis, paiement hébergé ; écran « Mes demandes de services » (menu Profil) ; boutons sur la page d'une annonce |
-| 5D — Interface démarcheur | « Velqix Agent » : missions avec rémunération visible avant d'accepter, acceptation, rapport (constat + photos), Mes gains (en validation / à recevoir / payé), Disponibilité (zones, horaires) |
-| 5E — Interface agent d'entretien | « Velqix Services » : même espace, missions d'entretien, détails (surface, prestation), preuves, gains ; validation / contestation côté client |
+| 5D — Interface démarcheur | « TOIT D’OR Agent » : missions avec rémunération visible avant d'accepter, acceptation, rapport (constat + photos), Mes gains (en validation / à recevoir / payé), Disponibilité (zones, horaires) |
+| 5E — Interface agent d'entretien | « TOIT D’OR Services » : même espace, missions d'entretien, détails (surface, prestation), preuves, gains ; validation / contestation côté client |
 | 6 — Administration | Onglet « Opérations & finances » : missions (devis, validation, refus avec preuves), tarifs et rémunérations configurables + simulation de marge, revenus, reversements aux agents, journal d'activité ; nouveaux droits dans la matrice des permissions |
-| 4 — Exemple de marge d'une vérification | Reproduit dans l'admin (3 500 F → contribution VelQix ≈ 1 395 F, ≈ 40 %) |
+| 4 — Exemple de marge d'une vérification | Reproduit dans l'admin (3 500 F → contribution TOIT D’OR ≈ 1 395 F, ≈ 40 %) |
 | 7 — Contrat technique | `BACKEND_CHANGES.md` : tables, statuts, routes, règles de sécurité financière |
 
 ## À faire (phases suivantes)

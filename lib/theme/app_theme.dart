@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ─── Couleurs de marque (identiques en clair et en sombre) ─────────────────
-  // Charte Velqix : vert profond, or chaleureux, beige ivoire, gris foncé / doux.
+  // Charte TOIT D’OR : vert profond, or chaleureux, beige ivoire, gris foncé / doux.
   static const Color primary = Color(0xFF0F5132);      // Vert profond
   static const Color primaryLight = Color(0xFF1B7A4E);
   static const Color primaryDark = Color(0xFF0A3622);

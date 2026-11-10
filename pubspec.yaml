@@ -1,5 +1,5 @@
 name: VELQIX
-description: VELQIX - Plateforme de location et vente de biens
+description: TOIT D’OR - Plateforme de location et vente de biens
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -65,7 +65,7 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/logo_square.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#061008"
+  adaptive_icon_background: "#090D0E"
   adaptive_icon_foreground: "assets/images/logo_square.png"
 
 flutter:

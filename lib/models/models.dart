@@ -80,7 +80,7 @@ class UserModel {
     this.isFollowedByMe = false,
   });
 
-  // ── Comptes créés uniquement par l'équipe VelQix / l'administrateur ──────
+  // ── Comptes créés uniquement par l'équipe TOIT D’OR / l'administrateur ──────
   bool get isDemarcheur => role == 'demarcheur';
   bool get isAgentEntretien => role == 'agent_entretien';
   bool get isStaff => isDemarcheur || isAgentEntretien;
@@ -183,7 +183,7 @@ class PropertyModel {
   final DateTime? lastConfirmedAt;
 
   // ── Vérification terrain ─────────────────────────────────────────────────
-  // Un bien est « vérifié sur le terrain » uniquement si un agent VelQix s'est
+  // Un bien est « vérifié sur le terrain » uniquement si un agent TOIT D’OR s'est
   // rendu sur place (mission de vérification validée). Un paiement (Premium,
   // mise en avant…) ne donne JAMAIS ce statut (cahier des charges §10.3).
   final bool fieldVerified;            // vérifié sur place par un démarcheur
@@ -227,7 +227,7 @@ class PropertyModel {
     this.verificationRequested = false,
   });
 
-  /// Vérifié sur le terrain par un agent VelQix. Le statut Premium du
+  /// Vérifié sur le terrain par un agent TOIT D’OR. Le statut Premium du
   /// propriétaire n'entre PAS dans ce calcul (cahier des charges §10.3 :
   /// « le paiement ne doit jamais permettre d'afficher un bien comme vérifié »).
   /// Le nom est conservé pour ne pas casser les écrans existants.
@@ -304,7 +304,7 @@ class PropertyModel {
     return '🏠 $titre\n'
         '📍 ${adresse.full}\n'
         '💰 $montant FCFA\n'
-        '🔗 Disponible sur VelQix\n'
+        '🔗 Disponible sur TOIT D’OR\n'
         '$shareUrl';
   }
 

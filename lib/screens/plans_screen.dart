@@ -124,7 +124,7 @@ class _PlansScreenState extends State<PlansScreen> {
             style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
       ),
       body: ListView(children: [
-        // En-tête VelQix Premium : pleine largeur (dégradé bleu + médaille)
+        // En-tête TOIT D’OR Premium : pleine largeur (dégradé bleu + médaille)
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),

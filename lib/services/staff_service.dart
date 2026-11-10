@@ -1,7 +1,7 @@
 // lib/services/staff_service.dart
 // Démarcheurs et agents d'entretien.
 // ⚠️ Ces comptes NE peuvent PAS être créés via l'inscription publique :
-// ils sont créés uniquement par l'équipe VelQix ou l'administrateur
+// ils sont créés uniquement par l'équipe TOIT D’OR ou l'administrateur
 // (POST /admin/staff). Les utilisateurs, eux, ne font que les consulter
 // et les contacter (GET /users/staff).
 

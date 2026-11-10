@@ -189,7 +189,7 @@ class AvailabilityEventItem {
   static String channelLabel(String c) {
     switch (c) {
       case 'app':    return 'Application';
-      case 'admin':  return 'Équipe VelQix';
+      case 'admin':  return 'Équipe TOIT D’OR';
       case 'system': return 'Automatique';
       default:       return c;
     }

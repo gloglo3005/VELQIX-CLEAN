@@ -1,6 +1,6 @@
 // lib/services/platform_knowledge.dart
 //
-// Base de connaissances de VelqIA sur le FONCTIONNEMENT de la plateforme.
+// Base de connaissances de TOIT D’OR IA sur le FONCTIONNEMENT de la plateforme.
 //
 // Principes :
 //  - Aucune dépendance Flutter : logique pure, testable (voir
@@ -13,7 +13,7 @@
 //  - Les chiffres qui bougent (tarif Premium, zones desservies) ne sont pas
 //    écrits en dur : le widget les lit sur le serveur et les injecte.
 //  - Rien n'est promis au-delà de ce que dit le cahier des charges : Premium
-//    ne donne pas le statut « vérifié », et VelQix ne garantit pas les
+//    ne donne pas le statut « vérifié », et TOIT D’OR ne garantit pas les
 //    transactions entre utilisateurs.
 
 class GeoMention {
@@ -226,7 +226,7 @@ class PlatformKnowledge {
     'room', 'warehouse',
   ];
   static const _platformWords = [
-    'velqix', 'velqia', 'plateforme', 'platform', 'application', 'appli', 'app',
+    'toit d or', 'toit d or ia', 'plateforme', 'platform', 'application', 'appli', 'app',
     'site', 'service', 'services', 'vous', 'you', 'premium', 'abonnement',
     'compte', 'account', 'inscription', 'paiement', 'publier',
   ];
@@ -413,20 +413,20 @@ class PlatformKnowledge {
     switch (g.kind) {
       case 'togo':
         return fr
-            ? '📍 **$label** : VelQix est soumise au droit togolais (litiges : tribunaux de Lomé). Les prix s\'affichent en FCFA par défaut, et vous pouvez chercher par ville. Les services terrain (vérification, visites, entretien) ne sont disponibles que dans les zones desservies : elles sont confirmées au moment de la demande.$payNote'
-            : '📍 **$label**: VelQix is governed by Togolese law (disputes: Lomé courts). Prices show in FCFA by default and you can search by city. Field services (verification, visits, maintenance) are only available in served zones, confirmed when you make a request.$payNote';
+            ? '📍 **$label** : TOIT D’OR est soumise au droit togolais (litiges : tribunaux de Lomé). Les prix s\'affichent en FCFA par défaut, et vous pouvez chercher par ville. Les services terrain (vérification, visites, entretien) ne sont disponibles que dans les zones desservies : elles sont confirmées au moment de la demande.$payNote'
+            : '📍 **$label**: TOIT D’OR is governed by Togolese law (disputes: Lomé courts). Prices show in FCFA by default and you can search by city. Field services (verification, visits, maintenance) are only available in served zones, confirmed when you make a request.$payNote';
       case 'wa':
         return fr
-            ? '📍 **$label** : VelQix est conçue pour l\'Afrique de l\'Ouest. Choisissez votre pays à l\'inscription (Profil → Changer de pays ensuite), publiez et consultez des annonces, et affichez les prix dans votre devise. Je ne peux pas garantir qu\'il y a déjà des annonces dans votre ville : lancez une recherche pour le vérifier. Les services terrain dépendent des zones desservies.$payNote'
-            : '📍 **$label**: VelQix is built for West Africa. Pick your country when signing up (Profile → Change country later), post and browse listings, and show prices in your currency. I can\'t promise listings already exist in your city: run a search to check. Field services depend on served zones.$payNote';
+            ? '📍 **$label** : TOIT D’OR est conçue pour l\'Afrique de l\'Ouest. Choisissez votre pays à l\'inscription (Profil → Changer de pays ensuite), publiez et consultez des annonces, et affichez les prix dans votre devise. Je ne peux pas garantir qu\'il y a déjà des annonces dans votre ville : lancez une recherche pour le vérifier. Les services terrain dépendent des zones desservies.$payNote'
+            : '📍 **$label**: TOIT D’OR is built for West Africa. Pick your country when signing up (Profile → Change country later), post and browse listings, and show prices in your currency. I can\'t promise listings already exist in your city: run a search to check. Field services depend on served zones.$payNote';
       case 'africa':
         return fr
             ? '📍 **$label** : vous pouvez créer un compte en choisissant votre pays dans la liste d\'inscription. La plateforme est d\'abord pensée pour l\'Afrique de l\'Ouest : les annonces et les services terrain (vérification, visites, entretien) peuvent y être limités ou absents.$payNote'
             : '📍 **$label**: you can create an account by picking your country in the sign-up list. The platform is designed first for West Africa: listings and field services (verification, visits, maintenance) may be limited or unavailable there.$payNote';
       case 'world':
         return fr
-            ? '📍 **$label** : vous pouvez consulter VelQix et créer un compte depuis là-bas (diaspora comprise). Les biens et les services terrain concernent surtout l\'Afrique de l\'Ouest : pour un bien situé en Afrique, faites vérifier l\'annonce sur le terrain avant tout paiement.$payNote'
-            : '📍 **$label**: you can browse VelQix and create an account from there (diaspora included). Listings and field services mostly concern West Africa: for a property in Africa, have the listing verified on the ground before paying anything.$payNote';
+            ? '📍 **$label** : vous pouvez consulter TOIT D’OR et créer un compte depuis là-bas (diaspora comprise). Les biens et les services terrain concernent surtout l\'Afrique de l\'Ouest : pour un bien situé en Afrique, faites vérifier l\'annonce sur le terrain avant tout paiement.$payNote'
+            : '📍 **$label**: you can browse TOIT D’OR and create an account from there (diaspora included). Listings and field services mostly concern West Africa: for a property in Africa, have the listing verified on the ground before paying anything.$payNote';
       default:
         return fr
             ? '📍 **Depuis l\'étranger** : le compte et la consultation fonctionnent depuis n\'importe quel pays. Les biens et les services terrain concernent surtout l\'Afrique de l\'Ouest. Faites vérifier le bien sur le terrain avant tout paiement.$payNote'
@@ -455,14 +455,14 @@ class PlatformKnowledge {
       'trust',
       [
         'annonce verifiee', 'bien verifie', 'badge verifie', 'verifie sur le terrain',
-        'verifie par velqix', 'approuve par velqix', 'signifie verifie', 'que veut dire verifie',
+        'verifie par toit d or', 'approuve par toit d or', 'signifie verifie', 'que veut dire verifie',
       ],
-      ['verified badge', 'verified listing', 'field verified', 'what does verified mean', 'verified by velqix'],
+      ['verified badge', 'verified listing', 'field verified', 'what does verified mean', 'verified by toit d or'],
       '✅ **Annonce « vérifiée »**\n'
-          'Le badge signifie qu\'un démarcheur VelQix a contrôlé le bien sur le terrain : il existe, les photos correspondent et l\'annonceur est identifié. La date, l\'agent et le périmètre sont affichés sur la fiche.\n\n'
+          'Le badge signifie qu\'un démarcheur TOIT D’OR a contrôlé le bien sur le terrain : il existe, les photos correspondent et l\'annonceur est identifié. La date, l\'agent et le périmètre sont affichés sur la fiche.\n\n'
           '⚠️ Ce n\'est pas une preuve de propriété ni une garantie contre la fraude. Premium ou un paiement ne donne jamais ce badge. Une annonce sans badge a simplement été validée par la modération avant publication.',
       '✅ **« Verified » listing**\n'
-          'The badge means a VelQix field agent checked the property on site: it exists, the photos match and the advertiser is identified. The date, agent and scope are shown on the listing.\n\n'
+          'The badge means a TOIT D’OR field agent checked the property on site: it exists, the photos match and the advertiser is identified. The date, agent and scope are shown on the listing.\n\n'
           '⚠️ It is not proof of ownership nor a guarantee against fraud. Premium or any payment never gives this badge. A listing without a badge was simply approved by moderation before publication.',
       geo: true,
     ),
@@ -499,11 +499,11 @@ class PlatformKnowledge {
         'verification*', 'verify a property', 'verify a listing', 'guided visit',
         'accompanied visit', 'maintenance', 'field agent', 'request a service', 'paid services',
       ],
-      '🛠️ **Services VelQix (payants, à la prestation)**\n'
+      '🛠️ **Services TOIT D’OR (payants, à la prestation)**\n'
           '• **Vérification terrain** : un démarcheur contrôle que le bien existe, que les photos correspondent et que l\'annonceur est identifié. Prix fixe selon la zone.\n'
           '• **Visite accompagnée** et **entretien** : sur devis.\n\n'
           'Comment : bouton « Demander un service » sur la fiche d\'une annonce ; suivi dans Profil → Mes demandes de services ; paiement en ligne (FedaPay). Ces services sont séparés de l\'abonnement Premium. Le prix exact et la disponibilité dépendent de la zone.',
-      '🛠️ **VelQix services (paid per service)**\n'
+      '🛠️ **TOIT D’OR services (paid per service)**\n'
           '• **Field verification**: an agent checks the property exists, the photos match and the advertiser is identified. Fixed price depending on the zone.\n'
           '• **Guided visit** and **maintenance**: on quote.\n\n'
           'How: « Request a service » button on a listing; follow-up in Profile → My service requests; paid online (FedaPay). These services are separate from the Premium subscription. Exact price and availability depend on the zone.',
@@ -535,17 +535,17 @@ class PlatformKnowledge {
         'est ce fiable', 'est ce sur', 'faire confiance', 'garantie*', 'assurance',
         'securite de la plateforme',
       ],
-      ['scam*', 'fraud*', 'is it safe', 'is velqix safe', 'is it reliable', 'can i trust', 'guarantee*', 'insurance'],
-      '🛡️ **Rester en sécurité sur VelQix**\n'
-          'Ce que VelQix fait : modération de chaque annonce avant publication, avis et notes, signalement des annonces, vérification terrain en option.\n'
+      ['scam*', 'fraud*', 'is it safe', 'is toit d or safe', 'is it reliable', 'can i trust', 'guarantee*', 'insurance'],
+      '🛡️ **Rester en sécurité sur TOIT D’OR**\n'
+          'Ce que TOIT D’OR fait : modération de chaque annonce avant publication, avis et notes, signalement des annonces, vérification terrain en option.\n'
           'Ce qu\'elle ne fait pas : elle ne garantit pas les transactions entre utilisateurs et ne propose pas d\'assurance sur les paiements.\n\n'
           'Bons réflexes :\n'
           '• ne payez rien avant d\'avoir vu le bien ou fait vérifier l\'annonce\n'
           '• méfiez-vous des prix anormalement bas et des demandes d\'avance urgentes\n'
           '• gardez vos échanges dans l\'app\n'
           '• signalez toute annonce suspecte',
-      '🛡️ **Staying safe on VelQix**\n'
-          'What VelQix does: moderation of every listing before publication, reviews and ratings, listing reports, optional field verification.\n'
+      '🛡️ **Staying safe on TOIT D’OR**\n'
+          'What TOIT D’OR does: moderation of every listing before publication, reviews and ratings, listing reports, optional field verification.\n'
           'What it does not do: it does not guarantee transactions between users and offers no payment insurance.\n\n'
           'Good habits:\n'
           '• pay nothing before seeing the property or having the listing verified\n'
@@ -575,17 +575,17 @@ class PlatformKnowledge {
     _Topic(
       'support',
       [
-        'contacter le support', 'contacter velqix', 'joindre velqix', 'service client',
+        'contacter le support', 'contacter toit d or', 'joindre toit d or', 'service client',
         'probleme technique', 'besoin d aide', 'aide urgente', 'whatsapp', 'assistance',
-        'numero de velqix', 'email de velqix',
+        'numero de toit d or', 'email de toit d or',
       ],
-      ['customer service', 'customer support', 'technical problem', 'need help', 'contact support', 'contact velqix', 'assistance'],
-      '🆘 **Support VelQix**\n'
+      ['customer service', 'customer support', 'technical problem', 'need help', 'contact support', 'contact toit d or', 'assistance'],
+      '🆘 **Support TOIT D’OR**\n'
           'Profil → Support & Aide.\n'
           '• Email : smartinnovators294@gmail.com\n'
           '• WhatsApp : +228 99 42 40 87 (pour les urgences)\n'
           'Réponse en général sous 24 à 48 h. Pour une annonce douteuse, utilisez plutôt « Signaler l\'annonce ».',
-      '🆘 **VelQix support**\n'
+      '🆘 **TOIT D’OR support**\n'
           'Profile → Support & Help.\n'
           '• Email: smartinnovators294@gmail.com\n'
           '• WhatsApp: +228 99 42 40 87 (for urgent matters)\n'
@@ -637,10 +637,10 @@ class PlatformKnowledge {
       ],
       ['payment*', 'pay', 'fedapay', 'mobile money', 'payment methods', 'bank card', 'refund*'],
       '💳 **Paiements**\n'
-          'Dans l\'application, les paiements en ligne (FedaPay, page sécurisée hébergée) servent à régler Premium et les services VelQix (vérification, visite, entretien). Le montant est toujours calculé par le serveur.\n\n'
+          'Dans l\'application, les paiements en ligne (FedaPay, page sécurisée hébergée) servent à régler Premium et les services TOIT D’OR (vérification, visite, entretien). Le montant est toujours calculé par le serveur.\n\n'
           'Le prix d\'un bien ou le loyer se convient avec l\'annonceur : ne payez jamais avant d\'avoir vu le bien ou fait vérifier l\'annonce.',
       '💳 **Payments**\n'
-          'In the app, online payments (FedaPay, hosted secure page) are used for Premium and VelQix services (verification, visit, maintenance). The amount is always computed by the server.\n\n'
+          'In the app, online payments (FedaPay, hosted secure page) are used for Premium and TOIT D’OR services (verification, visit, maintenance). The amount is always computed by the server.\n\n'
           'A property price or rent is agreed with the advertiser: never pay before seeing the property or having the listing verified.',
       geo: true,
     ),
@@ -652,16 +652,16 @@ class PlatformKnowledge {
         'quels profils', 'quels roles', 'role*',
       ],
       ['business account', 'company account', 'become an owner', 'become an agent', 'roles', 'account types'],
-      '👤 **Profils sur VelQix**\n'
+      '👤 **Profils sur TOIT D’OR**\n'
           '• **Client** : cherche, contacte, met en favori.\n'
           '• **Propriétaire** : publie et gère des annonces.\n'
           '• **Entreprise / agence** : espace dédié et formules agence (écran Plans).\n'
-          '• **Démarcheur** (VelQix Agent) et **Agent d\'entretien** (VelQix Services) : réalisent les missions payantes ; ces deux rôles sont attribués par l\'administration, pas à l\'inscription.',
-      '👤 **Profiles on VelQix**\n'
+          '• **Démarcheur** (TOIT D’OR Agent) et **Agent d\'entretien** (TOIT D’OR Services) : réalisent les missions payantes ; ces deux rôles sont attribués par l\'administration, pas à l\'inscription.',
+      '👤 **Profiles on TOIT D’OR**\n'
           '• **Client**: searches, contacts, saves favorites.\n'
           '• **Owner**: posts and manages listings.\n'
           '• **Company / agency**: dedicated space and agency plans (Plans screen).\n'
-          '• **Field agent** (VelQix Agent) and **Maintenance agent** (VelQix Services): carry out the paid missions; these two roles are assigned by the administration, not at sign-up.',
+          '• **Field agent** (TOIT D’OR Agent) and **Maintenance agent** (TOIT D’OR Services): carry out the paid missions; these two roles are assigned by the administration, not at sign-up.',
       geo: true,
     ),
     _Topic(
@@ -671,12 +671,12 @@ class PlatformKnowledge {
         'pays couverts', 'dans mon pays', 'mon pays', 'zones desservies', 'zone de couverture',
       ],
       ['which countries', 'what countries', 'which cities', 'my country', 'countries available', 'served zones', 'coverage'],
-      '🌍 **Où VelQix est-il disponible ?**\n'
+      '🌍 **Où TOIT D’OR est-il disponible ?**\n'
           '• Conçue pour l\'Afrique de l\'Ouest, avec le Togo comme point de départ (FCFA par défaut).\n'
           '• L\'inscription est possible depuis de nombreux pays : choisissez le vôtre dans la liste.\n'
           '• Les annonces visibles dépendent des biens publiés dans chaque ville : cherchez par ville ou par pays.\n'
           '• Les services terrain (vérification, visites, entretien) ne sont proposés que dans les zones desservies.',
-      '🌍 **Where is VelQix available?**\n'
+      '🌍 **Where is TOIT D’OR available?**\n'
           '• Built for West Africa, with Togo as the starting point (FCFA by default).\n'
           '• Sign-up is possible from many countries: pick yours in the list.\n'
           '• Visible listings depend on the properties posted in each city: search by city or country.\n'
@@ -742,16 +742,16 @@ class PlatformKnowledge {
     _Topic(
       'about',
       [
-        'c est quoi velqix', 'qu est ce que velqix', 'a quoi sert velqix', 'presentation de velqix',
-        'qui est velqix', 'comment ca marche', 'comment fonctionne velqix', 'comment utiliser velqix',
-        'que peut faire velqia', 'qui es tu',
+        'c est quoi toit d or', 'qu est ce que toit d or', 'a quoi sert toit d or', 'presentation de toit d or',
+        'qui est toit d or', 'comment ca marche', 'comment fonctionne toit d or', 'comment utiliser toit d or',
+        'que peut faire toit d or ia', 'qui es tu',
       ],
       [
-        'what is velqix', 'about velqix', 'how does velqix work', 'how does it work',
-        'how to use velqix', 'who are you',
+        'what is toit d or', 'about toit d or', 'how does toit d or work', 'how does it work',
+        'how to use toit d or', 'who are you',
       ],
-      '🏠 **VelQix** est une plateforme de location et de vente de biens (immobilier) pour l\'Afrique de l\'Ouest : annonces modérées, messagerie et appels intégrés, avis et notes, vérification terrain en option, abonnement Premium.\n\nDites-moi ce que vous cherchez (type de bien, ville, budget), ou posez-moi une question sur le fonctionnement de la plateforme.',
-      '🏠 **VelQix** is a rental and sales platform (real estate) for West Africa: moderated listings, built-in messaging and calls, reviews and ratings, optional field verification, Premium subscription.\n\nTell me what you are looking for (property type, city, budget), or ask me anything about how the platform works.',
+      '🏠 **TOIT D’OR** est une plateforme de location et de vente de biens (immobilier) pour l\'Afrique de l\'Ouest : annonces modérées, messagerie et appels intégrés, avis et notes, vérification terrain en option, abonnement Premium.\n\nDites-moi ce que vous cherchez (type de bien, ville, budget), ou posez-moi une question sur le fonctionnement de la plateforme.',
+      '🏠 **TOIT D’OR** is a rental and sales platform (real estate) for West Africa: moderated listings, built-in messaging and calls, reviews and ratings, optional field verification, Premium subscription.\n\nTell me what you are looking for (property type, city, budget), or ask me anything about how the platform works.',
       geo: true,
     ),
   ];

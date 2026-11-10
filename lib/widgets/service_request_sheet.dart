@@ -31,7 +31,7 @@ Future<void> showServiceRequestSheet(
   );
 }
 
-/// Boutons « Services VelQix » affichés sur la page d'une annonce.
+/// Boutons « Services TOIT D’OR » affichés sur la page d'une annonce.
 class ServiceActionsRow extends StatelessWidget {
   final PropertyModel property;
   const ServiceActionsRow({super.key, required this.property});
@@ -218,7 +218,7 @@ class _ServiceSheetState extends State<_ServiceSheet> {
             price == null
                 ? 'Récupération du tarif…'
                 : price.onQuote
-                ? "VelQix vous envoie un devis selon la surface, l'état du bien et la durée. Vous êtes libre de l'accepter ou non."
+                ? "TOIT D’OR vous envoie un devis selon la surface, l'état du bien et la durée. Vous êtes libre de l'accepter ou non."
                 : 'Payé une seule fois, pour cette prestation. Indépendant de votre abonnement.',
             style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
           ),
@@ -310,7 +310,7 @@ class _ServiceSheetState extends State<_ServiceSheet> {
       const SizedBox(height: 6),
       Text(
         m.isPayable
-            ? "Réglez pour lancer la mission : un agent VelQix sera assigné dès réception du paiement."
+            ? "Réglez pour lancer la mission : un agent TOIT D’OR sera assigné dès réception du paiement."
             : m.status == MissionStatus.devis
                 ? 'Un devis vous sera envoyé. Retrouvez-le dans « Mes demandes de services » pour l\'accepter et payer.'
                 : 'Suivez l\'avancement dans « Mes demandes de services ».',

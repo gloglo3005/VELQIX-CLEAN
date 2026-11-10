@@ -62,7 +62,7 @@ class _SharedPropertyScreenState extends State<SharedPropertyScreen> {
               ElevatedButton(
                 onPressed: _goToApp,
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-                child: Text('Découvrir VelQix',
+                child: Text('Découvrir TOIT D’OR',
                     style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
               ),
             ]),
@@ -88,7 +88,7 @@ class _SharedPropertyScreenState extends State<SharedPropertyScreen> {
                   const Icon(Icons.home_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('Voir toutes les annonces sur VelQix',
+                    child: Text('Voir toutes les annonces sur TOIT D’OR',
                         style: GoogleFonts.poppins(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
                   ),
                   const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),

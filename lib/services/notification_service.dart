@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// NOTIFICATION SERVICE — VelQix
+// NOTIFICATION SERVICE — TOIT D’OR
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/foundation.dart';
@@ -163,7 +163,7 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         'velqix_messages',
-        'VELQIX Messages et appels',
+        'TOIT D’OR Messages et appels',
         description: 'Messages, appels et missions',
         importance: Importance.max,
       ),
@@ -172,8 +172,8 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
         'velqix_notifications',
-        'VELQIX Notifications',
-        description: 'Notifications VELQIX',
+        'TOIT D’OR Notifications',
+        description: 'Notifications TOIT D’OR',
         importance: Importance.high,
       ),
     );
@@ -241,8 +241,8 @@ class NotificationService {
     const androidDetails =
         AndroidNotificationDetails(
       'velqix_notifications',
-      'VELQIX Notifications',
-      channelDescription: 'Notifications VELQIX',
+      'TOIT D’OR Notifications',
+      channelDescription: 'Notifications TOIT D’OR',
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,

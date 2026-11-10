@@ -176,8 +176,8 @@ class AvailabilityActionsRow extends StatelessWidget {
     );
     if (sent == true) {
       _toast(context,
-          _t("Signalement envoyé. L'équipe VelQix l'examinera ; un signalement isolé n'entraîne pas de sanction automatique.",
-              'Report sent. The VelQix team will review it; a single report does not trigger an automatic penalty.'));
+          _t("Signalement envoyé. L'équipe TOIT D’OR l'examinera ; un signalement isolé n'entraîne pas de sanction automatique.",
+              'Report sent. The TOIT D’OR team will review it; a single report does not trigger an automatic penalty.'));
     }
   }
 }

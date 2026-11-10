@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// API SERVICE — Couche réseau centrale VelQix
+// API SERVICE — Couche réseau centrale TOIT D’OR
 // ═══════════════════════════════════════════════════════════════════
 
 import 'dart:async';

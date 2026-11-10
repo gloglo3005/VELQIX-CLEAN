@@ -1,5 +1,5 @@
 // lib/screens/pro_space_screen.dart
-// Velqix Pro : agents immobiliers, démarcheurs indépendants, commerciaux, vendeurs.
+// TOIT D’OR Pro : agents immobiliers, démarcheurs indépendants, commerciaux, vendeurs.
 // Accessible aux indépendants qui travaillent seuls : pas d'outils d'entreprise imposés.
 
 import 'package:flutter/material.dart';
@@ -43,7 +43,7 @@ class _ProSpaceScreenState extends State<ProSpaceScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Velqix Pro', style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
+        title: Text('TOIT D’OR Pro', style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
         bottom: TabBar(
           controller: _tab,
           labelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),

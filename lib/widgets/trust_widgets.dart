@@ -1,6 +1,6 @@
 // lib/widgets/trust_widgets.dart
 // Signes de confiance d'une annonce :
-//  • SIGNE « VÉRIFIÉ » : un agent VelQix s'est rendu sur place. Seul ce signe est affiché.
+//  • SIGNE « VÉRIFIÉ » : un agent TOIT D’OR s'est rendu sur place. Seul ce signe est affiché.
 //  • AUCUN SIGNE : l'annonce n'a pas (encore) été vérifiée — on n'affiche RIEN
 //    (aucun message « non vérifiée »).
 //  • BADGE PREMIUM : affiché pour les annonceurs abonnés Premium.
@@ -22,16 +22,16 @@ const Color _approvedColor = Color(0xFF10B981);
 const Color _premiumColor = Color(0xFFD4A017);
 
 // ─── Textes ──────────────────────────────────────────────────────────────────
-String trustApprovedTitle() => _t('Vérifiée par VelQix', 'Verified by VelQix');
+String trustApprovedTitle() => _t('Vérifiée par TOIT D’OR', 'Verified by TOIT D’OR');
 
 String trustApprovedRule() => _t(
-    "Un agent VelQix s'est rendu sur place à la date indiquée et a contrôlé que le bien existe et correspond aux photos et à la description. Cela ne prouve pas la propriété et ne garantit pas que le bien reste disponible.",
-    'A VelQix agent visited the site on the date shown and checked that the property exists and matches the photos and description. This is not proof of ownership and does not guarantee the property stays available.');
+    "Un agent TOIT D’OR s'est rendu sur place à la date indiquée et a contrôlé que le bien existe et correspond aux photos et à la description. Cela ne prouve pas la propriété et ne garantit pas que le bien reste disponible.",
+    'A TOIT D’OR agent visited the site on the date shown and checked that the property exists and matches the photos and description. This is not proof of ownership and does not guarantee the property stays available.');
 
 /// Explication du signe (message de l'app : signe = vérifié, pas de signe = non vérifié).
 String trustSignMeaning() => _t(
-    'Si une annonce porte ce signe, elle a été vérifiée par VelQix. Sans ce signe, elle ne l\'a pas été.',
-    'If a listing shows this sign, it has been verified by VelQix. Without the sign, it has not.');
+    'Si une annonce porte ce signe, elle a été vérifiée par TOIT D’OR. Sans ce signe, elle ne l\'a pas été.',
+    'If a listing shows this sign, it has been verified by TOIT D’OR. Without the sign, it has not.');
 
 /// Limites des garanties (cahier des charges §14.3) — affichées sans détour.
 String trustLimitsNote() => _t(
@@ -46,8 +46,8 @@ String _approvalReason(PropertyModel p) {
         ? ''
         : ' (${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year})';
     return who.isEmpty
-        ? _t("Vérifié sur le terrain par un agent VelQix$date.",
-            'Verified on site by a VelQix agent$date.')
+        ? _t("Vérifié sur le terrain par un agent TOIT D’OR$date.",
+            'Verified on site by a TOIT D’OR agent$date.')
         : _t("Vérifié sur le terrain par l'agent $who$date.",
             'Verified on site by agent $who$date.');
   }
@@ -71,7 +71,7 @@ Widget _sign({required IconData icon, required Color color, required double size
   );
 }
 
-/// Signes affichés sur une annonce : Premium (annonceur abonné) et/ou Vérifié (agent VelQix).
+/// Signes affichés sur une annonce : Premium (annonceur abonné) et/ou Vérifié (agent TOIT D’OR).
 /// Annonce sans signe → ne rend RIEN.
 class TrustBadge extends StatelessWidget {
   final PropertyModel property;
@@ -154,8 +154,8 @@ Future<void> showTrustExplainer(BuildContext context, {PropertyModel? property})
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                    _t('Annonceur Premium. Le statut Premium ne remplace pas la vérification VelQix.',
-                        'Premium advertiser. Premium status does not replace VelQix verification.'),
+                    _t('Annonceur Premium. Le statut Premium ne remplace pas la vérification TOIT D’OR.',
+                        'Premium advertiser. Premium status does not replace TOIT D’OR verification.'),
                     style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary, height: 1.4)),
               ),
             ]),

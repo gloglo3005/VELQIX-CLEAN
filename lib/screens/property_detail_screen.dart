@@ -616,7 +616,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   const SizedBox(height: 10),
                   AvailabilityActionsRow(property: p),
 
-                  // Signes : Vérifié VelQix / Premium (rien si aucun)
+                  // Signes : Vérifié TOIT D’OR / Premium (rien si aucun)
                   if (TrustInfoCard.hasSign(p)) ...[
                     const SizedBox(height: 14),
                     TrustInfoCard(property: p),

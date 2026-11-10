@@ -359,7 +359,7 @@ class _SplashScreenState extends State<_SplashScreen> {
 }
 
 /// ===============================================================
-/// VELQIX APP
+/// TOIT D’OR APP
 /// ===============================================================
 
 class VelQixApp extends StatefulWidget {
@@ -420,7 +420,7 @@ class _VelQixAppState extends State<VelQixApp> {
           valueListenable: localeNotifier,
           builder: (context, locale, child) {
             return MaterialApp(
-              title: 'VELQIX',
+              title: 'TOIT D’OR',
               debugShowCheckedModeBanner: false,
               navigatorKey: navigatorKey,
               theme: AppTheme.lightTheme,

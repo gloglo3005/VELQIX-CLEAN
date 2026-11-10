@@ -81,7 +81,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
       _snack(err, error: true);
       return;
     }
-    _snack('Espace Velqix Pro activé.');
+    _snack('Espace TOIT D’OR Pro activé.');
     await _load();
   }
 
@@ -111,7 +111,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
       _snack(err, error: true);
       return;
     }
-    _snack('Espace Velqix Business créé : vous en êtes l\'administrateur.');
+    _snack('Espace TOIT D’OR Business créé : vous en êtes l\'administrateur.');
     await _load();
   }
 
@@ -184,7 +184,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
                       ),
                       _card(
                         icon: Icons.badge_rounded,
-                        title: 'Velqix Pro',
+                        title: 'TOIT D’OR Pro',
                         subtitle: s.pro
                             ? 'Annonces, prospects, statistiques, abonnement.'
                             : 'Pour les agents, démarcheurs indépendants, commerciaux et vendeurs. Gratuit.',
@@ -199,7 +199,7 @@ class _SpacesScreenState extends State<SpacesScreen> {
                       ),
                       _card(
                         icon: Icons.business_rounded,
-                        title: 'Velqix Business',
+                        title: 'TOIT D’OR Business',
                         subtitle: s.business
                             ? '${s.businessName ?? 'Entreprise'} · ${BusinessRole.label(s.businessRole ?? BusinessRole.admin)}'
                             : 'Pour les entreprises et agences : portefeuille, équipe, rapports.',

@@ -1,6 +1,6 @@
 // lib/screens/agent_workspace_screen.dart
 // Espace de travail des comptes opérationnels :
-//   • Démarcheur VelQix  : vérifications terrain et visites accompagnées
+//   • Démarcheur TOIT D’OR  : vérifications terrain et visites accompagnées
 //   • Agent d'entretien  : nettoyage / entretien
 // Parcours : voir la mission ET sa rémunération → accepter → se rendre sur place
 // → envoyer les preuves → suivre la validation et le paiement.
@@ -242,7 +242,7 @@ class _AgentWorkspaceScreenState extends State<AgentWorkspaceScreen>
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_isCleaner ? 'Velqix Services' : 'Velqix Agent',
+          Text(_isCleaner ? 'TOIT D’OR Services' : 'TOIT D’OR Agent',
               style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
           Text(me.fullName, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400)),
         ]),
@@ -910,7 +910,7 @@ class _AgentSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final me = AuthService.instance.currentUserOrEmpty;
-    final roleLabel = me.role == 'agent_entretien' ? "Agent d'entretien" : 'Démarcheur VelQix';
+    final roleLabel = me.role == 'agent_entretien' ? "Agent d'entretien" : 'Démarcheur TOIT D’OR';
     return Scaffold(
       appBar: AppBar(title: Text('Paramètres', style: GoogleFonts.poppins(fontWeight: FontWeight.w700))),
       body: Align(

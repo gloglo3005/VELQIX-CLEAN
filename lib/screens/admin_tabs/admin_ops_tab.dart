@@ -402,7 +402,7 @@ const _priceFields = [
   _PriceField('verificationTransport', 'Transport estimé', 'F', 'Vérification terrain', '500'),
   _PriceField('supportCost', 'Traitement et support (par mission)', 'F', 'Vérification terrain', '300'),
   _PriceField('paymentFeePercent', 'Frais de paiement (hypothèse)', '%', 'Commissions et frais', '3'),
-  _PriceField('servicesFeePercent', 'Frais de service VelQix (devis)', '%', 'Commissions et frais'),
+  _PriceField('servicesFeePercent', 'Frais de service TOIT D’OR (devis)', '%', 'Commissions et frais'),
   _PriceField('premiumDiscountPercent', 'Remise Premium sur les prestations', '%', 'Commissions et frais', '10'),
   _PriceField('premiumMonthly', 'Premium : 1 mois', 'F', 'Abonnements', '2000'),
   _PriceField('premium6Months', 'Premium : 6 mois (prépayé)', 'F', 'Abonnements', '10000'),
@@ -498,7 +498,7 @@ class _PricingFormState extends State<_PricingForm> {
                 style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text(
-              'Contribution VelQix : ${formatFcfa(contribution)} (${pct.toStringAsFixed(0)} % du prix)\n'
+              'Contribution TOIT D’OR : ${formatFcfa(contribution)} (${pct.toStringAsFixed(0)} % du prix)\n'
               'avant frais fixes, impôts et autres charges. Frais de paiement estimés : ${formatFcfa(fee)}.',
               style: GoogleFonts.poppins(fontSize: 12),
             ),

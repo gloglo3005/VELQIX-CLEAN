@@ -193,7 +193,7 @@ class PushNotificationService {
     final title =
         notification?.title ??
         data['title']?.toString() ??
-        'VELQIX';
+        'TOIT D’OR';
 
     final body =
         notification?.body ??

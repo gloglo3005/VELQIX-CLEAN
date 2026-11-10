@@ -1,7 +1,7 @@
 // lib/widgets/video_brand_background.dart
-// Vidéo en boucle (muette) en arrière-plan, avec un voile bleu VelQix pour que
+// Vidéo en boucle (muette) en arrière-plan, avec un voile bleu TOIT D’OR pour que
 // le texte blanc reste lisible. Tant que la vidéo n'est pas prête (ou si elle
-// ne peut pas être lue), un fond bleu dégradé VelQix reste affiché.
+// ne peut pas être lue), un fond bleu dégradé TOIT D’OR reste affiché.
 
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';

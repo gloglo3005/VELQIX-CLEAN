@@ -1,4 +1,4 @@
-# VelQix — application Flutter
+# TOIT D’OR — application Flutter
 
 Plateforme de location et de vente de biens (immobilier, véhicules, mobilier) pour
 l'Afrique de l'Ouest. Application Flutter (Android, web, Windows) connectée à
@@ -14,7 +14,7 @@ l'API `velqix-backend`.
 - **Appels audio et vidéo** (Agora) avec notification d'appel entrant (FCM).
 - **Premium** : abonnement payé via FedaPay. Le statut Premium vient toujours du
   serveur (webhook FedaPay), jamais d'une valeur locale.
-- **VelqIA** : assistant IA (Gemini côté serveur) pour trouver un bien et
+- **TOIT D’OR IA** : assistant IA (Gemini côté serveur) pour trouver un bien et
   répondre aux questions sur la plateforme. Bouton flottant présent sur les
   onglets principaux, saisie vocale à la demande.
 - **Tableau de bord admin** : modération des annonces, utilisateurs, statistiques.
@@ -23,7 +23,7 @@ l'API `velqix-backend`.
 ## Prérequis
 
 - Flutter stable (SDK Dart `>=3.0.0 <4.0.0`)
-- Un backend VelQix joignable (par défaut `https://velqix.onrender.com/api`)
+- Un backend TOIT D’OR joignable (par défaut `https://velqix.onrender.com/api`)
 
 ## Lancer en développement
 
@@ -89,7 +89,7 @@ flutter analyze
 lib/
   main.dart            point d'entrée, thème, langue, devise, Firebase
   models/              modèles de données
-  screens/             écrans (MainShell héberge les onglets et VelqIA)
+  screens/             écrans (MainShell héberge les onglets et TOIT D’OR IA)
   services/            API, auth, chat, notifications, traductions, tarif Premium
   theme/               thème clair / sombre
   widgets/             composants partagés et assistant IA

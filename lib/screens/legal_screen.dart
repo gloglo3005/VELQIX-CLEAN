@@ -101,21 +101,21 @@ class LegalScreen extends StatelessWidget {
   // ── CONDITIONS D'UTILISATION ───────────────────────────────────────────────
   List<Widget> _termsContent(BuildContext context) => [
     _Section(context, '1. Acceptation des conditions',
-        'En accédant à VelQix et en l\'utilisant, vous acceptez d\'être lié par ces conditions d\'utilisation. Si vous n\'acceptez pas ces conditions, veuillez ne pas utiliser notre plateforme.'),
+        'En accédant à TOIT D’OR et en l\'utilisant, vous acceptez d\'être lié par ces conditions d\'utilisation. Si vous n\'acceptez pas ces conditions, veuillez ne pas utiliser notre plateforme.'),
     _Section(context, '2. Utilisation licite',
-        'Vous vous engagez à utiliser VelQix uniquement à des fins licites. Il est interdit de publier du contenu frauduleux, trompeur, illégal ou portant atteinte aux droits de tiers.'),
+        'Vous vous engagez à utiliser TOIT D’OR uniquement à des fins licites. Il est interdit de publier du contenu frauduleux, trompeur, illégal ou portant atteinte aux droits de tiers.'),
     _Section(context, '3. Responsabilité des annonces',
-        'Chaque utilisateur est seul responsable de l\'exactitude et de la légalité des informations publiées dans ses annonces. VelQix n\'assume aucune responsabilité pour les contenus publiés par les utilisateurs.'),
+        'Chaque utilisateur est seul responsable de l\'exactitude et de la légalité des informations publiées dans ses annonces. TOIT D’OR n\'assume aucune responsabilité pour les contenus publiés par les utilisateurs.'),
     _Section(context, '4. Transactions sécurisées',
-        'VelQix facilite la mise en relation entre propriétaires et locataires/acheteurs. Nous encourageons l\'utilisation de nos outils de paiement intégrés pour sécuriser vos transactions. Toute transaction hors plateforme se fait sous votre entière responsabilité.'),
+        'TOIT D’OR facilite la mise en relation entre propriétaires et locataires/acheteurs. Nous encourageons l\'utilisation de nos outils de paiement intégrés pour sécuriser vos transactions. Toute transaction hors plateforme se fait sous votre entière responsabilité.'),
     _Section(context, '5. Compte utilisateur',
-        'Vous êtes responsable de la confidentialité de vos identifiants de connexion. Vous devez nous signaler immédiatement toute utilisation non autorisée de votre compte. VelQix ne peut être tenu responsable des pertes résultant d\'un accès non autorisé à votre compte.'),
+        'Vous êtes responsable de la confidentialité de vos identifiants de connexion. Vous devez nous signaler immédiatement toute utilisation non autorisée de votre compte. TOIT D’OR ne peut être tenu responsable des pertes résultant d\'un accès non autorisé à votre compte.'),
     _Section(context, '6. Propriété intellectuelle',
-        'Le contenu de VelQix (logos, interface, textes, etc.) est protégé par des droits de propriété intellectuelle. Toute reproduction ou utilisation non autorisée est interdite.'),
+        'Le contenu de TOIT D’OR (logos, interface, textes, etc.) est protégé par des droits de propriété intellectuelle. Toute reproduction ou utilisation non autorisée est interdite.'),
     _Section(context, '7. Suspension et résiliation',
-        'VelQix se réserve le droit de suspendre ou supprimer tout compte qui viole ces conditions, sans préavis et sans indemnité. Nous pouvons également modifier ou interrompre nos services à tout moment.'),
+        'TOIT D’OR se réserve le droit de suspendre ou supprimer tout compte qui viole ces conditions, sans préavis et sans indemnité. Nous pouvons également modifier ou interrompre nos services à tout moment.'),
     _Section(context, '8. Modifications',
-        'VelQix peut modifier ces conditions à tout moment. Les modifications entrent en vigueur dès leur publication. En continuant à utiliser la plateforme, vous acceptez les nouvelles conditions.'),
+        'TOIT D’OR peut modifier ces conditions à tout moment. Les modifications entrent en vigueur dès leur publication. En continuant à utiliser la plateforme, vous acceptez les nouvelles conditions.'),
     _Section(context, '9. Droit applicable',
         'Ces conditions sont régies par le droit en vigueur au Togo. Tout litige sera soumis aux tribunaux compétents de Lomé.'),
   ];
@@ -123,7 +123,7 @@ class LegalScreen extends StatelessWidget {
   // ── POLITIQUE DE CONFIDENTIALITÉ ──────────────────────────────────────────
   List<Widget> _privacyContent(BuildContext context) => [
     _Section(context, '1. Données collectées',
-        'VelQix collecte les informations suivantes :\n• Informations d\'identité : nom, prénom, email, téléphone\n• Données de localisation (si autorisées)\n• Photos et documents partagés dans vos annonces\n• Données de navigation et d\'utilisation de l\'application\n• Informations de paiement (traitées par FedaPay — nous ne stockons pas vos données bancaires)'),
+        'TOIT D’OR collecte les informations suivantes :\n• Informations d\'identité : nom, prénom, email, téléphone\n• Données de localisation (si autorisées)\n• Photos et documents partagés dans vos annonces\n• Données de navigation et d\'utilisation de l\'application\n• Informations de paiement (traitées par FedaPay — nous ne stockons pas vos données bancaires)'),
     _Section(context, '2. Utilisation des données',
         'Vos données sont utilisées pour :\n• Créer et gérer votre compte\n• Afficher et gérer vos annonces\n• Faciliter la communication entre utilisateurs\n• Traiter vos paiements\n• Améliorer nos services\n• Vous envoyer des notifications pertinentes'),
     _Section(context, '3. Protection des données',
@@ -135,7 +135,7 @@ class LegalScreen extends StatelessWidget {
     _Section(context, '6. Vos droits',
         'Vous disposez des droits suivants sur vos données :\n• Droit d\'accès et de rectification\n• Droit à l\'effacement (droit à l\'oubli)\n• Droit à la portabilité des données\n• Droit d\'opposition au traitement\n\nPour exercer ces droits, contactez-nous à support@velqix.tg'),
     _Section(context, '7. Cookies',
-        'VelQix utilise des cookies et technologies similaires pour améliorer votre expérience. Vous pouvez les désactiver dans les paramètres de votre navigateur, mais cela peut affecter le fonctionnement de certaines fonctionnalités.'),
+        'TOIT D’OR utilise des cookies et technologies similaires pour améliorer votre expérience. Vous pouvez les désactiver dans les paramètres de votre navigateur, mais cela peut affecter le fonctionnement de certaines fonctionnalités.'),
     _Section(context, '8. Modifications',
         'Nous pouvons mettre à jour cette politique à tout moment. Nous vous notifierons des changements significatifs par email ou via l\'application.'),
   ];

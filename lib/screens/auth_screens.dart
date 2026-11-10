@@ -28,7 +28,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       color: AppTheme.primary,
       image: 'assets/images/hero_slide_1.jpg', // terrain
       title: 'Louez ou vendez\nen toute simplicité',
-      subtitle: 'VelQix vous connecte propriétaires et acheteurs/locataires pour des transactions sécurisées.',
+      subtitle: 'TOIT D’OR vous connecte propriétaires et acheteurs/locataires pour des transactions sécurisées.',
       bgColor: const Color(0xFFE7F1EC),
     ),
     _OnboardPage(
@@ -956,13 +956,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 300,
                 child: SingleChildScrollView(
                   child: Text(
-                    'En utilisant VelQix, vous acceptez les conditions suivantes :\n\n'
+                    'En utilisant TOIT D’OR, vous acceptez les conditions suivantes :\n\n'
                     '1. Utilisation licite\nVous vous engagez à utiliser la plateforme uniquement à des fins licites et à ne pas publier de contenu frauduleux ou trompeur.\n\n'
                     '2. Responsabilité des annonces\nChaque utilisateur est responsable de l\'exactitude des informations publiées dans ses annonces.\n\n'
                     '3. Confidentialité\nVos données personnelles sont protégées conformément à notre politique de confidentialité. Nous ne revendons jamais vos données à des tiers.\n\n'
-                    '4. Transactions sécurisées\nVelQix facilite la mise en relation entre propriétaires et locataires/acheteurs, mais ne garantit pas les transactions effectuées hors plateforme.\n\n'
+                    '4. Transactions sécurisées\nTOIT D’OR facilite la mise en relation entre propriétaires et locataires/acheteurs, mais ne garantit pas les transactions effectuées hors plateforme.\n\n'
                     '5. Compte utilisateur\nVous êtes responsable de la confidentialité de vos identifiants. Signalez toute utilisation non autorisée de votre compte.\n\n'
-                    '6. Résiliation\nVelQix se réserve le droit de suspendre ou supprimer tout compte qui viole ces conditions.\n\n'
+                    '6. Résiliation\nTOIT D’OR se réserve le droit de suspendre ou supprimer tout compte qui viole ces conditions.\n\n'
                     'Pour toute question, contactez-nous à support@velqix.tg',
                     style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.6),
                   ),
@@ -1164,7 +1164,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               if (_accountType == 'business') ...[
                 AppTextField(strongBorder: true, 
                   label: "Nom de l\'entreprise *",
-                  hint: "Ex: VelQix Sarl",
+                  hint: "Ex: TOIT D’OR Sarl",
                   controller: _nomEntrepriseCtrl,
                   prefixIcon: Icons.business_outlined,
                   validator: (v) => (_accountType == 'business' && (v == null || v.trim().isEmpty))
@@ -1432,7 +1432,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ),
                             ),
-                            const TextSpan(text: ' d\'VelQix *'),
+                            const TextSpan(text: ' d\'TOIT D’OR *'),
                           ],
                         ),
                       ),

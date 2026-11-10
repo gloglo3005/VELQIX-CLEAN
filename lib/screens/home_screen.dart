@@ -328,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
       content: Row(children: [
         const Icon(Icons.mic_off_rounded, color: Colors.white, size: 18),
         const SizedBox(width: 8),
-        Text('Utilisez le micro dans VelqIA 🤖',
+        Text('Utilisez le micro dans TOIT D’OR IA 🤖',
             style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
       ]),
       backgroundColor: AppTheme.primary,
@@ -685,14 +685,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final headerRow = Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Logo Velqix
+                        // Logo TOIT D’OR
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.asset(
                             'assets/images/logo.png',
                             height: MediaQuery.of(context).size.width >= 900 ? 64 : 52,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Text('VELQIX',
+                            errorBuilder: (_, __, ___) => Text('TOIT D’OR',
                                 style: GoogleFonts.poppins(
                                     fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.primary)),
                           ),

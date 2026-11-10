@@ -1,5 +1,5 @@
 // lib/screens/business_space_screen.dart
-// Velqix Business : entreprises et agences.
+// TOIT D’OR Business : entreprises et agences.
 // Vue d'ensemble · Portefeuille · Équipe (rôles) · Rapports.
 // Les onglets et actions affichés dépendent du rôle du collaborateur ; le serveur
 // vérifie les mêmes droits sur chaque route.
@@ -56,7 +56,7 @@ class _BusinessSpaceScreenState extends State<BusinessSpaceScreen> with SingleTi
     return Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Velqix Business', style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
+          Text('TOIT D’OR Business', style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700)),
           Text('${widget.companyName} · ${BusinessRole.label(widget.role)}',
               style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400)),
         ]),
@@ -196,7 +196,7 @@ class _PortfolioState extends State<_Portfolio> {
                             Icon(verified ? Icons.verified_rounded : Icons.info_outline_rounded,
                                 size: 14, color: verified ? AppTheme.success : AppTheme.warning),
                             const SizedBox(width: 4),
-                            Text(verified ? 'Approuvée VelQix' : 'Non approuvée',
+                            Text(verified ? 'Approuvée TOIT D’OR' : 'Non approuvée',
                                 style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600)),
                           ]),
                         ]),
@@ -242,7 +242,7 @@ class _TeamState extends State<_Team> {
             TextField(
               controller: email,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'E-mail du compte VelQix'),
+              decoration: const InputDecoration(labelText: 'E-mail du compte TOIT D’OR'),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(

@@ -420,11 +420,11 @@ class _ListingManageCardState extends State<_ListingManageCard> {
         border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Obtenir le signe « Vérifié par VelQix »',
+        Text('Obtenir le signe « Vérifié par TOIT D’OR »',
             style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
         const SizedBox(height: 2),
         Text(
-          'Pour rassurer les demandeurs : faites vérifier le bien sur place par un agent VelQix (service payant). Le statut « vérifiée sur le terrain » ne s\'obtient que par cette vérification.',
+          'Pour rassurer les demandeurs : faites vérifier le bien sur place par un agent TOIT D’OR (service payant). Le statut « vérifiée sur le terrain » ne s\'obtient que par cette vérification.',
           style: GoogleFonts.poppins(fontSize: 11, color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 8),

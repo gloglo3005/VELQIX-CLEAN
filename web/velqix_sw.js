@@ -1,4 +1,4 @@
-/* VelQix — service worker : l'application s'ouvre SANS connexion internet.
+/* TOIT D’OR — service worker : l'application s'ouvre SANS connexion internet.
  *
  * • Coquille de l'app (HTML, JS, CanvasKit, polices, icônes) : mise en cache au
  *   premier chargement, puis servie depuis le cache.

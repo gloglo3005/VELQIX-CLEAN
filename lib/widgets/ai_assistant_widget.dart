@@ -67,10 +67,14 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   late AnimationController _micPulseAnim;
   final stt.SpeechToText _speech = stt.SpeechToText();
 
-  // ── Mode vocal : VelqIA répond À VOIX HAUTE ───────────────────────────
+  // ── Mode vocal : TOIT D’OR IA répond À VOIX HAUTE ───────────────────────────
   // _voiceMode  = conversation mains libres (j'écoute, je réponds, j'écoute…).
   // _speakNext  = la prochaine question vient du micro : on y répond oralement.
   final FlutterTts _tts = FlutterTts();
+  // File d'attente de la lecture : la réponse est lue PHRASE PAR PHRASE.
+  // Les moteurs vocaux (Chrome ~15 s, Android ~4000 car.) coupent les longs blocs.
+  List<String> _ttsQueue = [];
+  DateTime _ttsLastSpeakAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _ttsReady = false;
   bool _voiceMode = false;
   bool _speakNext = false;
@@ -93,7 +97,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     {'label': '🏢 Appartement meublé', 'query': 'Appartement meublé'},
     {'label': '🌍 Bien au Togo', 'query': 'Bien disponible au Togo'},
     {'label': '💎 Premium', 'query': 'Que comprend Premium ?'},
-    {'label': '🌐 Dans quels pays ?', 'query': 'VelQix est disponible dans quels pays ?'},
+    {'label': '🌐 Dans quels pays ?', 'query': 'TOIT D’OR est disponible dans quels pays ?'},
   ];
 
   @override
@@ -230,7 +234,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       _speech.stop();
     }
     _voiceMode = false;
-    _tts.stop();
+    _ttsQueue = []; _tts.stop();
     super.dispose();
   }
 
@@ -406,7 +410,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   }
 
   // ─── Base de connaissances de la plateforme ──────────────────────────────
-  // Réponses précises aux questions sur le fonctionnement de VelQix, adaptées
+  // Réponses précises aux questions sur le fonctionnement de TOIT D’OR, adaptées
   // au lieu cité (Lomé, une ville du Togo, un autre pays, un continent,
   // « l'étranger »…) — voir lib/services/platform_knowledge.dart.
   // Les chiffres qui bougent (tarif Premium, zones desservies) sont lus sur
@@ -848,7 +852,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('VelQIA',
+                Text('TOIT D’OR IA',
                     style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1315,7 +1319,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 Expanded(
                   child: Text(
                     _isSpeaking
-                        ? (_uiLang == 'en' ? 'VelqIA is speaking…' : 'VelqIA vous répond…')
+                        ? (_uiLang == 'en' ? 'TOIT D’OR IA is speaking…' : 'TOIT D’OR IA vous répond…')
                         : (_uiLang == 'en' ? 'Voice mode on: thinking…' : 'Mode vocal activé…'),
                     style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary),
                   ),
@@ -1493,7 +1497,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 ),
               ),
           const SizedBox(width: 8),
-          // Bouton « mode vocal » : je parle, VelqIA répond à voix haute, puis je réécoute
+          // Bouton « mode vocal » : je parle, TOIT D’OR IA répond à voix haute, puis je réécoute
           GestureDetector(
             onTap: _toggleVoiceMode,
             child: Container(
@@ -1646,7 +1650,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     );
   }
 
-  // ─── Mode vocal : VelqIA parle ───────────────────────────────────────────
+  // ─── Mode vocal : TOIT D’OR IA parle ───────────────────────────────────────────
   Future<void> _initTts() async {
     if (_ttsReady) return;
     _ttsReady = true;
@@ -1654,6 +1658,13 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       // Fin de la lecture : en mode vocal, on repart à l'écoute (conversation mains libres).
       _tts.setCompletionHandler(() {
         if (!mounted) return;
+        // Événement tardif de la lecture qu'on vient d'interrompre : on l'ignore.
+        if (DateTime.now().difference(_ttsLastSpeakAt).inMilliseconds < 250) return;
+        // Il reste des phrases à lire : on enchaîne.
+        if (_ttsQueue.isNotEmpty) {
+          _speakNextChunk();
+          return;
+        }
         setState(() => _isSpeaking = false);
         if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
       });
@@ -1662,6 +1673,11 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       });
       _tts.setErrorHandler((_) {
         if (!mounted) return;
+        // Une phrase a échoué : on passe à la suivante plutôt que de couper toute la réponse.
+        if (_ttsQueue.isNotEmpty) {
+          _speakNextChunk();
+          return;
+        }
         setState(() => _isSpeaking = false);
         if (_voiceMode) Future.delayed(const Duration(milliseconds: 350), _resumeListening);
       });
@@ -1681,13 +1697,70 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
         .replaceAll(RegExp(r'(\.\s*){2,}'), '. ')
         .replaceAll(RegExp(r'\s{2,}'), ' ')
         .trim();
-    // Réponse longue : on lit le début (jusqu'à une fin de phrase) et le texte reste à l'écran.
-    const maxChars = 520;
-    if (t.length > maxChars) {
-      final cut = t.lastIndexOf('. ', maxChars);
-      t = cut > 120 ? t.substring(0, cut + 1) : t.substring(0, maxChars);
-    }
     return t;
+  }
+
+  /// Découpe le texte en morceaux courts (≤ ~150 caractères) aux fins de phrases.
+  List<String> _splitForSpeech(String text) {
+    const maxLen = 150;
+    final sentences = text
+        .split(RegExp(r'(?<=[.!?…;:])\s+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty);
+    final chunks = <String>[];
+    var cur = '';
+    void flush() {
+      if (cur.trim().isNotEmpty) chunks.add(cur.trim());
+      cur = '';
+    }
+    for (final sen in sentences) {
+      if (sen.length > maxLen) {
+        // phrase très longue : on coupe aux virgules / espaces
+        flush();
+        var rest = sen;
+        while (rest.length > maxLen) {
+          var cut = rest.lastIndexOf(RegExp(r'[,،]\s'), maxLen);
+          if (cut < 40) cut = rest.lastIndexOf(' ', maxLen);
+          if (cut < 40) cut = maxLen;
+          chunks.add(rest.substring(0, cut + 1).trim());
+          rest = rest.substring(cut + 1).trim();
+        }
+        cur = rest;
+        continue;
+      }
+      if (cur.isEmpty) {
+        cur = sen;
+      } else if (cur.length + 1 + sen.length <= maxLen) {
+        cur = '$cur $sen';
+      } else {
+        flush();
+        cur = sen;
+      }
+    }
+    flush();
+    return chunks;
+  }
+
+  /// Arrête la lecture ET vide la file (sinon la phrase suivante repartirait).
+  Future<void> _stopTts() async {
+    _ttsQueue = [];
+    try { await _tts.stop(); } catch (_) {}
+  }
+
+  Future<void> _speakNextChunk() async {
+    if (_ttsQueue.isEmpty) return;
+    final chunk = _ttsQueue.removeAt(0);
+    _ttsLastSpeakAt = DateTime.now();
+    try {
+      await _tts.speak(chunk);
+    } catch (_) {
+      if (_ttsQueue.isNotEmpty) {
+        _speakNextChunk();
+      } else if (mounted) {
+        setState(() => _isSpeaking = false);
+        if (_voiceMode) Future.delayed(const Duration(milliseconds: 300), _resumeListening);
+      }
+    }
   }
 
   Future<void> _speak(String text) async {
@@ -1698,18 +1771,22 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }
     try {
       await _initTts();
-      await _tts.stop();
+      await _stopTts();
       await _tts.setLanguage(_speechLocale().replaceAll('_', '-'));
       if (mounted) setState(() => _isSpeaking = true);
-      await _tts.speak(clean);
+      // La réponse est lue EN ENTIER, phrase par phrase.
+      _ttsQueue = _splitForSpeech(clean);
+      _ttsLastSpeakAt = DateTime.now();
+      await _speakNextChunk();
     } catch (_) {
+      _ttsQueue = [];
       if (mounted) setState(() => _isSpeaking = false);
       // la voix a échoué : en mode vocal on continue quand même à écouter
       if (_voiceMode) Future.delayed(const Duration(milliseconds: 300), _resumeListening);
     }
   }
 
-  /// Reprend l'écoute en mode vocal (jamais pendant que VelqIA parle ou réfléchit).
+  /// Reprend l'écoute en mode vocal (jamais pendant que TOIT D’OR IA parle ou réfléchit).
   void _resumeListening() {
     if (!mounted || !_voiceMode || !_isOpen) return;
     if (_isListening || _isSpeaking || _isTyping) return;
@@ -1726,7 +1803,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
       _voiceMode = true;
       _emptyListens = 0;
     });
-    _tts.stop();
+    _ttsQueue = []; _tts.stop();
     if (!_isListening) _toggleVoice();
   }
 
@@ -1735,7 +1812,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     _voiceMode = false;
     _speakNext = false;
     _emptyListens = 0;
-    _tts.stop();
+    _ttsQueue = []; _tts.stop();
     if (_isListening) {
       _cancelListening();
       _micPulseAnim.stop();

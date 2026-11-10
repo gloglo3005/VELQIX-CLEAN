@@ -1,6 +1,6 @@
 {
-    "name": "VelQix",
-    "short_name": "VelQix",
+    "name": "TOIT D’OR",
+    "short_name": "TOIT D’OR",
     "id": "/",
     "start_url": ".",
     "scope": "/",
@@ -8,7 +8,7 @@
     "display": "standalone",
     "background_color": "#F7F3EB",
     "theme_color": "#0F5132",
-    "description": "VelQix - Plateforme de location et vente de biens",
+    "description": "TOIT D’OR - Plateforme de location et vente de biens",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

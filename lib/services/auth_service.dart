@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// AUTH SERVICE — VelQix
+// AUTH SERVICE — TOIT D’OR
 // ═══════════════════════════════════════════════════════════════════
 
 import 'package:flutter/foundation.dart' show kIsWeb;

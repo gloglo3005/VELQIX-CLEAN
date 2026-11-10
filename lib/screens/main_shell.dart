@@ -367,7 +367,7 @@ class _MainShellState
       children: [
         _buildMainContent(context),
 
-        /// Assistant IA VelqIA : bouton flottant + panneau de chat.
+        /// Assistant IA TOIT D’OR IA : bouton flottant + panneau de chat.
         /// Il ne capte que les touches sur le bouton et le panneau :
         /// le reste de l'écran reste utilisable.
         const AiAssistantWidget(),
