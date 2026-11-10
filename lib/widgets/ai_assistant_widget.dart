@@ -67,7 +67,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
   late AnimationController _micPulseAnim;
   final stt.SpeechToText _speech = stt.SpeechToText();
 
-  // ── Mode vocal : TOIT D’OR IA répond À VOIX HAUTE ───────────────────────────
+  // ── Mode vocal : Assistante TOIT D’OR répond À VOIX HAUTE ───────────────────────────
   // _voiceMode  = conversation mains libres (j'écoute, je réponds, j'écoute…).
   // _speakNext  = la prochaine question vient du micro : on y répond oralement.
   final FlutterTts _tts = FlutterTts();
@@ -854,7 +854,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('TOIT D’OR IA',
+                Text('Assistante TOIT D’OR',
                     style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1321,7 +1321,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 Expanded(
                   child: Text(
                     _isSpeaking
-                        ? (_uiLang == 'en' ? 'TOIT D’OR IA is speaking…' : 'TOIT D’OR IA vous répond…')
+                        ? (_uiLang == 'en' ? 'The TOIT D’OR assistant is speaking…' : 'L’assistante TOIT D’OR vous répond…')
                         : (_uiLang == 'en' ? 'Voice mode on: thinking…' : 'Mode vocal activé…'),
                     style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textPrimary),
                   ),
@@ -1499,7 +1499,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
                 ),
               ),
           const SizedBox(width: 8),
-          // Bouton « mode vocal » : je parle, TOIT D’OR IA répond à voix haute, puis je réécoute
+          // Bouton « mode vocal » : je parle, Assistante TOIT D’OR répond à voix haute, puis je réécoute
           GestureDetector(
             onTap: _toggleVoiceMode,
             child: Container(
@@ -1652,7 +1652,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     );
   }
 
-  // ─── Mode vocal : TOIT D’OR IA parle ───────────────────────────────────────────
+  // ─── Mode vocal : Assistante TOIT D’OR parle ───────────────────────────────────────────
   Future<void> _initTts() async {
     if (_ttsReady) return;
     _ttsReady = true;
@@ -1811,7 +1811,7 @@ class _AiAssistantWidgetState extends State<AiAssistantWidget>
     }
   }
 
-  /// Reprend l'écoute en mode vocal (jamais pendant que TOIT D’OR IA parle ou réfléchit).
+  /// Reprend l'écoute en mode vocal (jamais pendant que Assistante TOIT D’OR parle ou réfléchit).
   void _resumeListening() {
     if (!mounted || !_voiceMode || !_isOpen) return;
     if (_isListening || _isSpeaking || _isTyping) return;

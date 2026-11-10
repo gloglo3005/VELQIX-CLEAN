@@ -328,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
       content: Row(children: [
         const Icon(Icons.mic_off_rounded, color: Colors.white, size: 18),
         const SizedBox(width: 8),
-        Text('Utilisez le micro dans TOIT D’OR IA 🤖',
+        Text('Utilisez le micro avec l’assistante TOIT D’OR 🤖',
             style: GoogleFonts.poppins(color: Colors.white, fontSize: 13)),
       ]),
       backgroundColor: AppTheme.primary,

@@ -14,7 +14,7 @@ l'API `velqix-backend`.
 - **Appels audio et vidéo** (Agora) avec notification d'appel entrant (FCM).
 - **Premium** : abonnement payé via FedaPay. Le statut Premium vient toujours du
   serveur (webhook FedaPay), jamais d'une valeur locale.
-- **TOIT D’OR IA** : assistant IA (Gemini côté serveur) pour trouver un bien et
+- **Assistante TOIT D’OR** : assistant IA (Gemini côté serveur) pour trouver un bien et
   répondre aux questions sur la plateforme. Bouton flottant présent sur les
   onglets principaux, saisie vocale à la demande.
 - **Tableau de bord admin** : modération des annonces, utilisateurs, statistiques.
@@ -89,7 +89,7 @@ flutter analyze
 lib/
   main.dart            point d'entrée, thème, langue, devise, Firebase
   models/              modèles de données
-  screens/             écrans (MainShell héberge les onglets et TOIT D’OR IA)
+  screens/             écrans (MainShell héberge les onglets et Assistante TOIT D’OR)
   services/            API, auth, chat, notifications, traductions, tarif Premium
   theme/               thème clair / sombre
   widgets/             composants partagés et assistant IA

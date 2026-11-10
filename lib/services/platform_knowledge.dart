@@ -1,6 +1,6 @@
 // lib/services/platform_knowledge.dart
 //
-// Base de connaissances de TOIT D’OR IA sur le FONCTIONNEMENT de la plateforme.
+// Base de connaissances de Assistante TOIT D’OR sur le FONCTIONNEMENT de la plateforme.
 //
 // Principes :
 //  - Aucune dépendance Flutter : logique pure, testable (voir
@@ -226,7 +226,7 @@ class PlatformKnowledge {
     'room', 'warehouse',
   ];
   static const _platformWords = [
-    'toit d or', 'toit d or ia', 'plateforme', 'platform', 'application', 'appli', 'app',
+    'toit d or', 'assistante toit d or', 'plateforme', 'platform', 'application', 'appli', 'app',
     'site', 'service', 'services', 'vous', 'you', 'premium', 'abonnement',
     'compte', 'account', 'inscription', 'paiement', 'publier',
   ];
@@ -744,7 +744,7 @@ class PlatformKnowledge {
       [
         'c est quoi toit d or', 'qu est ce que toit d or', 'a quoi sert toit d or', 'presentation de toit d or',
         'qui est toit d or', 'comment ca marche', 'comment fonctionne toit d or', 'comment utiliser toit d or',
-        'que peut faire toit d or ia', 'qui es tu',
+        'que peut faire l assistante toit d or', 'qui es tu',
       ],
       [
         'what is toit d or', 'about toit d or', 'how does toit d or work', 'how does it work',
