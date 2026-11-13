@@ -967,7 +967,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     '4. Transactions sécurisées\nTOIT D’OR facilite la mise en relation entre propriétaires et locataires/acheteurs, mais ne garantit pas les transactions effectuées hors plateforme.\n\n'
                     '5. Compte utilisateur\nVous êtes responsable de la confidentialité de vos identifiants. Signalez toute utilisation non autorisée de votre compte.\n\n'
                     '6. Résiliation\nTOIT D’OR se réserve le droit de suspendre ou supprimer tout compte qui viole ces conditions.\n\n'
-                    'Pour toute question, contactez-nous à support@velqix.tg',
+                    'Pour toute question, contactez-nous à support@toitdor.com',
                     style: GoogleFonts.poppins(fontSize: 13, color: AppTheme.textSecondary, height: 1.6),
                   ),
                 ),

@@ -60,7 +60,7 @@ class SupportScreen extends StatelessWidget {
       valueListenable: localeNotifier,
       builder: (context, _, __) {
     final contacts = [
-      (Icons.email_outlined,              'Email',      'smartinnovators294@gmail.com', const Color(0xFF4285F4), Icons.open_in_new_rounded),
+      (Icons.email_outlined,              'Email',      'support@toitdor.com', const Color(0xFF4285F4), Icons.open_in_new_rounded),
       (Icons.phone_outlined, tr('support_phone_label'), '+228 99 42 40 87', const Color(0xFF34A853), Icons.call_rounded),
       (Icons.chat_bubble_outline_rounded, 'WhatsApp',   '+228 99 42 40 87',    const Color(0xFF25D366), Icons.open_in_new_rounded),
     ];

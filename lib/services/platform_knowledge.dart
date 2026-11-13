@@ -582,12 +582,12 @@ class PlatformKnowledge {
       ['customer service', 'customer support', 'technical problem', 'need help', 'contact support', 'contact toit d or', 'assistance'],
       '🆘 **Support TOIT D’OR**\n'
           'Profil → Support & Aide.\n'
-          '• Email : smartinnovators294@gmail.com\n'
+          '• Email : support@toitdor.com\n'
           '• WhatsApp : +228 99 42 40 87 (pour les urgences)\n'
           'Réponse en général sous 24 à 48 h. Pour une annonce douteuse, utilisez plutôt « Signaler l\'annonce ».',
       '🆘 **TOIT D’OR support**\n'
           'Profile → Support & Help.\n'
-          '• Email: smartinnovators294@gmail.com\n'
+          '• Email: support@toitdor.com\n'
           '• WhatsApp: +228 99 42 40 87 (for urgent matters)\n'
           'Usually answered within 24 to 48 h. For a doubtful listing, use « Report the listing » instead.',
       geo: true,
